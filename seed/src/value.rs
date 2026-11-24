@@ -75,9 +75,11 @@ pub enum Value {
     /// symbol is a tagged string, made from text by `to_sym` (ADR 0071) or
     /// written literally, and dies with its last reference.
     Symbol(String),
-    /// Immutable named record; fields stay in definition order.
+    /// Immutable named record; fields stay in definition order. Shared,
+    /// as an array's elements are: a struct never changes, so handing one
+    /// on is one more holder and not a copy of everything inside it.
     Struct {
-        fields: Vec<(String, Value)>,
+        fields: std::rc::Rc<Vec<(String, Value)>>,
         name: String,
     },
     /// A type as a value (ADR 0074): what `value.class` answers, holding the

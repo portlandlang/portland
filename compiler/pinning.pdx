@@ -360,7 +360,7 @@ def made_fields(calls)
     made = type_at(call, 1)
     type_at(made, 1).each do |handed|
       key = field_key(made[0], handed[0])
-      found = fields.find { it[0] == key }
+      found = fields.assoc(key)
       if found.nil?
         fields << [key, [type_at(handed, 1)]]
       else
@@ -421,7 +421,7 @@ def pin_block_call(node, walk, answers, names)
   arguments = native_argument_types(node.arguments, scope)
   answer = native_block_answer(node, arguments, scope)
   leaves = native_block_leaves?(node.block, scope)
-  yielded = answers.find { it[0] == yields_key(node.name, arguments) }
+  yielded = answers.assoc(yields_key(node.name, arguments))
   mutable inner = current.bindings
   mutable index = 0
   node.block.parameters.each do |parameter|
@@ -685,7 +685,7 @@ def reads_name?(body, name)
 end
 
 def rebound(bindings, name, type)
-  found = bindings.find { it[0] == name }
+  found = bindings.assoc(name)
   return [[name, type]] + bindings if found.nil?
   return bindings if type_at(found, 1) == type
   return bindings if type == EMPTY_ARRAY && (type_at(found, 1) in ["array", *])
@@ -901,7 +901,7 @@ end
 
 # Whether a def mentions none of the names that changed (#537).
 def unaffected?(name, changed, mentions)
-  found = mentions.find { it[0] == name }
+  found = mentions.assoc(name)
   return false if found.nil?
   mentioned = type_at(found, 1)
   changed.none? { mentioned.include?(it) }

@@ -1,7 +1,34 @@
 //! A tree-walking interpreter — the reference semantics for the Stage 0
 //! subset before any codegen exists. Crude in the seed: type errors panic.
 
-use std::collections::HashMap;
+/// The interpreter's tables, each keyed by a name. They hash with FNV-1a
+/// where the standard table hashes with SipHash: a program's names are
+/// short and are looked up on every read and every call, and nothing
+/// here is keyed by text an adversary picked, which is what SipHash is
+/// the guard against.
+type HashMap<K, V> = std::collections::HashMap<K, V, std::hash::BuildHasherDefault<NameHasher>>;
+
+/// FNV-1a over the bytes of a name.
+pub struct NameHasher(u64);
+
+impl Default for NameHasher {
+    fn default() -> Self {
+        NameHasher(0xcbf2_9ce4_8422_2325)
+    }
+}
+
+impl std::hash::Hasher for NameHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            self.0 ^= u64::from(*byte);
+            self.0 = self.0.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+}
 
 use crate::ast::{
     BinaryOperator, Block, Expression, GuardAction, LogicalOperator, Parameter, Pattern, Program,
@@ -3033,7 +3060,7 @@ impl<W: std::io::Write> Interpreter<W> {
             .unwrap_or_else(|| panic!("cannot load '{name}' — the core has no such file"));
         self.loaded.insert(key);
         let program = parser::parse(&crate::lexer::normalize_line_endings(source.to_string()));
-        let mut scope = HashMap::new();
+        let mut scope = HashMap::default();
         std::mem::swap(&mut self.variables, &mut scope);
         self.run_body(&program.statements);
         std::mem::swap(&mut self.variables, &mut scope);
@@ -3044,7 +3071,7 @@ impl<W: std::io::Write> Interpreter<W> {
         Self {
             loading_core: false,
             core_names: std::collections::HashSet::new(),
-            core_types: HashMap::new(),
+            core_types: HashMap::default(),
             arguments: Vec::new(),
             call_depth: 0,
             home_depth: 0,
@@ -3055,7 +3082,7 @@ impl<W: std::io::Write> Interpreter<W> {
             nesting: 0,
             loaded: std::collections::HashSet::new(),
             expression_depth: 0,
-            methods: HashMap::new(),
+            methods: HashMap::default(),
             module_path: Vec::new(),
             constants: builtin_constants(),
             redefinable: false,
@@ -3067,10 +3094,10 @@ impl<W: std::io::Write> Interpreter<W> {
             current_block: None,
             collected: Vec::new(),
             random: crate::random::Mt::new(crate::random::entropy_seed()),
-            enums: HashMap::new(),
-            structs: HashMap::new(),
-            traits: HashMap::new(),
-            variables: HashMap::new(),
+            enums: HashMap::default(),
+            structs: HashMap::default(),
+            traits: HashMap::default(),
+            variables: HashMap::default(),
             fields_target: None,
             pending_fields: None,
         }
@@ -3334,17 +3361,15 @@ impl<W: std::io::Write> Interpreter<W> {
         name: &str,
         table: &'a HashMap<String, T>,
     ) -> Option<(String, &'a T)> {
-        for depth in (0..=home.len()).rev() {
-            let candidate = if depth == 0 {
-                name.to_string()
-            } else {
-                format!("{}::{name}", home[..depth].join("::"))
-            };
+        for depth in (1..=home.len()).rev() {
+            let candidate = format!("{}::{name}", home[..depth].join("::"));
             if let Some(found) = table.get(&candidate) {
                 return Some((candidate, found));
             }
         }
-        None
+        // The top level is asked by the name as it is: no String is made
+        // for a name that is not there, which is most of the asking.
+        table.get(name).map(|found| (name.to_string(), found))
     }
 
     /// A method reachable from where we stand — own namespace first, then
@@ -3569,7 +3594,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // module as its home, so bare names resolve from where the trait
             // was written.
             Statement::TraitDefinition { methods, name } => {
-                let mut method_table = HashMap::new();
+                let mut method_table = HashMap::default();
                 for method in methods {
                     let Statement::MethodDefinition {
                         body,
@@ -3608,7 +3633,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 nested,
                 type_functions,
             } => {
-                let mut method_table = HashMap::new();
+                let mut method_table = HashMap::default();
                 for method in methods {
                     let Statement::MethodDefinition {
                         body,
@@ -3633,7 +3658,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 // dispatch and bare-name resolution need no new rungs — and
                 // every collision is a refusal naming both owners, never
                 // Ruby's silent last-include-wins.
-                let mut origin: HashMap<String, String> = HashMap::new();
+                let mut origin: HashMap<String, String> = HashMap::default();
                 let mut comparable = false;
                 let mut enumerable = false;
                 // In the core, a struct named for a builtin type is that
@@ -5108,7 +5133,7 @@ impl<W: std::io::Write> Interpreter<W> {
         let Value::Struct { fields, .. } = receiver else {
             return None;
         };
-        let fields: Vec<(String, Value)> = fields.clone();
+        let fields: Vec<(String, Value)> = fields.as_ref().clone();
         let answer = match (name, block) {
             ("to_h", None) => Value::hash(
                 fields
@@ -5711,7 +5736,7 @@ impl<W: std::io::Write> Interpreter<W> {
             })
             .collect();
         Value::Struct {
-            fields: ordered,
+            fields: std::rc::Rc::new(ordered),
             name: struct_name.to_string(),
         }
     }
@@ -6075,18 +6100,18 @@ impl<W: std::io::Write> Interpreter<W> {
                 }
             }
             let updated = fields
-                .into_iter()
+                .iter()
                 .map(|(field, value)| {
                     let value = keyword_arguments
                         .iter()
-                        .find(|(label, _)| *label == field)
+                        .find(|(label, _)| label == field)
                         .map(|(_, new_value)| new_value.clone())
-                        .unwrap_or(value);
-                    (field, value)
+                        .unwrap_or_else(|| value.clone());
+                    (field.clone(), value)
                 })
                 .collect();
             return Some(Value::Struct {
-                fields: updated,
+                fields: std::rc::Rc::new(updated),
                 name,
             });
         }
@@ -9093,7 +9118,7 @@ impl<W: std::io::Write> Interpreter<W> {
         // locals do not cross, in either direction. Its defs, structs,
         // enums, traits, and constants live in their own tables and cross
         // on their own.
-        let mut scope = HashMap::new();
+        let mut scope = HashMap::default();
         std::mem::swap(&mut self.variables, &mut scope);
         self.run_body(&program.statements);
         std::mem::swap(&mut self.variables, &mut scope);
@@ -10042,10 +10067,10 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         // A fresh scope: bare locals do not cross; namespace constants are
         // in `constants`, which every frame reads (ADR 0021).
-        let mut scope = HashMap::new();
+        let mut scope = HashMap::default();
         std::mem::swap(&mut self.variables, &mut scope);
         let field_names: Vec<String> = if let Value::Struct { fields, .. } = &receiver {
-            for (field, value) in fields {
+            for (field, value) in fields.iter() {
                 self.variables.insert(
                     field.clone(),
                     Binding {
@@ -10205,7 +10230,7 @@ impl<W: std::io::Write> Interpreter<W> {
         // Formatting is a function, not the `%` operator (ADR 0067): Ruby's
         // directives whole, the keyword arguments its `%<name>d` and
         // `%{name}` references. `sprintf` is the twin.
-        if self.lookup_method(name).is_none() && (name == "format" || name == "sprintf") {
+        if (name == "format" || name == "sprintf") && self.lookup_method(name).is_none() {
             let template = match arguments.first() {
                 Some(Value::String(template)) => template,
                 Some(other) => panic!(
@@ -10230,10 +10255,10 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         // `printf` is `format` then `print`, so it reads `format`'s keywords
         // (#264); every other builtin function takes none.
-        if self.lookup_method(name).is_none() && !keyword_arguments.is_empty() && name != "printf" {
+        if !keyword_arguments.is_empty() && name != "printf" && self.lookup_method(name).is_none() {
             panic!("{name} takes no keyword arguments");
         }
-        if self.lookup_method(name).is_none() && name == "puts" {
+        if name == "puts" && self.lookup_method(name).is_none() {
             // Like Ruby: bare puts() prints a blank line.
             if arguments.is_empty() {
                 self.emit_standard_output("\n")
@@ -10263,7 +10288,7 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         // `print` is `puts` without the newline, answering nil (#185); the
         // nil and failure refusals are the same ones.
-        if self.lookup_method(name).is_none() && name == "print" {
+        if name == "print" && self.lookup_method(name).is_none() {
             for argument in &arguments {
                 if matches!(argument, Value::Nil) {
                     panic!(
@@ -10282,7 +10307,7 @@ impl<W: std::io::Write> Interpreter<W> {
             return Some(Value::Nil);
         }
         // `printf` is `format` then `print` (#185).
-        if self.lookup_method(name).is_none() && name == "printf" {
+        if name == "printf" && self.lookup_method(name).is_none() {
             let template = match arguments.first() {
                 Some(Value::String(template)) => template,
                 Some(other) => panic!(
@@ -10309,7 +10334,7 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         // `warn` is `puts` to standard error, answering nil (#185): each
         // argument on its own line, an array's elements each on theirs.
-        if self.lookup_method(name).is_none() && name == "warn" {
+        if name == "warn" && self.lookup_method(name).is_none() {
             let mut lines: Vec<Value> = Vec::new();
             for argument in arguments {
                 match argument {
@@ -10334,7 +10359,7 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             return Some(Value::Nil);
         }
-        if self.lookup_method(name).is_none() && name == "some" {
+        if name == "some" && self.lookup_method(name).is_none() {
             let mut arguments = arguments;
             match arguments.len() {
                 1 => return Some(Value::present(arguments.remove(0))),
@@ -10343,14 +10368,14 @@ impl<W: std::io::Write> Interpreter<W> {
         }
         // `failure(reason)` — absence with a reason (ADR 0027). Always a
         // real box, where `some` boxes only nil and other boxes.
-        if self.lookup_method(name).is_none() && name == "failure" {
+        if name == "failure" && self.lookup_method(name).is_none() {
             let mut arguments = arguments;
             match arguments.len() {
                 1 => return Some(Value::Failure(Box::new(arguments.remove(0)))),
                 other => panic!("failure takes one argument, got {other}"),
             }
         }
-        if self.lookup_method(name).is_none() && name == "panic" {
+        if name == "panic" && self.lookup_method(name).is_none() {
             // The only crash is one you typed (ADR 0010).
             match arguments.as_slice() {
                 [Value::String(message)] => panic!("{message}"),
@@ -10358,7 +10383,7 @@ impl<W: std::io::Write> Interpreter<W> {
             }
         }
         // `pp` is `p` here: there is no pretty-printer to defer to (#185).
-        if self.lookup_method(name).is_none() && (name == "p" || name == "pp") {
+        if (name == "p" || name == "pp") && self.lookup_method(name).is_none() {
             for argument in &arguments {
                 let inspected = self.inspected(argument);
                 self.emit_standard_output(&format!("{inspected}\n"))
@@ -10377,7 +10402,7 @@ impl<W: std::io::Write> Interpreter<W> {
         // a string, for composing into messages. A function rather than a
         // method so absence needs no ceremony — nil is its most important
         // input, and nil has no methods (ADR 0006).
-        if self.lookup_method(name).is_none() && name == "inspect" {
+        if name == "inspect" && self.lookup_method(name).is_none() {
             match arguments.as_slice() {
                 [argument] => return Some(Value::String(self.inspected(argument))),
                 other => panic!("inspect takes one argument, got {}", other.len()),
@@ -10457,7 +10482,7 @@ impl<W: std::io::Write> Interpreter<W> {
         // Bind left to right so a default can reference earlier parameters.
         // Bare locals do not cross; namespace constants are in
         // `constants`, which every frame reads (ADR 0021).
-        let mut scope = HashMap::new();
+        let mut scope = HashMap::default();
         std::mem::swap(&mut self.variables, &mut scope);
         let mut supplied = arguments.into_iter();
         for parameter in &method.parameters {
