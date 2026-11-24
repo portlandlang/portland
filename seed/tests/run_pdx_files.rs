@@ -2269,6 +2269,19 @@ fn a_bare_call_hands_its_block_to_the_receivers_own_method() {
     );
 }
 
+/// `format`'s `%s` and `%p` render a struct by its own `to_s` and
+/// `inspect` (#372), as `puts` and `p` do (#282) and as Ruby's do: alone,
+/// inside a collection, by name, and under a width. `printf` is `format`
+/// printed.
+#[test]
+fn format_renders_a_struct_by_its_own_to_s_and_inspect() {
+    assert_both_print(
+        "format_struct_renderings.pdx",
+        "struct Gadget\n  name\n\n  def inspect\n    \"ci\"\n  end\n\n  def to_s\n    \"cs\"\n  end\nend\n\nstruct Plain\n  name\nend\n\ngadget = Gadget.new(name: \"g\")\nputs format(\"%s and %p\", gadget, gadget)\nputs format(\"%s and %p\", [gadget], [gadget])\nputs format(\"%<item>s and %{item} and %<item>p\", item: gadget)\nputs format(\"[%5s] [%-5p]\", gadget, gadget)\nputs format(\"%s and %p\", Plain.new(name: \"p\"), Plain.new(name: \"p\"))\nputs sprintf(\"%s\", gadget)\nprintf(\"%s and %p\\n\", gadget, gadget)\n",
+        "cs and ci\n[ci] and [ci]\ncs and cs and ci\n[   cs] [ci   ]\nPlain(name: \"p\") and Plain(name: \"p\")\ncs\ncs and ci\n",
+    );
+}
+
 /// A program cannot reopen a core type (ADR 0093, #437): a struct named
 /// for one refuses on both implementations, naming the closed runtime and
 /// the rewrites. A struct of that name inside a module is another name.

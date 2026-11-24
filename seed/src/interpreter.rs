@@ -10203,8 +10203,18 @@ impl<W: std::io::Write> Interpreter<W> {
                 ),
                 None => panic!("too few arguments"),
             };
-            let formatted =
-                crate::format::format_values(template, &arguments[1..], &keyword_arguments);
+            let formatted = crate::format::format_values_shown(
+                template,
+                &arguments[1..],
+                &keyword_arguments,
+                &mut |value, source| {
+                    if source {
+                        self.inspected(value)
+                    } else {
+                        self.rendered(value)
+                    }
+                },
+            );
             return Some(Value::String(formatted));
         }
         // `printf` is `format` then `print`, so it reads `format`'s keywords
@@ -10270,8 +10280,18 @@ impl<W: std::io::Write> Interpreter<W> {
                 ),
                 None => panic!("too few arguments"),
             };
-            let formatted =
-                crate::format::format_values(template, &arguments[1..], &keyword_arguments);
+            let formatted = crate::format::format_values_shown(
+                template,
+                &arguments[1..],
+                &keyword_arguments,
+                &mut |value, source| {
+                    if source {
+                        self.inspected(value)
+                    } else {
+                        self.rendered(value)
+                    }
+                },
+            );
             self.emit_standard_output(&formatted)
                 .expect("failed to write output");
             return Some(Value::Nil);
