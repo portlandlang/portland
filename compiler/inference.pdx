@@ -770,6 +770,11 @@ end
 
 def entry_name(entry) = entry.split("/").first
 
+# Every node in a file, each before what it holds.
+def every_node(nodes)
+  nodes.flat_map { [it] + every_node(held_by(it)) }
+end
+
 def exit?(node)
   case node
   in ReturnNode | BreakNode | NextNode then true
@@ -826,6 +831,19 @@ def guard_proof(node, types)
   return when_false(proof) if then_exits && !else_exits
   return when_true(proof) if else_exits && !then_exits
   []
+end
+
+# Everything a node holds, for a tool that walks a whole file (#30,
+# #551): a def's body and a type's methods, which the checker reads one
+# at a time, and then whatever an expression holds.
+def held_by(node)
+  case node
+  in DefNode(body:) then body
+  in ModuleDefNode(body:) then body
+  in StructDefNode(methods:, type_functions:) then methods + type_functions
+  in TraitDefNode(methods:) then methods
+  else children_of(node).reject { it.nil? }
+  end
 end
 
 # Each top-level def's parameters, as [name, entry] pairs — an entry is a
