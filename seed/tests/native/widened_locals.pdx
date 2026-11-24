@@ -1,0 +1,37 @@
+# A local has one type through its whole body (#572): a call written
+# above the binding that makes the local a maybe, or one of several
+# structs, is handed the local as the body leaves it.
+struct Circle
+  radius
+end
+
+struct Square
+  side
+end
+
+def shown(word)
+  word.nil? ? "nothing" : "#{word}!"
+end
+
+def kind(shape)
+  (shape in Circle) ? "round" : "cornered"
+end
+
+def described(words, place)
+  mutable word = "first"
+  early = shown(word)
+  word = words[place]
+  "#{early} then #{shown(word)}"
+end
+
+def kinds(flat)
+  mutable shape = Circle.new(radius: 1)
+  early = kind(shape)
+  shape = Square.new(side: 2) if flat
+  "#{early} then #{kind(shape)}"
+end
+
+puts described(["a", "b"], 1)
+puts described(["a", "b"], 7)
+puts kinds(true)
+puts kinds(false)

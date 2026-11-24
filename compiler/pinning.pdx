@@ -222,7 +222,9 @@ end
 # call after it (#537).
 def body_calls(found, names, answers)
   return [] if found.parameters.length != found.definition.parameters.length
-  pin_statements(found.definition.body, PinWalk.new(bindings: found.parameters, calls: []), yielding_answers(answers, found.block), names).calls
+  reading = yielding_answers(answers, found.block)
+  starting = settled_start(found.definition.body, found.parameters, reading, names)
+  pin_statements(found.definition.body, PinWalk.new(bindings: starting, calls: []), reading, names).calls
 end
 
 # One line of what the build is doing (#543), on standard error, with
@@ -351,7 +353,7 @@ end
 # of them, makes the calls it made then. With `changed` nil every body is
 # walked.
 def gathered_round(statements, names, answers, pinned, changed, mentions, read_before)
-  walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
+  walk = pin_statements(statements, PinWalk.new(bindings: settled_start(statements, [], answers, names), calls: []), answers, names)
   mutable calls = walk.calls
   mutable read = []
   mutable again = 0
@@ -457,6 +459,19 @@ def merge_answers(candidates)
   (joined_types(candidates) or merge_candidates(candidates))
 end
 
+# Each name once, at the type it holds: where a guard's proof is bound
+# ahead of a name's own binding, the binding beneath it.
+def own_bindings(bindings)
+  mutable own = []
+  mutable seen = []
+  bindings.reverse.each do |binding|
+    next if seen.include?(binding[0])
+    seen << binding[0]
+    own = [binding] + own
+  end
+  own
+end
+
 # A method's shape, for a call to be held to (ADR 0093, #536): the
 # fewest parameters it takes by place and the most, whether it yields,
 # and the names it takes.
@@ -517,7 +532,8 @@ def pin_combination(definition, arguments, handed, leaves, answers, names, stric
   # A combination refused for its block keeps what it yields, which a
   # call site reads its block with.
   return unpinned.with(definition: called, parameters: parameters, reason: block.reason, block: block) if block.some? && block.reason.some?
-  solved = solved_answer(called, key, parameters, yielding_answers(answers, block), names, strict)
+  starting = settled_start(called.body, parameters, yielding_answers(answers, block), names)
+  solved = solved_answer(called, key, starting, yielding_answers(answers, block), names, strict)
   # A def whose every way out answers nil answers nothing (#561).
   answer = solved == ["nil"] ? NOTHING : solved
   reason = concrete?(answer) ? nil : "its answer is #{render_type(answer)}"
@@ -640,7 +656,7 @@ def pin_program(written, core: nil, progress: nil)
   pinned = settled.pinned
   answers = fixed + settled.fields + pinned_answers(pinned)
   walk = gathered_calls(definitions, statements, names, answers, pinned)
-  top = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
+  top = own_bindings(pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names).bindings)
   # A def with no combination is one nothing calls, or one called only
   # with a value whose type is not known. Of those, the program's own are
   # listed; the core's are most of the core.
@@ -654,7 +670,7 @@ def pin_program(written, core: nil, progress: nil)
       listed += combinations
     end
   end
-  PinnedProgram.new(defs: listed, bindings: top.bindings.reverse, definitions: definitions, shapes: fixed + settled.fields, structs: structs, conflicts: field_conflicts(walk.calls))
+  PinnedProgram.new(defs: listed, bindings: top.reverse, definitions: definitions, shapes: fixed + settled.fields, structs: structs, conflicts: field_conflicts(walk.calls))
 end
 
 # One statement: the calls inside it are recorded with the bindings above
@@ -700,7 +716,9 @@ def pin_statement(statement, walk, answers, names)
     after_then = taken.with(bindings: unnarrowed(entering, taken.bindings))
     other = pin_statements((else_body or []), after_then.with(bindings: narrowed_bindings(after_then.bindings, when_false(proof))), answers, names)
     after_else = other.with(bindings: unnarrowed(entering, other.bindings))
-    after_else.with(bindings: narrowed_bindings(after_else.bindings, shape_guard(statement, entering + answers)))
+    # What a guard proved is bound ahead of the name's own binding, which
+    # stays beneath it as the type the name holds.
+    after_else.with(bindings: shape_guard(statement, entering + answers) + after_else.bindings)
   else
     pin_expression(statement, walk, answers, names)
   end
@@ -957,6 +975,25 @@ def settled_fields(calls)
     bindings << [made[0], (joined_field(types) or types[0])] unless types.empty?
   end
   bindings
+end
+
+# The bindings a body is read with from its first statement (#572): its
+# parameters, and each local at the one type it holds, which is what the
+# whole body leaves it as. Lowering gives a local one type throughout, so
+# a call written above the binding that widens a local is gathered with
+# the type lowering hands it. A local whose type is not known is left to
+# be bound where it is written, and one a guard proved more of is taken
+# at the type beneath the proof.
+def settled_start(body, parameters, answers, names)
+  walked = pin_statements(body, PinWalk.new(bindings: parameters, calls: []), answers, names)
+  mutable start = parameters
+  mutable seen = parameters.map { it[0] }
+  walked.bindings.reverse.each do |binding|
+    next if seen.include?(binding[0])
+    seen << binding[0]
+    start = [binding] + start if concrete?(type_at(binding, 1))
+  end
+  start
 end
 
 # A combination's answer with its parameters pinned. Read plainly first.
