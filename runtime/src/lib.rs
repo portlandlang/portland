@@ -221,6 +221,17 @@ pub extern "C" fn portland_exit_check() {
             "{count} {noun} still held when the program ended — the native build missed a release (#465)"
         ));
     }
+    if cfg!(debug_assertions) && live_structs() != 0 {
+        let count = live_structs();
+        let noun = if count == 1 {
+            "struct was"
+        } else {
+            "structs were"
+        };
+        refuse(&format!(
+            "{count} {noun} still held when the program ended — the native build missed a release (#532)"
+        ));
+    }
     if cfg!(debug_assertions) && live_arrays() != 0 {
         let count = live_arrays();
         let noun = if count == 1 {
@@ -261,6 +272,45 @@ pub const INTEGERS: i64 = 0;
 pub const BOOLEANS: i64 = 1;
 pub const STRINGS: i64 = 2;
 pub const ARRAYS: i64 = 3;
+/// A struct, which is counted too (#532).
+pub const STRUCTS: i64 = 4;
+
+/// One word, as its kind says to hold it: a holder gained or lost where
+/// it is a counted pointer, and nothing where it is the value itself.
+///
+/// # Safety
+/// `word` is a value of that kind, and a pointer among them is null or
+/// points at a block that has not been freed.
+unsafe fn hold_word(kind: i64, word: i64, held: bool) {
+    unsafe {
+        match (kind, held) {
+            (STRINGS, false) => portland_release(word as *mut StringBlock),
+            (ARRAYS, false) => portland_array_release(word as *mut ArrayBlock),
+            (STRUCTS, false) => portland_struct_release(word as *mut StructBlock),
+            (STRINGS | ARRAYS | STRUCTS, true) => portland_retain(word as *mut StringBlock),
+            _ => {}
+        }
+    }
+}
+
+/// One word in its source form, as its kind says to write it.
+///
+/// # Safety
+/// `word` is a value of that kind, and a pointer among them points at a
+/// live block.
+unsafe fn word_source(kind: i64, word: i64) -> String {
+    unsafe {
+        match kind {
+            BOOLEANS => (word != 0).to_string(),
+            STRINGS => portland_source_form::quoted(std::str::from_utf8_unchecked(bytes_of(
+                word as *const StringBlock,
+            ))),
+            ARRAYS => array_source(word as *mut ArrayBlock),
+            STRUCTS => struct_source(word as *mut StructBlock),
+            _ => word.to_string(),
+        }
+    }
+}
 
 /// Every element of an array of counted pointers gains a holder, or
 /// loses one. An array of plain words owes its elements nothing.
@@ -270,16 +320,11 @@ pub const ARRAYS: i64 = 3;
 unsafe fn each_counted(array: *mut ArrayBlock, held: bool) {
     unsafe {
         let kind = (*array).kind;
-        if kind != STRINGS && kind != ARRAYS {
+        if kind != STRINGS && kind != ARRAYS && kind != STRUCTS {
             return;
         }
         for index in 0..(*array).length as usize {
-            let element = elements_of(array).add(index).read();
-            match (kind, held) {
-                (STRINGS, false) => portland_release(element as *mut StringBlock),
-                (ARRAYS, false) => portland_array_release(element as *mut ArrayBlock),
-                _ => portland_retain(element as *mut StringBlock),
-            }
+            hold_word(kind, elements_of(array).add(index).read(), held);
         }
     }
 }
@@ -568,15 +613,10 @@ unsafe fn array_source(array: *mut ArrayBlock) -> String {
     unsafe {
         let mut written = Vec::with_capacity((*array).length as usize);
         for index in 0..(*array).length as usize {
-            let element = elements_of(array).add(index).read();
-            written.push(match (*array).kind {
-                BOOLEANS => (element != 0).to_string(),
-                STRINGS => portland_source_form::quoted(std::str::from_utf8_unchecked(bytes_of(
-                    element as *const StringBlock,
-                ))),
-                ARRAYS => array_source(element as *mut ArrayBlock),
-                _ => element.to_string(),
-            });
+            written.push(word_source(
+                (*array).kind,
+                elements_of(array).add(index).read(),
+            ));
         }
         format!("[{}]", written.join(", "))
     }
@@ -594,6 +634,165 @@ pub unsafe extern "C" fn portland_array_to_string(array: *mut ArrayBlock) -> *mu
         return std::ptr::null_mut();
     }
     unsafe { string_from(&[array_source(array).as_bytes()]) }
+}
+
+/// What the compiler writes into the binary for each struct a program
+/// declares (#532): its name, how many fields it has, and after this
+/// header, for each field in order, the kind of slot it is and then its
+/// name. It is what lets the runtime free a struct and write one out
+/// without the compiler saying how each time.
+#[repr(C)]
+pub struct StructShape {
+    name: *const StringBlock,
+    fields: i64,
+}
+
+/// A struct as a native program holds it: a pointer to this header, with
+/// its fields straight after it, one word each. The plain layout, as a
+/// String's and an array's are. A struct never changes, so it is never
+/// copied to be changed: `with` makes a new one.
+#[repr(C)]
+pub struct StructBlock {
+    /// How many names hold this struct.
+    count: i64,
+    /// What struct it is.
+    shape: *const StructShape,
+}
+
+/// How many structs made at run time are alive, kept by the debug build.
+static LIVE_STRUCTS: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+
+/// The structs made at run time and not yet freed: zero in a release
+/// build, which does not keep the tally.
+pub fn live_structs() -> i64 {
+    LIVE_STRUCTS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// The memory a struct of this many fields takes.
+fn struct_layout(fields: usize) -> std::alloc::Layout {
+    std::alloc::Layout::from_size_align(
+        std::mem::size_of::<StructBlock>() + fields * std::mem::size_of::<i64>(),
+        std::mem::align_of::<StructBlock>(),
+    )
+    .expect("a struct's size fits the address space")
+}
+
+/// The kind of a shape's field, and its name: the two words written for
+/// it after the shape's header.
+///
+/// # Safety
+/// `shape` points at a shape with more than `index` fields.
+unsafe fn field_of(shape: *const StructShape, index: usize) -> (i64, *const StringBlock) {
+    unsafe {
+        let words = shape.add(1).cast::<i64>();
+        (
+            words.add(index * 2).read(),
+            words.add(index * 2 + 1).read() as *const StringBlock,
+        )
+    }
+}
+
+/// Where a struct's fields begin.
+///
+/// # Safety
+/// `record` points at a `StructBlock`.
+unsafe fn fields_of(record: *mut StructBlock) -> *mut i64 {
+    unsafe { record.add(1).cast::<i64>() }
+}
+
+/// A new struct of the given shape, held once, its fields for the
+/// compiled program to fill before anything reads them.
+///
+/// # Safety
+/// `shape` points at a shape the compiler wrote.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_struct_new(shape: *const StructShape) -> *mut StructBlock {
+    unsafe {
+        let fields = (*shape).fields as usize;
+        let block = std::alloc::alloc_zeroed(struct_layout(fields)).cast::<StructBlock>();
+        if block.is_null() {
+            std::alloc::handle_alloc_error(struct_layout(fields));
+        }
+        block.write(StructBlock { count: 1, shape });
+        if cfg!(debug_assertions) {
+            LIVE_STRUCTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        block
+    }
+}
+
+/// One name fewer holds this struct, and the last one frees it, letting
+/// go of each field it holds. A local not yet bound is not counted.
+///
+/// # Safety
+/// `record` is null or points at a struct that has not been freed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_struct_release(record: *mut StructBlock) {
+    unsafe {
+        if record.is_null() {
+            return;
+        }
+        if cfg!(debug_assertions) && (*record).count <= 0 {
+            refuse(
+                "a struct was released more times than it was held — the native build counted wrong (#532)",
+            );
+        }
+        (*record).count -= 1;
+        if (*record).count == 0 {
+            let shape = (*record).shape;
+            let fields = (*shape).fields as usize;
+            for index in 0..fields {
+                let (kind, _) = field_of(shape, index);
+                hold_word(kind, fields_of(record).add(index).read(), false);
+            }
+            if cfg!(debug_assertions) {
+                // Left readable as freed, as a String is, so a second
+                // release is caught above.
+                LIVE_STRUCTS.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+                return;
+            }
+            std::alloc::dealloc(record.cast(), struct_layout(fields));
+        }
+    }
+}
+
+/// A struct's source form: its name, and each field by name with its
+/// value written as its kind says.
+///
+/// # Safety
+/// `record` points at a live struct whose fields are what its shape says.
+unsafe fn struct_source(record: *mut StructBlock) -> String {
+    unsafe {
+        let shape = (*record).shape;
+        let mut written = Vec::with_capacity((*shape).fields as usize);
+        for index in 0..(*shape).fields as usize {
+            let (kind, name) = field_of(shape, index);
+            written.push(format!(
+                "{}: {}",
+                std::str::from_utf8_unchecked(bytes_of(name)),
+                word_source(kind, fields_of(record).add(index).read())
+            ));
+        }
+        format!(
+            "{}({})",
+            std::str::from_utf8_unchecked(bytes_of((*shape).name)),
+            written.join(", ")
+        )
+    }
+}
+
+/// A struct written out, which is its source form whether `puts`,
+/// `inspect`, or interpolation asks: a new String, held once. The
+/// absence of a struct is answered by absence.
+///
+/// # Safety
+/// `record` is null or points at a live struct.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_struct_to_string(record: *mut StructBlock) -> *mut StringBlock {
+    if record.is_null() {
+        return std::ptr::null_mut();
+    }
+    unsafe { string_from(&[struct_source(record).as_bytes()]) }
 }
 
 /// What a refusal calls a value: its source form, or `nil` where there
@@ -799,6 +998,46 @@ mod tests {
             assert_eq!(text_of(truth), "true");
             portland_release(truth);
         }
+    }
+
+    #[test]
+    fn a_struct_holds_its_fields_and_writes_itself_out() {
+        #[repr(C)]
+        struct Shape {
+            header: StructShape,
+            fields: [i64; 4],
+        }
+        let _counting = COUNTING.lock().unwrap();
+        let (strings, structs) = (live_strings(), live_structs());
+        unsafe {
+            let name = string_from(&[b"Named"]);
+            let label = string_from(&[b"label"]);
+            let rank = string_from(&[b"rank"]);
+            let shape = Shape {
+                header: StructShape { name, fields: 2 },
+                fields: [STRINGS, label as i64, INTEGERS, rank as i64],
+            };
+            let pointer = std::ptr::addr_of!(shape).cast::<StructShape>();
+            let record = portland_struct_new(pointer);
+            fields_of(record).write(string_from(&[b"home"]) as i64);
+            fields_of(record).add(1).write(7);
+            assert_eq!(live_structs(), structs + 1);
+            let source = portland_struct_to_string(record);
+            assert_eq!(text_of(source), "Named(label: \"home\", rank: 7)");
+            portland_release(source);
+            // An array of structs holds each, and frees what they hold.
+            let held =
+                portland_array_append(portland_array_new(STRUCTS, 1), record as i64, STRUCTS);
+            let listed = portland_array_to_string(held);
+            assert_eq!(text_of(listed), "[Named(label: \"home\", rank: 7)]");
+            portland_release(listed);
+            portland_array_release(held);
+            assert_eq!(live_structs(), structs);
+            portland_release(name);
+            portland_release(label);
+            portland_release(rank);
+        }
+        assert_eq!(live_strings(), strings);
     }
 
     #[test]
