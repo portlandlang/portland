@@ -649,8 +649,8 @@ def case_in_as_if(node)
     named = struct_pattern_node(branch.pattern.name, [], line: branch.line)
     test = match_test_node(node.subject, named, line: branch.line)
     bound = branch.pattern.fields.map do |field|
-      read = method_call_node(node.subject, field[0], [], nil, line: branch.line)
-      assignment_node(type_at(field, 1).name, read, line: branch.line)
+      read = method_call_node(node.subject, field.label, [], nil, line: branch.line)
+      assignment_node(field.pattern.name, read, line: branch.line)
     end
     rest = [if_node(test, bound + branch.body, rest, line: branch.line)]
   end
@@ -1223,7 +1223,7 @@ def pattern_names(pattern)
   in HashPatternNode(pairs:, rest_kind:, rest_name:)
     mutable found = []
     pairs.each do |pair|
-      found += pattern_names(pair[1])
+      found += pattern_names(pair.pattern)
     end
     found << rest_name if rest_kind == "bind"
     found
@@ -1243,13 +1243,13 @@ def pattern_names(pattern)
   in StructPatternNode(fields:)
     mutable found = []
     fields.each do |field|
-      found += pattern_names(field[1])
+      found += pattern_names(field.pattern)
     end
     found
   in EnumCasePatternNode(payload:)
     mutable found = []
     payload.each do |entry|
-      found += pattern_names(entry[1])
+      found += pattern_names(entry.pattern)
     end
     found
   else
@@ -1507,7 +1507,7 @@ end
 # (#572): no guard, and a struct's name with each field bound to a name.
 def struct_arm?(branch)
   return false unless branch.guard.nil? && (branch.pattern in StructPatternNode)
-  branch.pattern.fields.all? { type_at(it, 1) in IdentifierNode }
+  branch.pattern.fields.all? { it.pattern in IdentifierNode }
 end
 
 # Read a type off an expression. Synthesis mode only (ADR 0040's ladder —

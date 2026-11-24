@@ -327,7 +327,7 @@ struct EnumCasePatternNode
 
   def sexp
     parts = payload.map do |entry|
-      "(: #{entry[0]} #{entry[1].sexp})"
+      "(: #{entry.label} #{entry.pattern.sexp})"
     end
     return "(enum_pattern #{name})" if parts.empty?
     "(enum_pattern #{name} #{parts.join(" ")})"
@@ -391,7 +391,7 @@ struct HashPatternNode
 
   def sexp
     mutable parts = pairs.map do |pair|
-      "(: #{pair[0]} #{pair[1].sexp})"
+      "(: #{pair.label} #{pair.pattern.sexp})"
     end
     parts << "**#{rest_name}" if rest_kind == "bind"
     parts << "**nil" if rest_kind == "closed"
@@ -515,6 +515,14 @@ struct KeywordParameterNode
     return "(: #{name})" if default.nil?
     "(: #{name} #{default.sexp})"
   end
+end
+
+# One labelled part of a pattern: a struct pattern's field, a hash
+# pattern's pair, or an enum case pattern's payload entry, each a label
+# and the pattern its value is matched against.
+struct LabelledPattern
+  label
+  pattern
 end
 
 struct LogicalNode
@@ -844,7 +852,7 @@ struct StructPatternNode
 
   def sexp
     parts = fields.map do |field|
-      "(: #{field[0]} #{field[1].sexp})"
+      "(: #{field.label} #{field.pattern.sexp})"
     end
     return "(pattern #{name})" if parts.empty?
     "(pattern #{name} #{parts.join(" ")})"
@@ -2466,10 +2474,10 @@ def parse_enum_case_pattern(tokens, name, mutable position)
     label = token.text
     position += 2
     if operator_at?(tokens, position, %w[,]) || operator_at?(tokens, position, %w[)])
-      payload << [label, identifier_node(label, line: token.line)]
+      payload << LabelledPattern.new(label: label, pattern: identifier_node(label, line: token.line))
     else
       inner = parse_pattern(tokens, position)
-      payload << [label, inner.node]
+      payload << LabelledPattern.new(label: label, pattern: inner.node)
       position = inner.position
     end
     break unless operator_at?(tokens, position, %w[,])
@@ -2603,13 +2611,13 @@ def parse_hash_pattern(tokens, mutable position)
         return hash_pattern_refusal(tokens, position, "hash patterns take symbol keys — write {name: pattern} or {name:}, got #{token.text}")
       end
       label = token.text
-      return hash_pattern_refusal(tokens, position, "duplicate key #{label} in a hash pattern") if pairs.any? { it[0] == label }
+      return hash_pattern_refusal(tokens, position, "duplicate key #{label} in a hash pattern") if pairs.any? { it.label == label }
       position += 2
       if operator_at?(tokens, position, %w[,]) || operator_at?(tokens, position, ["}"])
-        pairs << [label, identifier_node(label)]
+        pairs << LabelledPattern.new(label: label, pattern: identifier_node(label))
       else
         sub_pattern = parse_pattern(tokens, position)
-        pairs << [label, sub_pattern.node]
+        pairs << LabelledPattern.new(label: label, pattern: sub_pattern.node)
         position = sub_pattern.position
       end
       break unless operator_at?(tokens, position, %w[,])
@@ -3565,10 +3573,10 @@ def parse_struct_pattern(tokens, name, mutable position)
       position += 2
       if operator_at?(tokens, position, %w[,]) || operator_at?(tokens, position, %w[)])
         # `field:` shorthand desugars to a capture named after the field.
-        fields << [label, identifier_node(label)]
+        fields << LabelledPattern.new(label: label, pattern: identifier_node(label))
       else
         sub_pattern = parse_pattern(tokens, position)
-        fields << [label, sub_pattern.node]
+        fields << LabelledPattern.new(label: label, pattern: sub_pattern.node)
         position = sub_pattern.position
       end
       break unless operator_at?(tokens, position, %w[,])
