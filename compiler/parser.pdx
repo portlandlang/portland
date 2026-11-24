@@ -988,6 +988,18 @@ struct YieldNode
   end
 end
 
+# The def an alias points at, cloned under its new name, as a step that
+# goes on from `after`; or the refusal where no method has the old name.
+def aliased_step(methods, old_name, new_name, after)
+  methods.each do |method|
+    if (method in DefNode) && method.name == old_name
+      twin = DefNode.new(kind: "def", name: new_name, parameters: method.parameters, body: method.body, type_function: false, line: method.line)
+      return Step.new(node: twin, position: after)
+    end
+  end
+  Step.new(node: error_node("alias points at nothing — no method #{old_name} defined yet"), position: after)
+end
+
 def alternative_pattern_node(options, line: nil)
   AlternativePatternNode.new(kind: "alternative_pattern", options: options, line: line)
 end
@@ -3562,12 +3574,7 @@ def parse_struct_alias(tokens, position, struct_name, fields, methods, type_func
   return Step.new(node: error_node("#{new_name} is a field of #{struct_name} — a name is a field or a method, never both"), position: after) if fields.include?(new_name)
   taken = methods.select { it.name == new_name } + type_functions.select { it.name == new_name }
   return Step.new(node: error_node("duplicate method #{new_name} in struct #{struct_name}"), position: after) unless taken.empty?
-  target = methods.find { it.name == old_name }
-  if target.nil?
-    return Step.new(node: error_node("alias points at nothing — no method #{old_name} defined yet"), position: after)
-  end
-  twin = DefNode.new(kind: "def", name: new_name, parameters: target.parameters, body: target.body, type_function: false, line: target.line)
-  Step.new(node: twin, position: after)
+  aliased_step(methods, old_name, new_name, after)
 end
 
 def parse_struct_pattern(tokens, name, mutable position)
@@ -3751,12 +3758,7 @@ def parse_trait_alias(tokens, position, trait_name, methods)
   after = second.position
   taken = methods.select { it.name == new_name }
   return Step.new(node: error_node("duplicate method #{new_name} in trait #{trait_name}"), position: after) unless taken.empty?
-  target = methods.find { it.name == old_name }
-  if target.nil?
-    return Step.new(node: error_node("alias points at nothing — no method #{old_name} defined yet"), position: after)
-  end
-  twin = DefNode.new(kind: "def", name: new_name, parameters: target.parameters, body: target.body, type_function: false, line: target.line)
-  Step.new(node: twin, position: after)
+  aliased_step(methods, old_name, new_name, after)
 end
 
 # `NAME = value` in a type body (#145), as an ordinary assignment node the
