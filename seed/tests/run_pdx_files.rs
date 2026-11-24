@@ -1377,6 +1377,50 @@ fn portland_report_reads_back_panics_and_mutables() {
     assert_eq!(run(&["mutable"]), mutables);
 }
 
+/// `pdx lint file.pdx` and `pdx report file.pdx` (#550): the linter and
+/// the report run by name, each saying what its script says. Named with
+/// no file, either refuses as a command used wrongly.
+#[test]
+fn pdx_runs_lint_and_report_by_name() {
+    let sample = std::env::temp_dir().join("subcommand_sample.pdx");
+    std::fs::write(
+        &sample,
+        "def shown(value)\n  mutable seen = value\n  seen += 1\n  panic(\"too many\") if seen > 9\n  seen\nend\n",
+    )
+    .unwrap();
+    let path = sample.display();
+    let run = |arguments: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .args(arguments)
+            .output()
+            .expect("failed to run pdx")
+    };
+    let linted = run(&["lint", &sample.to_string_lossy()]);
+    assert!(linted.status.success(), "a clean file should lint");
+    assert_eq!(String::from_utf8(linted.stdout).unwrap(), "ok\n");
+    let reported = run(&["report", &sample.to_string_lossy()]);
+    assert!(reported.status.success(), "a report never refuses");
+    assert_eq!(
+        String::from_utf8(reported.stdout).unwrap(),
+        format!(
+            "panic: 1 site\n  {path}:4  too many\nmutable: 1 name, 1 rebinding\n  {path}:2  seen, rebound on line 3\ntogether: 0 sites\n"
+        )
+    );
+    let narrowed = run(&["report", "panic", &sample.to_string_lossy()]);
+    assert_eq!(
+        String::from_utf8(narrowed.stdout).unwrap(),
+        format!("panic: 1 site\n  {path}:4  too many\n")
+    );
+    for tool in ["lint", "report"] {
+        let bare = run(&[tool]);
+        assert_eq!(bare.status.code(), Some(64), "pdx {tool} needs a file");
+        assert_eq!(
+            String::from_utf8(bare.stderr).unwrap(),
+            format!("pdx {tool}: needs a file to read\n")
+        );
+    }
+}
+
 /// The linter holds a file to its order (#509): requires, constants,
 /// traits, structs, defs, and then what it runs, each kind alphabetical,
 /// the methods of a struct among themselves too. A constant built from
