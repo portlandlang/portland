@@ -36,3 +36,11 @@ end
 
 p(names_before(["a", "b"], "z"))
 p(names_before(["a", "b"], "b"))
+
+# An empty array handed to a struct's field is the array the field holds.
+struct Shelf
+  books
+end
+
+p(Shelf.new(books: ["one"]))
+p(Shelf.new(books: []))

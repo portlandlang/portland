@@ -813,7 +813,7 @@ def lower_record(node, made, bindings, context)
     argument = labelled.find { it.label == field[0] } or refuse_native("#{made.name}.new without #{field[0]}", node)
     written = lower_value(argument.value, bindings, context)
     type = type_at(field, 1)
-    refuse_native("a field, #{made.name}.#{field[0]}, that is #{with_article(written.type)}", node) unless native_type?(written.type) || written.type == ["nil"]
+    refuse_native("a field, #{made.name}.#{field[0]}, that is #{with_article(written.type)}", node) unless native_type?(written.type) || written.type == ["nil"] || written.type == EMPTY_ARRAY
     # A value handed to a field that is a maybe of it is one that is
     # there, and nil is one that is not (#553).
     fitted(written, type) or refuse_native("#{made.name}.#{field[0]} handed #{with_article(written.type)} where it is #{with_article(type)}", node)
