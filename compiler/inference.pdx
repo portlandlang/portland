@@ -948,7 +948,7 @@ end
 # nil, or a value or nil, or not known, since nothing can read it then
 # and the block is run for what it does.
 def native_block_answer(node, arguments, types)
-  yielded = types.find { it[0] == yields_key(node.name, arguments) }
+  yielded = types.assoc(yields_key(node.name, arguments))
   mutable inner = types
   mutable index = 0
   node.block.parameters.each do |parameter|
@@ -977,7 +977,7 @@ def native_call_answer(node, types)
   arguments = native_argument_types(node.arguments, types)
   handed = node.block.nil? ? nil : native_block_answer(node, arguments, types)
   leaves = node.block.some? && native_block_leaves?(node.block, types)
-  found = types.find { it[0] == combination_key(node.name, arguments, handed, leaves) }
+  found = types.assoc(combination_key(node.name, arguments, handed, leaves))
   found.nil? ? ["unknown"] : type_at(found, 1)
 end
 
@@ -999,7 +999,7 @@ end
 def native_method_call(node, receiver, types)
   owner = native_owner(opened_natively(receiver, types))
   return nil if owner.nil?
-  shape = types.find { it[0] == method_shape_key(owner, node.name) }
+  shape = types.assoc(method_shape_key(owner, node.name))
   return nil if shape.nil? || !shape_answers?(type_at(shape, 1), node)
   # A receiver that is a maybe is opened for the method, which is handed
   # the value, and nil refuses by the method's name (#503).
@@ -1021,7 +1021,7 @@ def native_nothing?(body, types)
     return native_nothing?((last.then_body or []), types) && (other.empty? || native_nothing?(other, types))
   end
   if last in YieldNode
-    handed = types.find { it[0] == YIELD }
+    handed = types.assoc(YIELD)
     return handed.some? && type_at(handed, 1) == NOTHING
   end
   return false unless last in CallNode
@@ -1084,7 +1084,7 @@ def ordered_pairs(nodes, types, kind)
     next unless node.kind == kind
     next if seen.include?(node.name)
     seen << node.name
-    found = types.find { it[0] == node.name }
+    found = types.assoc(node.name)
     ordered << [node.name, type_at(found, 1)]
   end
   ordered
@@ -1591,7 +1591,7 @@ def synthesize_call(node, types)
     # settled for it (#532).
     holder = opened_natively(receiver, types)
     if (holder in ["struct", *]) && node.arguments.empty? && node.block.nil?
-      field = types.find { it[0] == field_key(type_at(holder, 1), node.name) }
+      field = types.assoc(field_key(type_at(holder, 1), node.name))
       return type_at(field, 1) if field.some?
     end
     # A method the library holds answers what its row says (#560).
@@ -1656,13 +1656,13 @@ def synthesize_hash(node, types)
 end
 
 def synthesize_identifier(node, types)
-  found = types.find { it[0] == node.name }
+  found = types.assoc(node.name)
   return type_at(found, 1) if found.some?
   plain = synthesize_name(node.name, types)
   # A def with no parameters is called by its bare name; under the
   # native reading it is kept by its combination, which has none.
   return plain unless plain == ["unknown"] && native_reading?(types)
-  called = types.find { it[0] == combination_key(node.name, [], nil, false) }
+  called = types.assoc(combination_key(node.name, [], nil, false))
   called.nil? ? plain : type_at(called, 1)
 end
 
@@ -1720,7 +1720,7 @@ def synthesize_logical(node, types)
 end
 
 def synthesize_name(name, types)
-  found = types.find { it[0] == name }
+  found = types.assoc(name)
   # A builtin type's bare name is the type as a value (ADR 0074).
   return ["type", name] if found.nil? && %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(name)
   return ["unknown"] if found.nil?
@@ -1830,10 +1830,11 @@ end
 # Raw positional read: host indexing lifts nil, and a type cell can hold
 # ["nil"] legitimately.
 def type_at(list, target_index)
+  # Read through a run of one, so the walk is one step however long the
+  # list is (#537). An index answers a maybe, and a nil that is there
+  # comes back wrapped; a block's parameter is the element itself.
   mutable result = nil
-  list.each_with_index do |element, index|
-    result = element if index == target_index
-  end
+  list.slice(target_index, 1).each { |element| result = element }
   result
 end
 
