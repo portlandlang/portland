@@ -1,0 +1,63 @@
+# A `return` from inside a loop, reading a local the loop rebinds (#556).
+# A local has one type wherever it is bound, so the name keeps its type
+# through the loop and through a branch that rebinds it.
+def first_past(limit, start)
+  mutable index = start + 1
+  while index < limit
+    return index + 1 if index == 3
+    index += 1
+  end
+  limit
+end
+
+def skipping(limit, start)
+  mutable index = start + 1
+  while index < limit
+    if index == 2
+      index += 2
+      next
+    end
+    if index == 7
+      return index + 1
+    end
+    index += 1
+  end
+  limit
+end
+
+def closing(characters, start)
+  quote = characters[start]
+  mutable index = start + 1
+  while index < characters.length
+    if characters[index] == "\\"
+      index += 2
+      next
+    end
+    if characters[index] == quote
+      return index + 1
+    end
+    index += 1
+  end
+  characters.length
+end
+
+def gathered(characters, start, quote)
+  mutable text = ""
+  mutable index = start
+  while index < characters.length
+    character = (characters[index] or "")
+    text += character
+    index += 1
+    return text if character == quote
+  end
+  text
+end
+
+puts first_past(9, 0)
+puts first_past(2, 0)
+puts skipping(9, 0)
+puts skipping(5, 0)
+puts closing(["'", "a", "\\", "'", "b", "'", "c"], 0)
+puts closing(["'", "a"], 0)
+puts gathered(["a", "b", "'", "c"], 0, "'")
+puts gathered(["a", "b"], 0, "'")

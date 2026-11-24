@@ -743,6 +743,10 @@ end
 # from here on. A name new to that body dies with it (ADR 0001) and needs
 # nothing.
 def forget_types(locals, names)
+  # Read as the native build runs it, nothing is forgotten (#556): a
+  # local has one type wherever it is bound, so a rebinding in a branch
+  # or a loop leaves it the type it had.
+  return locals if native_reading?(locals)
   mutable widened = locals
   names.each do |name|
     next if locals.none? { it[0] == name }
