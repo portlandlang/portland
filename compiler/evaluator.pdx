@@ -662,7 +662,7 @@ def evaluate_append(node, mutable bindings)
   # A `yield` whose block answered nothing has no value to append: the
   # seed's sentence, which a method written in the core reaches (#437),
   # naming the method the block was handed to (#484).
-  panic(silent_block_sentence(yielder_of(bindings))) if (node.value in YieldNode) && value_step.value.empty?
+  panic(silent_yield_sentence(bindings)) if (node.value in YieldNode) && value_step.value.empty?
   bindings = value_step.bindings
   value = slot_value(value_step.value)
   slot = lookup(bindings, node.name)
@@ -3291,7 +3291,7 @@ def evaluate_statement(node, bindings)
     # nothing (ADR 0012); the seed's sentence.
     # A `yield` whose block answered nothing is the block's doing, and is
     # said so by the method's name (#484).
-    panic(silent_block_sentence(yielder_of(bindings))) if (value in YieldNode) && step.value.empty?
+    panic(silent_yield_sentence(bindings)) if (value in YieldNode) && step.value.empty?
     panic("assignment to #{name} produced no value") if step.value.empty?
     bound = slot_value(step.value)
     outcome([bound], assigned(name, bound, node.rebindable, step.bindings))
@@ -3442,7 +3442,7 @@ def evaluate_yield(node, mutable bindings)
   # The signal rides along too (#41), target included: a `return` in the
   # block stops the yielding method's body at this statement and keeps its
   # aim on the block's writer (ADR 0025).
-  Outcome.new(value: result.value, bindings: [["__block__", "block", [block, result.bindings, value_at(handed, 2)]]] + bindings, signal: result.signal, target: target)
+  Outcome.new(value: result.value, bindings: [["__block__", "block", [block, result.bindings, value_at(handed, 2), value_at(handed, 3)]]] + bindings, signal: result.signal, target: target)
 end
 
 def extreme_value(values, which, bindings)
@@ -4089,7 +4089,10 @@ def invoke_struct_method_with_block(receiver, method, arguments, block, bindings
   end
   depth = frame_of(bindings) + 1
   scope = [["__frame__", "frame", depth]] + scope
-  scope = [["__block__", "block", [block, bindings, method.name]]] + scope
+  # The block carries the method's name, and whether the language defines
+  # the method (#487): one written in the core for a builtin value, and
+  # not a struct's own.
+  scope = [["__block__", "block", [block, bindings, method.name, !(receiver in ["__struct__", *])]]] + scope
   check_call_count("#{method_owner_of(receiver)} method", method.parameters, arguments.length)
   scope = bind_parameters(method.parameters, arguments, [], scope)
   result = run_body(method.body, scope)
@@ -4119,7 +4122,7 @@ def invoke_with_block(payload, arguments, keyword_values, block, fields_target, 
   # A `yield` inside the body reaches this. The caller's bindings travel with
   # it, because a block closes over where it was *written*: the method's own
   # scope has dropped every local, so yielding into it would hide them.
-  scope = [["__block__", "block", [block, bindings, name]]] + scope unless block.nil?
+  scope = [["__block__", "block", [block, bindings, name, false]]] + scope unless block.nil?
   # This frame's depth, for `return` to aim at (ADR 0025). The caller's
   # `__frame__` survives the local-reject above; prepending shadows it.
   depth = frame_of(bindings) + 1
@@ -5397,6 +5400,19 @@ def silent_block_sentence(name)
   "#{name}'s block produced no value"
 end
 
+# What to say of a `yield` whose block answered nothing (#484), by the
+# method the block was handed to. A method the language defines says
+# where the writer most likely meant to go; a program's own def or a
+# struct's own method is only named, since nothing says its receiver has
+# an `each` (#487).
+def silent_yield_sentence(bindings)
+  slot = lookup(bindings, "__block__")
+  return "the block produced no value" if slot.empty?
+  name = value_at(slot.first[2], 2) or "the"
+  return silent_block_sentence(name) if value_at(slot.first[2], 3) == true
+  "#{name}'s block produced no value"
+end
+
 # One directive's template on its own, every width and precision written
 # out, for the host to render with its one value.
 def single_directive(flags, width, precision, letter)
@@ -5777,15 +5793,6 @@ def written_slot(collection, key, value, name)
   end
   rebuilt[key] = value
   rebuilt
-end
-
-# The name of the method whose block a `yield` written here reaches, for
-# a refusal to name (#484).
-def yielder_of(bindings)
-  slot = lookup(bindings, "__block__")
-  return "the" if slot.empty?
-  name = value_at(slot.first[2], 2)
-  name.nil? ? "the" : name
 end
 
 # Whether a `yield` is written anywhere inside a node.

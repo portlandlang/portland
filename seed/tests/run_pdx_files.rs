@@ -2210,6 +2210,53 @@ fn a_misbehaving_block_is_refused_in_one_sentence_on_both_oracles() {
     assert_both_oracles_refuse("misbehaving_block_refusal.pdx", None, &cases);
 }
 
+/// The pointer to `each` is given by a method the language defines, and
+/// by no other (#487). `use each` promises the receiver has one that does
+/// what the writer wanted, which holds for the language's `map` and not
+/// for a program's own method or def of that name. A struct that includes
+/// `Enumerable` gets its `map` from the language, and keeps the pointer.
+#[test]
+fn the_pointer_to_each_is_given_only_by_a_method_the_language_defines() {
+    let plain = "map's block produced no value";
+    let pointing = "map's block produced no value — to run a block for each element without gathering, use each";
+    let cases = [
+        (
+            "struct Grid\n  cells\n\n  def map\n    mutable gathered = []\n    gathered << yield(0)\n    gathered\n  end\nend\n\nGrid.new(cells: []).map { |row| puts row }\n",
+            plain,
+        ),
+        (
+            "def map\n  first = yield\n  first\nend\n\nmap { puts 1 }\n",
+            plain,
+        ),
+        (
+            "struct Basket\n  items\n\n  include Enumerable\n\n  def each\n    items.each { |item| yield(item) }\n  end\nend\n\nBasket.new(items: [1, 2]).map { |item| puts item }\n",
+            pointing,
+        ),
+        ("p([1, 2].map { |number| puts number })\n", pointing),
+        ("p({ a: 1 }.map { |key, value| puts key })\n", pointing),
+    ];
+    for (source, expected) in cases {
+        let sample = std::env::temp_dir().join("each_pointer_case.pdx");
+        std::fs::write(&sample, source).unwrap();
+        let runs = [
+            vec![sample.clone()],
+            vec![std::path::PathBuf::from(portland_run()), sample.clone()],
+        ];
+        for arguments in runs {
+            let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+                .args(&arguments)
+                .output()
+                .expect("failed to run pdx");
+            assert!(!output.status.success(), "{source:?} should refuse");
+            assert_eq!(
+                seed_refusal_sentence(&String::from_utf8_lossy(&output.stderr)),
+                expected,
+                "{source:?} run as {arguments:?}"
+            );
+        }
+    }
+}
+
 /// A program cannot reopen a core type (ADR 0093, #437): a struct named
 /// for one refuses on both implementations, naming the closed runtime and
 /// the rewrites. A struct of that name inside a module is another name.
