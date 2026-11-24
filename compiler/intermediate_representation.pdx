@@ -515,9 +515,9 @@ def lower_function(definition, found, context)
   IntermediateFunction.new(name: definition.name, key: found.key, parameters: found.parameters, answer: found.answer, locals: locals.reverse, body: lowered.nodes, block: found.block, returned: returned_into?(definition.body))
 end
 
-def lower_program(nodes)
-  pinned = pin_program(nodes)
-  definitions = nodes.select { it in DefNode }
+def lower_program(nodes, core: nil)
+  pinned = pin_program(nodes, core: core)
+  definitions = pinned.definitions
   statements = nodes.reject { it in DefNode }
   mutable called = []
   pinned.defs.each do |found|
@@ -529,7 +529,7 @@ def lower_program(nodes)
       panic("the native build needs one type for every value — def #{found.name}#{line} has none: #{found.reason}")
     end
   end
-  context = LoweringContext.new(answers: pinned_answers(called), arities: unique_types(called.map { [it.name, it.parameters.length] }), procedure: false, looping: false, combinations: called, yielding: nil, inside_block: false, answer: nil, home: nil, root: nil, pinned: pinned.bindings)
+  context = LoweringContext.new(answers: pinned.shapes + pinned_answers(called), arities: unique_types(called.map { [it.name, it.parameters.length] }), procedure: false, looping: false, combinations: called, yielding: nil, inside_block: false, answer: nil, home: nil, root: nil, pinned: pinned.bindings)
   mutable functions = []
   called.each do |found|
     definition = definitions.find { it.name == found.name }
@@ -640,10 +640,31 @@ def lower_value(node, bindings, context)
   # What is lowered below this value sits inside a larger expression,
   # where a call or a yield that can leave may not be written (#523).
   inner = context.with(root: nil)
+  # A method the core writes for the receiver's type is a def (#525), and
+  # a call with a dot that it answers is a call of that def.
+  if node in MethodCallNode
+    scope = bindings + yielding_answers(context.answers, context.yielding)
+    called = native_method_call(node, synthesize(node.receiver, scope), scope)
+    return lower_value(called, bindings, context) if called.some?
+  end
   case node
   in IntegerNode(value:) then IntermediateConstant.new(type: ["integer"], value: value)
   in BooleanNode(value:) then IntermediateConstant.new(type: ["boolean"], value: value)
   in StringNode(value:) then IntermediateConstant.new(type: ["string"], value: value)
+  # `self` is a method's first parameter (#525).
+  in SelfNode
+    receiver = bindings.find { it[0] == "self" } or refuse_native("self outside a method", node)
+    IntermediateLocal.new(type: type_at(receiver, 1), name: "self")
+  # `value in Boolean` (#525): whether a local is of a type, which its own
+  # type settles before the program runs.
+  in MatchTestNode(subject:, pattern:)
+    refuse_native("an in test of anything but a type's name", node) unless (pattern in StructPatternNode) && pattern.fields.empty?
+    refuse_native("an in test of anything but a local", node) unless subject in IdentifierNode
+    tested = lower_value(subject, bindings, inner)
+    wanted = native_type_named(pattern.name) or refuse_native("an in test for #{pattern.name}", node)
+    refuse_native("an in test of #{with_article(tested.type)}", node) if tested.type in ["maybe", *]
+    matches = wanted == ["array"] ? (tested.type in ["array", *]) : tested.type == wanted
+    IntermediateConstant.new(type: ["boolean"], value: matches)
   # `nil` has no type of its own to be held as; what it is bound to, or
   # answered as, makes it a maybe that is not there (#505).
   in NilNode then IntermediateConstant.new(type: ["nil"], value: nil)
@@ -825,6 +846,18 @@ end
 def native_type?(type)
   return native_value?(type_at(type, 1)) if type in ["maybe", *]
   native_value?(type)
+end
+
+# The type a builtin type's name is, as an `in` test names it: for an
+# array, any array. Nil for a name the native build holds no type for.
+def native_type_named(name)
+  case name
+  when "Array" then ["array"]
+  when "Boolean" then ["boolean"]
+  when "Integer" then ["integer"]
+  when "String" then ["string"]
+  else nil
+  end
 end
 
 def native_value?(type)

@@ -813,6 +813,16 @@ def merge_candidates(candidates)
   ["unknown"]
 end
 
+# The name a method written for a type goes by as a def (#525): the
+# type, and the method.
+def method_def_name(owner, name) = "#{owner}##{name}"
+
+# The name bound for each shape of call a core method answers: a method,
+# the count of arguments it takes, and whether it is handed a block. A
+# method answers only the calls it was written for, and anything else is
+# the floor's (ADR 0093).
+def method_shape(owner, name, count, handed) = "#{owner}##{name}/#{count}#{handed ? "&" : ""}"
+
 def names?(node, name) = (node in IdentifierNode) && node.name == name
 
 def narrowings(condition, types)
@@ -863,6 +873,18 @@ def native_call_answer(node, types)
   found.nil? ? ["unknown"] : type_at(found, 1)
 end
 
+# A call with a dot as the call of a def it is under the native reading
+# (#525), where the core writes a method for the receiver's type that
+# answers this call: the def named for the type and the method, handed
+# the receiver first. Nil where no such method does.
+def native_method_call(node, receiver, types)
+  owner = native_owner(receiver)
+  return nil if owner.nil?
+  shape = method_shape(owner, node.name, node.arguments.length, node.block.some?)
+  return nil unless types.any? { it[0] == shape }
+  CallNode.new(kind: "call", name: method_def_name(owner, node.name), arguments: [node.receiver] + node.arguments, block: node.block, line: node.line)
+end
+
 # Whether a body ends in what produces no value: `puts`, a loop, an
 # `if` whose arms each do and a missing `else` among them, a `yield`
 # whose block answers nothing, or a call to a def that does.
@@ -882,6 +904,10 @@ def native_nothing?(body, types)
   return true if last.name == "puts"
   synthesize(last, types) == NOTHING
 end
+
+# The core type a value's type is, by the name its `class` is written
+# under, or nil where the native build compiles no methods for it.
+def native_owner(type) = (type in ["array", *]) ? "Array" : nil
 
 # Whether these bindings are the native build's: its name is the last of
 # them, where pinning keeps it, so a checker's bindings answer no after
@@ -1203,6 +1229,9 @@ def synthesize(node, types)
   # binds none, and reads unknown.
   in YieldNode then synthesize_name("yield", types)
   in IndexNode then synthesize_index(node, types)
+  # `self` is the receiver, which only the native build's pinning binds,
+  # as the first parameter of a method (#525).
+  in SelfNode then synthesize_name("self", types)
   else
     ["unknown"]
   end
@@ -1381,6 +1410,12 @@ end
 def synthesize_call(node, types)
   return type_function_answer(node) if builtin_type_function?(node, types)
   receiver = synthesize(node.receiver, types)
+  # A method the core writes for the receiver's type is a def of its own
+  # under the native reading (#525), and answers as a call of it does.
+  if native_reading?(types)
+    called = native_method_call(node, receiver, types)
+    return native_call_answer(called, types) if called.some?
+  end
   # `nil?` and `some?` are asked of the maybe itself; every other method
   # is asked of its value.
   asked = %w[nil? some?].include?(node.name) ? receiver : opened_natively(receiver, types)

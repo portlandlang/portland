@@ -1,0 +1,38 @@
+# A method written in the core, compiled (#525): each of these is
+# core/enumerable.pdx or core/array.pdx, built for the types it is called
+# with.
+def big?(number) = number > 5
+
+numbers = [3, 8, 12]
+names = ["ada", "grace", "barbara"]
+p(numbers.map { |number| number * 2 })
+p(numbers.collect { |number| number.to_s + "!" })
+p(names.map { |name| name.length })
+p(numbers.select { |number| number > 5 })
+p(numbers.filter { |number| big?(number) })
+p(numbers.find_all { |number| number.even? })
+p(names.select { |name| name.length > 3 })
+p(numbers.reject { |number| number > 5 })
+p(names.reject { |name| name == "grace" })
+p(numbers.find { |number| number > 5 })
+p(numbers.find { |number| number > 50 })
+p(numbers.detect { |number| number.even? })
+p(names.find { |name| name.length == 5 })
+p(names.find { |name| name == "nobody" })
+puts numbers.empty?
+empty = numbers.select { |number| number > 100 }
+puts empty.empty?
+p(empty)
+p(numbers.map { |number| number + 1 }.select { |number| number.even? })
+p(numbers.map { |number| [number, number * number] })
+p([[1, 2], [3]].map { |row| row.length })
+mutable total = 0
+doubled = numbers.map do |number|
+  total += number
+  number * 2
+end
+p(doubled)
+puts total
+found = numbers.find { |number| number > 5 }
+puts found + 1
+p(names.map { |name| name + "!" }.find { |name| name.length > 6 })
