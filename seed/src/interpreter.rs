@@ -6512,7 +6512,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                         let answer = answer
                             .unwrap_or_else(|| panic!("{}", Self::silent_block_sentence(name)));
-                        result.push_str(&self.joined(&[answer], ""));
+                        result.push_str(&self.replacement_text(answer));
                         copied_to = end;
                     }
                     result.push_str(&text[copied_to..]);
@@ -6547,7 +6547,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         }
                         let answer = answer
                             .unwrap_or_else(|| panic!("{}", Self::silent_block_sentence(name)));
-                        result.push_str(&self.joined(&[answer], ""));
+                        result.push_str(&self.replacement_text(answer));
                         copied_to = end;
                     }
                     result.push_str(&text[copied_to..]);
@@ -9817,6 +9817,17 @@ impl<W: std::io::Write> Interpreter<W> {
                 let got = other.map_or("nothing".to_string(), |value| value.shown());
                 panic!("'{method}' answers a String, got {got}")
             }
+        }
+    }
+
+    /// What a `sub` or `gsub` block answered, as the text put in the match's
+    /// place: its `to_s`, as Ruby converts it (#370). An array's `to_s` is
+    /// its source form (ADR 0060), where joining it would have run its
+    /// elements together.
+    fn replacement_text(&mut self, answer: Value) -> String {
+        match answer {
+            Value::Array(_) => self.rendered(&answer),
+            other => self.joined(&[other], ""),
         }
     }
 

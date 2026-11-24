@@ -9,6 +9,13 @@
 
 require_relative "../../spec_helper"
 
+# A value whose `to_s` is its own, in the place of upstream's mock.
+struct WrittenOut
+  text
+
+  def to_s = text
+end
+
 context "String#gsub with pattern and replacement" do
   specify "doesn't interpret regexp metacharacters if pattern is a string" do
     expect("12345".gsub('\d', "a")).to eq("12345")
@@ -207,9 +214,11 @@ context "String#gsub with pattern and block" do
     expect("hello".gsub(/(.+)/) { replacement }).to eq(replacement)
   end
 
-  # Upstream's mocks define `to_s`; a symbol and an integer, whose `to_s`
-  # is builtin, stand in. A struct's own `to_s` waits on #370.
+  # Upstream's mocks define `to_s`; a struct that defines its own stands
+  # in, beside a symbol and an integer, whose `to_s` is builtin.
   specify "converts the block's return value to a string using to_s" do
+    expect("hello".gsub(/hello/) { WrittenOut.new(text: "hello_replacement") }).to eq("hello_replacement")
+
     expect("hello".gsub(/hello/) { :hello_replacement }).to eq("hello_replacement")
 
     expect("hello".gsub(/.+/) { 42 }).to eq("42")

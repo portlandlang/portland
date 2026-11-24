@@ -2282,6 +2282,25 @@ fn format_renders_a_struct_by_its_own_to_s_and_inspect() {
     );
 }
 
+/// A `sub` or `gsub` block's answer is put in the match's place as its
+/// `to_s` (#370), as Ruby converts it: a struct by its own, an Integer
+/// and a Symbol as written, and an array in its source form, where it
+/// was joined. Ruby 4.0.9 prints the same lines for a class in the
+/// struct's place.
+#[test]
+fn a_replacement_blocks_answer_is_its_to_s() {
+    assert_both_print(
+        "replacement_block_answers.pdx",
+        "struct Replacement\n  name\n\n  def to_s = name\nend\n\nputs \"hello\".gsub(/hello/) { Replacement.new(name: \"ok\") }\nputs \"hello\".sub(\"h\") { Replacement.new(name: \"H\") }\nputs \"hello\".gsub(/l/) { 7 }\nputs \"hello\".gsub(/l/) { :s }\nputs \"hello\".gsub(/l/) { [1, 2] }\nputs \"hello\".sub(\"h\") { [\"a\", \"b\"] }\nputs \"hello\".gsub(\"l\") { [] }\n",
+        "ok\nHello\nhe77o\nhesso\nhe[1, 2][1, 2]o\n[\"a\", \"b\"]ello\nhe[][]o\n",
+    );
+    let cases = [(
+        "puts \"hello\".gsub(/l/) { nil }\n",
+        "nil has no method 'to_s' — handle the nil case first",
+    )];
+    assert_both_oracles_refuse("replacement_block_nil.pdx", None, &cases);
+}
+
 /// A program cannot reopen a core type (ADR 0093, #437): a struct named
 /// for one refuses on both implementations, naming the closed runtime and
 /// the rewrites. A struct of that name inside a module is another name.
