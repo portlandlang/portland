@@ -451,6 +451,20 @@ def fitted(value, type)
   nil
 end
 
+# What a call hands a combination, less each value whose parameter is
+# nil: such a parameter is nil wherever it is read, and has no place to
+# be handed into (#572).
+def handed_values(values, parameters)
+  mutable kept = []
+  mutable index = 0
+  values.each do |value|
+    taking = type_at(parameters, index)
+    kept << value unless taking.some? && type_at(taking, 1) == ["nil"]
+    index += 1
+  end
+  kept
+end
+
 # Whether a value of one type is held as another with nothing done to
 # it: the same type, or a struct held as one of several (#572).
 def held_as?(type, holding)
@@ -477,6 +491,8 @@ end
 # it is written out.
 def inspected(value, node)
   return IntermediateInspect.new(type: ["string"], value: value) if value.type == ["string"] || (value.type in ["maybe", *])
+  # Nil itself in its source form (#572).
+  return IntermediateConstant.new(type: ["string"], value: "nil") if value.type == ["nil"]
   written_out(value, node)
 end
 
@@ -666,7 +682,9 @@ def lower_call(node, name, arguments, bindings, context, root)
     handed_by_name = named.assoc(parameter[0]) or refuse_native("a call to #{name} without #{parameter[0]}", node)
     type_at(handed_by_name, 1)
   end
-  IntermediateCall.new(type: found.answer, name: name, target: key, arguments: placed + by_name, block: block)
+  # A parameter that is nil is handed nothing (#572).
+  kept = handed_values(placed + by_name, found.parameters)
+  IntermediateCall.new(type: found.answer, name: name, target: key, arguments: kept, block: block)
 end
 
 def lower_condition(node, bindings, context)
@@ -679,7 +697,9 @@ end
 # answers its last expression.
 def lower_function(definition, found, context)
   found.parameters.each do |parameter|
-    refuse_native("a parameter that is #{with_article(type_at(parameter, 1))}", definition) unless native_type?(type_at(parameter, 1))
+    # A parameter every call of this combination hands nil is nil
+    # wherever it is read, and is handed nothing (#572).
+    refuse_native("a parameter that is #{with_article(type_at(parameter, 1))}", definition) unless native_type?(type_at(parameter, 1)) || type_at(parameter, 1) == ["nil"]
   end
   refuse_native("a def answering #{with_article(found.answer)}", definition) unless found.answer == NOTHING || native_type?(found.answer)
   names = context.arities.map { it[0] }
@@ -687,7 +707,7 @@ def lower_function(definition, found, context)
   inside = context.with(procedure: found.answer == NOTHING, yielding: found.block, answer: found.answer, home: found.answer, pinned: settled.bindings)
   lowered = lower_body(definition.body, definition, "a def", found.parameters, found.answer, inside)
   locals = placed_locals(lowered.bindings.reject { |binding| found.parameters.any? { it[0] == binding[0] } })
-  IntermediateFunction.new(name: definition.name, key: found.key, parameters: found.parameters, answer: found.answer, locals: locals.reverse, body: lowered.nodes, block: found.block, returned: returned_into?(definition.body))
+  IntermediateFunction.new(name: definition.name, key: found.key, parameters: placed_locals(found.parameters), answer: found.answer, locals: locals.reverse, body: lowered.nodes, block: found.block, returned: returned_into?(definition.body))
 end
 
 # A call of a method the library holds (#560), or nil where it holds none
@@ -1314,7 +1334,7 @@ end
 # The one refusal for everything outside the slice: what the native build
 # does compile, then what it met and where.
 def refuse_native(what, node)
-  line = node.nil? ? "" : " on line #{node.line}"
+  line = node.nil? || node.line.nil? ? "" : " on line #{node.line}"
   panic("the native build compiles integers, strings, comparisons, if, while, def, yield, and puts — #{what}#{line} is unbuilt (#443)")
 end
 
@@ -1455,6 +1475,12 @@ def written_out(value, node)
   # A maybe is opened first, and nil refuses as the seed's `to_s` does.
   return written_out(IntermediateOpen.new(type: type_at(value.type, 1), value: value, name: "to_s"), node) if value.type in ["maybe", *]
   return value if value.type == ["string"]
+  # A name that is nil in this combination of its def's types refuses
+  # when the line runs, in the seed's words, and builds: the line may
+  # stand behind a guard that never lets it run (#572).
+  if value.type == ["nil"]
+    return IntermediateStop.new(type: ["string"], message: IntermediateConstant.new(type: ["string"], value: "nil has no method 'to_s' — handle the nil case first"))
+  end
   writable = value.type == ["integer"] || value.type == ["boolean"] || (value.type in ["array", *]) || (value.type in ["struct", *])
   refuse_native("writing out #{with_article(value.type)}", node) unless writable
   IntermediateText.new(type: ["string"], value: value)
