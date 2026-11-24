@@ -1375,9 +1375,10 @@ fn portland_lint_holds_a_file_to_its_order() {
 }
 
 /// `pin.pdx` — the native build's types (#445): a def's parameters pinned
-/// from its call sites, a recursive answer assumed and checked, and a
-/// `mutable` local keeping its type through a loop. A def that cannot be
-/// pinned is named with the reason. The checker reads none of this.
+/// from its call sites, once for each combination of types it is called
+/// with (#521), a recursive answer assumed and checked, and a `mutable`
+/// local keeping its type through a loop. A def that cannot be pinned is
+/// named with the reason. The checker reads none of this.
 #[test]
 fn portland_pin_dumps_types_pinned_from_call_sites() {
     let sample = std::env::temp_dir().join("pinning_sample.pdx");
@@ -1395,7 +1396,7 @@ fn portland_pin_dumps_types_pinned_from_call_sites() {
     assert!(output.status.success(), "pin.pdx should run");
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
-        "def fib(n: Integer) # -> Integer\ndef sum_to(limit: Integer) # -> Integer\ndef small?(number: Integer) # -> Boolean\ndef twice: not pinned — value is an Integer at one call and a Float at another\ndef unused: not pinned — nothing calls it\ndef shown(value: Integer) # -> nothing\nanswer: Integer\nflag: Boolean\n"
+        "def fib(n: Integer) # -> Integer\ndef sum_to(limit: Integer) # -> Integer\ndef small?(number: Integer) # -> Boolean\ndef twice(value: Integer) # -> Integer\ndef twice(value: Float) # -> Float\ndef unused: not pinned — nothing calls it\ndef shown(value: Integer) # -> nothing\nanswer: Integer\nflag: Boolean\n"
     );
 }
 
@@ -1427,9 +1428,9 @@ fn portland_pin_reaches_through_defs_and_declines_what_it_cannot_settle() {
 /// A def that yields is pinned with its block (#493): the block's
 /// parameters take the types of what the def yields, a `yield` is read as
 /// what the block answers, and a block that ends in what produces no
-/// value answers nothing, as does one whose answer differs from call to
-/// call. A def that yields two types at one position is declined by that
-/// reason.
+/// value answers nothing. A def handed blocks that answer two types is
+/// two combinations (#521). A def that yields two types at one position
+/// is declined by that reason.
 #[test]
 fn portland_pin_reads_a_block_with_the_def_it_is_handed_to() {
     let sample = std::env::temp_dir().join("pinning_block_sample.pdx");
@@ -1447,7 +1448,7 @@ fn portland_pin_reads_a_block_with_the_def_it_is_handed_to() {
     assert!(output.status.success(), "pin.pdx should run");
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
-        "def twice { -> Integer } # -> Integer\ndef apply(number: Integer) { |Integer| -> Integer } # -> Integer\ndef each_upto(limit: Integer) { |Integer| -> nothing } # -> nothing\ndef greet(name: String) { |String| -> nothing } # -> nothing\ndef torn: not pinned — it yields an Integer at one place and a String at another\ndef split(number: Integer) { |Integer| -> nothing } # -> nothing\ntotal: Integer\n"
+        "def twice { -> Integer } # -> Integer\ndef apply(number: Integer) { |Integer| -> Integer } # -> Integer\ndef each_upto(limit: Integer) { |Integer| -> nothing } # -> nothing\ndef greet(name: String) { |String| -> nothing } # -> nothing\ndef torn: not pinned — it yields an Integer at one place and a String at another\ndef split(number: Integer) { |Integer| -> Integer } # -> Integer\ndef split(number: Integer) { |Integer| -> String } # -> String\ntotal: Integer\n"
     );
 }
 
@@ -1587,9 +1588,16 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             "def run\n  yield\nend\nrun\n",
             "the native build needs one type for every value — def run on line 1 has none: it yields, and one call hands it no block".to_string(),
         ),
+        // A def is compiled once for each combination of types (#521), so two
+        // calls need not agree; one with a type the build does not hold is
+        // refused for that type, and a def with no end of combinations for that.
         (
             "def twice(value) = value + value\ntwice(1)\ntwice(1.5)\n",
-            "the native build needs one type for every value — def twice on line 1 has none: value is an Integer at one call and a Float at another".to_string(),
+            format!("{compiles} — a parameter that is a Float on line 1 is unbuilt (#443)"),
+        ),
+        (
+            "def grow(items) = grow([items])\n\nputs grow([1]).length\n",
+            "the native build compiles a def once for each combination of types it is called with, and stopped at 48 — def grow on line 1 is called with a new one each time it is called".to_string(),
         ),
     ];
     let driver = format!(
@@ -1637,8 +1645,8 @@ fn portland_build_writes_llvm_ir_for_a_program_inside_the_native_slice() {
     assert!(output.status.success(), "build.pdx should run");
     let text = std::fs::read_to_string(&written).expect("build.pdx should write the IR");
     for expected in [
-        "define i64 @\"portland.fib\"(i64 %\"n\") {",
-        "define i1 @\"portland.small?\"(i64 %\"number\") {",
+        "define i64 @\"portland.fib(Integer)\"(i64 %\"n\") {",
+        "define i1 @\"portland.small?(Integer)\"(i64 %\"number\") {",
         "define i32 @main() {",
         "call {i64, i1} @llvm.sadd.with.overflow.i64(",
         "call void @portland.overflow(",

@@ -1,0 +1,43 @@
+# A def compiled once for each combination of types it is called with
+# (#521): what its parameters are, and what its block answers.
+def twice(value) = value + value
+
+def first_of(items) = items[0]
+
+def each_of(items)
+  items.each { |item| yield(item) }
+end
+
+def gathered(items)
+  mutable kept = []
+  each_of(items) { |item| kept << yield(item) }
+  kept
+end
+
+def described(value) = "<#{value}>"
+
+def depth(number)
+  return 0 if number < 1
+  1 + depth(number - 1)
+end
+
+def main = "a def of its own"
+
+puts twice(21)
+puts twice("ab")
+p(twice([1, 2].length))
+p(first_of([3, 4]))
+p(first_of(["x", "y"]))
+p(first_of([[1], [2]]))
+each_of([1, 2]) { |number| puts number + 1 }
+each_of(["a", "b"]) { |name| puts name + "!" }
+p(gathered([1, 2, 3]) { |number| number * 2 })
+p(gathered([1, 2, 3]) { |number| number.to_s + "?" })
+p(gathered(["a", "b"]) { |name| name.length })
+p(gathered([[1, 2], [3]]) { |row| row.length })
+puts described(5)
+puts described("five")
+puts described(true)
+puts described([1])
+puts depth(4)
+puts main
