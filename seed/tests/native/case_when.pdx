@@ -62,3 +62,10 @@ when "few" then "a few"
 else "not a few"
 end
 puts label
+letters = "0x1f".chars
+base = case letters[1].downcase
+when "b" then "binary"
+when "x" then "hexadecimal"
+else "octal"
+end
+puts base
