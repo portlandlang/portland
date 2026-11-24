@@ -441,9 +441,12 @@ pub unsafe extern "C" fn portland_array_concat(
     right: *mut ArrayBlock,
 ) -> *mut ArrayBlock {
     unsafe {
+        // The kind is read off an array that holds something: an empty
+        // literal is one array shared by every type, and says nothing of
+        // what it would hold.
         let kind = [left, right]
             .into_iter()
-            .find(|array| !array.is_null())
+            .find(|array| !array.is_null() && (**array).length > 0)
             .map_or(INTEGERS, |array| (*array).kind);
         let mut joined = array_with(kind, SMALLEST_ROOM);
         for array in [left, right] {

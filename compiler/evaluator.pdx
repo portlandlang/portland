@@ -4389,10 +4389,10 @@ def match_enum_case(pattern, subject, bindings, earlier)
   mutable index = 0
   while index < pattern.payload.length
     entry = pattern.payload[index]
-    value = enum_payload_value(payload, entry[0])
+    value = enum_payload_value(payload, entry.label)
     return nil if value.nil?
 
-    sub_captures = match_pattern_with(entry[1], value, bindings, earlier + captures)
+    sub_captures = match_pattern_with(entry.pattern, value, bindings, earlier + captures)
     return nil if sub_captures.nil?
 
     sub_captures.each do |capture|
@@ -4411,11 +4411,11 @@ def match_hash(pattern, subject, bindings, earlier)
   mutable captures = []
   mutable named = []
   pattern.pairs.each do |pair|
-    key = ["__symbol__", pair[0]]
+    key = ["__symbol__", pair.label]
     return nil unless subject.key?(key)
     named << key
     value = subject[key] or nil
-    sub_captures = match_pattern_with(value_at(pair, 1), value, bindings, earlier + captures)
+    sub_captures = match_pattern_with(pair.pattern, value, bindings, earlier + captures)
     return nil if sub_captures.nil?
     captures += sub_captures
   end
@@ -4500,8 +4500,8 @@ def match_struct(pattern, subject, bindings, earlier)
   mutable index = 0
   while index < pattern.fields.length
     field = pattern.fields[index]
-    value = struct_field(subject, field[0])
-    sub_captures = match_pattern_with(field[1], value, bindings, earlier + captures)
+    value = struct_field(subject, field.label)
+    sub_captures = match_pattern_with(field.pattern, value, bindings, earlier + captures)
     return nil if sub_captures.nil?
     captures += sub_captures
     index += 1

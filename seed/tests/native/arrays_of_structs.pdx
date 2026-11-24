@@ -1,0 +1,65 @@
+# An array of one of several structs (#572): a literal holding more than
+# one struct, an array appended to with one and then another, a field
+# made with an array of one and an array of another, and a local bound
+# to one struct and then another.
+struct Circle
+  radius
+end
+
+struct Square
+  side
+end
+
+struct Board
+  tiles
+end
+
+def gathered(count)
+  mutable shapes = []
+  mutable index = 0
+  while index < count
+    if index.even?
+      shapes << Circle.new(radius: index)
+    else
+      shapes << Square.new(side: index)
+    end
+    index += 1
+  end
+  shapes
+end
+
+def picked(first)
+  mutable chosen = Circle.new(radius: 9)
+  chosen = Square.new(side: 8) unless first
+  chosen
+end
+
+def rounds(shapes)
+  mutable found = 0
+  shapes.each do |shape|
+    found += 1 if shape in Circle
+  end
+  found
+end
+
+mixed = [Circle.new(radius: 1), Square.new(side: 2)]
+p(mixed)
+p(gathered(3))
+puts rounds(gathered(5))
+puts rounds(mixed)
+board = Board.new(tiles: [Circle.new(radius: 4)])
+other = Board.new(tiles: [Square.new(side: 5)])
+p(board)
+p(other)
+puts rounds(board.tiles)
+puts rounds(other.tiles)
+p(picked(true))
+p(picked(false))
+
+# An array of one struct joined with an array of another.
+circles = [Circle.new(radius: 6)]
+squares = [Square.new(side: 7)]
+both = circles + squares
+p(both)
+p(both + circles)
+puts rounds(mixed + circles)

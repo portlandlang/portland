@@ -156,6 +156,35 @@ pub unsafe extern "C" fn portland_string_equal(
     }
 }
 
+/// Where one String stands against another: before it, the same, or after
+/// it, as less than nothing, nothing, or more. Strings order by their
+/// canonical text (ADR 0054), code point by code point, by the same crate
+/// the seed orders with; equal bytes and all-ASCII text take the short
+/// paths, as in the seed.
+///
+/// # Safety
+/// Both point at live Strings, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_string_order(
+    left: *const StringBlock,
+    right: *const StringBlock,
+) -> i64 {
+    use unicode_normalization::UnicodeNormalization;
+    unsafe {
+        let (first, second) = (bytes_of(left), bytes_of(right));
+        let ordering = if first == second {
+            std::cmp::Ordering::Equal
+        } else if first.is_ascii() && second.is_ascii() {
+            first.cmp(second)
+        } else {
+            let first = std::str::from_utf8_unchecked(first);
+            let second = std::str::from_utf8_unchecked(second);
+            first.nfc().cmp(second.nfc())
+        };
+        ordering as i64
+    }
+}
+
 /// One more name holds this String. A literal is not counted, and neither
 /// is the absence of a String: a local not yet bound.
 ///
@@ -810,6 +839,58 @@ pub unsafe extern "C" fn portland_struct_release(record: *mut StructBlock) {
             }
             std::alloc::dealloc(record.cast(), struct_layout(struct_words(shape)));
         }
+    }
+}
+
+/// Whether a struct that may not be there is of this shape (#572): one
+/// that is not there is of none.
+///
+/// # Safety
+/// `record` is null or points at a live struct, and `shape` at a shape
+/// the compiler wrote.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_struct_is(
+    record: *mut StructBlock,
+    shape: *const StructShape,
+) -> bool {
+    unsafe { !record.is_null() && std::ptr::eq((*record).shape, shape) }
+}
+
+/// Where the field of this name is in a struct that is one of several
+/// (#572): the compiled program knows the field's type, and the struct
+/// itself says where it keeps it. A struct with no such field refuses in
+/// the seed's words.
+///
+/// # Safety
+/// `record` points at a live struct whose fields are what its shape says,
+/// and `name` at a String.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_struct_slot(
+    record: *mut StructBlock,
+    name: *const StringBlock,
+) -> *mut i64 {
+    unsafe {
+        let shape = (*record).shape;
+        let wanted = bytes_of(name);
+        let mut slot = fields_of(record);
+        for index in 0..(*shape).fields as usize {
+            let (kind, field) = field_of(shape, index);
+            if bytes_of(field) == wanted {
+                return slot;
+            }
+            slot = slot.add(words_of(kind));
+        }
+        let struct_name = std::str::from_utf8_unchecked(bytes_of((*shape).name));
+        let article = if struct_name.starts_with(['A', 'E', 'I', 'O', 'U']) {
+            "an"
+        } else {
+            "a"
+        };
+        refuse_program(&format!(
+            "{} is {article} {struct_name}, which has no method '{}'",
+            struct_source(record),
+            std::str::from_utf8_unchecked(wanted)
+        ))
     }
 }
 

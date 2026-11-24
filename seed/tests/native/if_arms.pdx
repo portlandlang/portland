@@ -39,3 +39,22 @@ puts(found(["a"], "a") or "nothing")
 puts(found(["b"], "a") or "nothing")
 puts(tally(1) or 0)
 puts(tally(4) or 0)
+
+# A name bound to an `if` whose arms are more than one expression each
+# (#572) is bound in each arm to what the arm ends in.
+def scaled(number)
+  size = if number > 10
+    half = number / 2
+    half + 1
+  elsif number > 5
+    number
+  else
+    doubled = number * 2
+    doubled - 1
+  end
+  size * 10
+end
+
+puts scaled(20)
+puts scaled(7)
+puts scaled(3)

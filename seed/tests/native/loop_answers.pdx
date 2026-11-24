@@ -1,0 +1,25 @@
+# A def whose body ends in a loop answers what the `return`s inside it
+# do (#572): a `while true` is left no other way, and a loop that can
+# end answers nil where it does.
+def first_long(words)
+  mutable index = 0
+  while true
+    word = (words[index] or "none left")
+    return word if word.length > 3
+    index += 1
+  end
+end
+
+def position_of(words, wanted)
+  mutable index = 0
+  while index < words.length
+    return index if words[index] == wanted
+    index += 1
+  end
+end
+
+words = ["a", "to", "three", "four"]
+puts first_long(words)
+puts first_long(["no", "ox"])
+p(position_of(words, "three"))
+p(position_of(words, "five"))

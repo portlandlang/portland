@@ -44,7 +44,14 @@ EMPTY_ARRAY = ["array", ["unknown"]]
 # and the type of each field it was handed.
 MAKING = "new"
 
-# The name a `return` is gathered under: a keyword, so no def has it.
+# The name a `return` is gathered under where it is written straight in
+# a def's body, which nothing reads: what it answers is read with the
+# body, by what the conditions around it prove. One inside a block is
+# gathered under `RETURN` by the walk of the block.
+PLAIN_RETURN = "return here"
+
+# The name a `return` inside a block is gathered under: a keyword, so no
+# def has it.
 RETURN = "return"
 
 # How many rounds pinning takes before it is not going to settle. A
@@ -148,11 +155,16 @@ def answer_candidates(body, parameters, answers, names)
   mutable found = []
   mutable last = [["nil"]]
   body.each do |statement|
-    scope = walk.bindings + answers
+    after = pin_statement(statement, walk, answers, names)
+    scope = loop_scope(statement, walk, after) + answers
     found += return_types_in(statement, scope)
     last = value_candidates(statement, scope)
-    walk = pin_statement(statement, walk, answers, names)
+    walk = after
   end
+  # A loop at the end answers nil where it can end, and nothing where it
+  # cannot (#572).
+  ending = body.last
+  last = endless_loop?(ending) ? [] : [["nil"]] if ending in WhileNode
   found + returns_gathered(walk) + last
 end
 
@@ -160,8 +172,18 @@ end
 # its statements above the last one leave.
 def answers_nothing?(body, parameters, answers, names)
   return false if body.empty?
+  # A `return` with a value is an answer, whatever the body ends in.
+  return false if returns_value?(body)
   above = pin_statements(body.slice(0, body.length - 1), PinWalk.new(bindings: parameters, calls: []), answers, names)
   native_nothing?(body, above.bindings + answers)
+end
+
+# The calls a walk of a block's body gathered, with each `return` written
+# in the body gathered as one that leaves from inside a block (#523).
+# `before` is how many calls were gathered ahead of the body.
+def block_returns(calls, before)
+  inside = calls.slice(before, calls.length - before).map { it[0] == PLAIN_RETURN ? [RETURN] + it.slice(1, it.length - 1) : it }
+  calls.slice(0, before) + inside
 end
 
 # What a body answers: its last statement and its early returns, as
@@ -171,10 +193,11 @@ def body_answer(body, parameters, answers, names)
   mutable early = []
   mutable last = ["nil"]
   body.each do |statement|
-    scope = walk.bindings + answers
+    after = pin_statement(statement, walk, answers, names)
+    scope = loop_scope(statement, walk, after) + answers
     early += return_types_in(statement, scope)
     last = statement_answer(statement, scope)
-    walk = pin_statement(statement, walk, answers, names)
+    walk = after
   end
   # A body that ends in `panic` hands nothing back that way, so its
   # answer is what its returns say (#505).
@@ -183,6 +206,12 @@ def body_answer(body, parameters, answers, names)
   leaving = early + returns_gathered(walk)
   ending = body.last
   return merge_answers(leaving) if (ending in CallNode) && ending.name == "panic" && !leaving.empty?
+  # A body that ends in a loop with a `return` inside answers what its
+  # returns do (#572): a `while true` is left no other way, and a loop
+  # that can end answers nil where it does.
+  if (ending in WhileNode) && !leaving.empty?
+    return merge_answers(endless_loop?(ending) ? leaving : leaving + [["nil"]])
+  end
   merge_answers(leaving + [last])
 end
 
@@ -193,7 +222,8 @@ end
 # call after it (#537).
 def body_calls(found, names, answers)
   return [] if found.parameters.length != found.definition.parameters.length
-  pin_statements(found.definition.body, PinWalk.new(bindings: found.parameters, calls: []), yielding_answers(answers, found.block), names).calls
+  reading = yielding_answers(answers, found.block)
+  twice_read_calls(found.definition.body, found.parameters, reading, names)
 end
 
 # One line of what the build is doing (#543), on standard error, with
@@ -299,6 +329,16 @@ def field_prelude(fields, method)
   end
 end
 
+# Bindings with each array that holds nothing bound to the array a walk
+# left it as, and every other binding as it was.
+def filled_arrays(before, after)
+  return before unless before.any? { type_at(it, 1) == EMPTY_ARRAY }
+  before.map do |binding|
+    left = type_at(binding, 1) == EMPTY_ARRAY ? after.assoc(binding[0]) : nil
+    left.nil? || !concrete?(type_at(left, 1)) ? binding : left
+  end
+end
+
 # The calls every body reached names: the top level's, and those of each
 # combination pinned so far, read with its own parameters.
 def gathered_calls(definitions, statements, names, answers, pinned)
@@ -313,7 +353,7 @@ end
 # walked.
 def gathered_round(statements, names, answers, pinned, changed, mentions, read_before)
   walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
-  mutable calls = walk.calls
+  mutable calls = twice_read_calls(statements, [], answers, names)
   mutable read = []
   mutable again = 0
   pinned.each do |found|
@@ -327,29 +367,52 @@ def gathered_round(statements, names, answers, pinned, changed, mentions, read_b
   GatheredRound.new(walk: walk.with(calls: calls), read: read, again: again)
 end
 
-# The one type a field made with these holds (#553), or nil where they do
-# not join: the same type throughout, or a value and nil or a maybe of
-# it, which is a maybe of it, as a local bound both ways is (#505).
-def joined_field(types)
-  mutable joined = types.first
-  types.each do |type|
-    next if joined.nil? || type == joined || joined == ["maybe", type]
-    joined = if type == ["nil"] || type == ["maybe", joined]
-      maybe_of(joined)
-    elsif joined == ["nil"]
-      maybe_of(type)
-    else
-      nil
+# The array each def is handed in each place, by the combinations pinned
+# (#572), as bindings: what an empty array handed there is read as. Where
+# the combinations hand different arrays there, what those make together.
+def handed_arrays(pinned)
+  mutable found = []
+  pinned.each do |combination|
+    mutable place = 0
+    combination.arguments.each do |argument|
+      named = argument in ["keyword", *]
+      label = named ? type_at(argument, 1) : place.to_s
+      type = named ? type_at(argument, 2) : argument
+      place += 1 unless named
+      next unless (type in ["array", *]) && concrete?(type)
+      key = handed_array_key(combination.name, label)
+      held = found.assoc(key)
+      if held.nil?
+        found << [key, type]
+      else
+        joined = joined_plain(type_at(held, 1), type)
+        found = found.map { it[0] == key ? [key, joined] : it } if joined.some?
+      end
     end
   end
-  joined
+  found
 end
+
+# The one type a field made with these holds (#553), or nil where they do
+# not join: the same type throughout; a value and nil or a maybe of it,
+# which is a maybe of it, as a local bound both ways is (#505); or one
+# struct and another, which is one of several structs (#572).
+def joined_field(types) = joined_types(types)
 
 # The names in an answer's key (#537): `Array#map([Token]) { Integer }`
 # gives `Array` and `map`, and `Token.text` gives `Token` and `text`.
 def key_names(key)
-  head = (key.split("(").first or key)
+  head = ((key.split("(").first or key).split("[").first or key)
   head.split("#").flat_map { it.split(".") }
+end
+
+# The bindings a statement is read with: the ones above it, and for a
+# loop, each of those as the loop leaves it (#572). A local has one type,
+# so an array that goes into a loop empty is, inside it, the array the
+# loop's appends make it.
+def loop_scope(statement, walk, after)
+  return walk.bindings unless statement in WhileNode
+  filled_arrays(walk.bindings, after.bindings)
 end
 
 # Every field the gathered calls made, as [its key, the types it was
@@ -389,11 +452,23 @@ end
 # The one type a body's ways out answer together. Where they are one
 # value's type, with nil or a maybe of it among them, that is a maybe of
 # the value (#505): `return "none"` beside a last expression that is a
-# String or nil. Otherwise inference's own rule stands.
+# String or nil. Where they are one struct and another, that is one of
+# several structs (#572). Otherwise inference's own rule stands.
 def merge_answers(candidates)
-  values = unique_types(candidates.reject { it == ["nil"] }.map { (it in ["maybe", *]) ? type_at(it, 1) : it })
-  return merge_candidates(candidates) unless values.length == 1
-  candidates.any? { it == ["nil"] || (it in ["maybe", *]) } ? maybe_of(values[0]) : values[0]
+  (joined_types(candidates) or merge_candidates(candidates))
+end
+
+# Each name once, at the type it holds: where a guard's proof is bound
+# ahead of a name's own binding, the binding beneath it.
+def own_bindings(bindings)
+  mutable own = []
+  mutable seen = []
+  bindings.reverse.each do |binding|
+    next if seen.include?(binding[0])
+    seen << binding[0]
+    own = [binding] + own
+  end
+  own
 end
 
 # A method's shape, for a call to be held to (ADR 0093, #536): the
@@ -418,7 +493,7 @@ def pin_block_call(node, walk, answers, names)
     current = pin_statement(argument, current, answers, names)
   end
   scope = current.bindings + answers
-  arguments = native_argument_types(node.arguments, scope)
+  arguments = filled_arguments(node.name, native_argument_types(node.arguments, scope), scope)
   answer = native_block_answer(node, arguments, scope)
   leaves = native_block_leaves?(node.block, scope)
   yielded = answers.assoc(yields_key(node.name, arguments))
@@ -431,8 +506,8 @@ def pin_block_call(node, walk, answers, names)
   end
   walked = pin_statements(node.block.body, current.with(bindings: inner), answers, names)
   outer = current.bindings.length
-  kept = walked.bindings.slice(walked.bindings.length - outer, outer)
-  PinWalk.new(bindings: kept, calls: walked.calls + [[node.name, arguments, answer, leaves]])
+  kept = unnarrowed(current.bindings, walked.bindings.slice(walked.bindings.length - outer, outer))
+  PinWalk.new(bindings: kept, calls: block_returns(walked.calls, current.calls.length) + [[node.name, arguments, answer, leaves]])
 end
 
 # One combination of a def's types: its parameters from the arguments,
@@ -456,7 +531,8 @@ def pin_combination(definition, arguments, handed, leaves, answers, names, stric
   # A combination refused for its block keeps what it yields, which a
   # call site reads its block with.
   return unpinned.with(definition: called, parameters: parameters, reason: block.reason, block: block) if block.some? && block.reason.some?
-  solved = solved_answer(called, key, parameters, yielding_answers(answers, block), names, strict)
+  starting = settled_start(called.body, parameters, yielding_answers(answers, block), names)
+  solved = solved_answer(called, key, starting, yielding_answers(answers, block), names, strict)
   # A def whose every way out answers nil answers nothing (#561).
   answer = solved == ["nil"] ? NOTHING : solved
   reason = concrete?(answer) ? nil : "its answer is #{render_type(answer)}"
@@ -492,6 +568,21 @@ end
 # The calls to the program's defs anywhere inside an expression, each with
 # its arguments' types as the bindings in scope give them.
 def pin_expression(node, walk, answers, names)
+  # `value&.name` is walked as the `if` it means (#572).
+  guarded = safe_as_if(node)
+  return pin_statement(guarded, walk, answers, names) if guarded.some?
+  # An `if` read for its value is walked as one run for what it does,
+  # each arm with what the condition proved (#572).
+  return pin_statement(node, walk, answers, names) if node in IfNode
+  # The right of an `&&` or an `||` is walked with what the left proved
+  # (#572), so a call there is gathered with the types it is read with.
+  if (node in LogicalNode) && %w[&& ||].include?(node.operator)
+    after_left = pin_statement(node.left, walk, answers, names)
+    proof = shape_narrowings(node.left, after_left.bindings + answers)
+    proved = node.operator == "&&" ? when_true(proof) : when_false(proof)
+    after_right = pin_statement(node.right, after_left.with(bindings: narrowed_bindings(after_left.bindings, proved)), answers, names)
+    return after_right.with(bindings: unnarrowed(after_left.bindings, after_right.bindings))
+  end
   return pin_block_call(node, walk, answers, names) if (node in CallNode) && node.block.some? && names.include?(node.name)
   # A method the core writes for the receiver's type is a def (#525), and
   # the call is gathered as a call of it.
@@ -524,7 +615,7 @@ def pin_expression(node, walk, answers, names)
   end
   if (node in CallNode) && names.include?(node.name)
     scope = current.bindings + answers
-    current = current.with(calls: current.calls + [[node.name, native_argument_types(node.arguments, scope), nil, false]])
+    current = current.with(calls: current.calls + [[node.name, filled_arguments(node.name, native_argument_types(node.arguments, scope), scope), nil, false]])
   end
   if node in YieldNode
     scope = current.bindings + answers
@@ -564,7 +655,7 @@ def pin_program(written, core: nil, progress: nil)
   pinned = settled.pinned
   answers = fixed + settled.fields + pinned_answers(pinned)
   walk = gathered_calls(definitions, statements, names, answers, pinned)
-  top = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
+  top = own_bindings(pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names).bindings)
   # A def with no combination is one nothing calls, or one called only
   # with a value whose type is not known. Of those, the program's own are
   # listed; the core's are most of the core.
@@ -578,7 +669,7 @@ def pin_program(written, core: nil, progress: nil)
       listed += combinations
     end
   end
-  PinnedProgram.new(defs: listed, bindings: top.bindings.reverse, definitions: definitions, shapes: fixed + settled.fields, structs: structs, conflicts: field_conflicts(walk.calls))
+  PinnedProgram.new(defs: listed, bindings: top.reverse, definitions: definitions, shapes: fixed + settled.fields, structs: structs, conflicts: field_conflicts(walk.calls))
 end
 
 # One statement: the calls inside it are recorded with the bindings above
@@ -597,15 +688,36 @@ def pin_statement(statement, walk, answers, names)
   # A `return` is gathered with what it answers, wherever it is written:
   # one inside a block leaves the def as one outside it does (#523).
   in ReturnNode(value:)
-    return walk.with(calls: walk.calls + [[RETURN, [["nil"]], nil, false]]) if value.nil?
+    return walk.with(calls: walk.calls + [[PLAIN_RETURN, [["nil"]], nil, false]]) if value.nil?
     seen = pin_expression(value, walk, answers, names)
-    seen.with(calls: seen.calls + [[RETURN, [synthesize(value, seen.bindings + answers)], nil, false]])
+    seen.with(calls: seen.calls + [[PLAIN_RETURN, [synthesize(value, seen.bindings + answers)], nil, false]])
+  # What a guard in a loop's body proved of a name holds no further than
+  # the body (#572).
+  # An array that goes in empty and is appended to in the body is that
+  # array wherever the body reads it, so the body is walked again with
+  # what it left, and the calls of that walk are the ones kept.
   in WhileNode(condition:, body:)
-    pin_statements(body, pin_expression(condition, walk, answers, names), answers, names)
+    entering = pin_expression(condition, walk, answers, names)
+    first = pin_statements(body, entering, answers, names)
+    left = unnarrowed(walk.bindings, first.bindings)
+    kept = filled_arrays(entering.bindings, left)
+    return first.with(bindings: left) if kept == entering.bindings
+    turned = pin_statements(body, entering.with(bindings: kept), answers, names)
+    turned.with(bindings: unnarrowed(walk.bindings, turned.bindings))
+  # A name that holds one of several structs is the one the condition
+  # proved it to be, in the arm where that holds, and below the `if`
+  # where the other arm always leaves (#572).
   in IfNode(condition:, then_body:, else_body:)
     after_condition = pin_expression(condition, walk, answers, names)
-    after_then = pin_statements((then_body or []), after_condition, answers, names)
-    pin_statements((else_body or []), after_then, answers, names)
+    entering = after_condition.bindings
+    proof = shape_narrowings(condition, entering + answers)
+    taken = pin_statements((then_body or []), after_condition.with(bindings: narrowed_bindings(entering, when_true(proof))), answers, names)
+    after_then = taken.with(bindings: unnarrowed(entering, taken.bindings))
+    other = pin_statements((else_body or []), after_then.with(bindings: narrowed_bindings(after_then.bindings, when_false(proof))), answers, names)
+    after_else = other.with(bindings: unnarrowed(entering, other.bindings))
+    # What a guard proved is bound ahead of the name's own binding, which
+    # stays beneath it as the type the name holds.
+    after_else.with(bindings: shape_guard(statement, entering + answers) + after_else.bindings)
   else
     pin_expression(statement, walk, answers, names)
   end
@@ -639,7 +751,7 @@ def pin_walk(node, walk, answers, names)
   end
   walked = pin_statements(node.block.body, current.with(bindings: inner), answers, names)
   outer = current.bindings.length
-  walked.with(bindings: walked.bindings.slice(walked.bindings.length - outer, outer))
+  walked.with(bindings: unnarrowed(current.bindings, walked.bindings.slice(walked.bindings.length - outer, outer)), calls: block_returns(walked.calls, current.calls.length))
 end
 
 # The pinned combinations' answers as bindings, each under the name its
@@ -654,7 +766,7 @@ def pinned_answers(pinned)
   # Everything pinning reads, it reads the way the native build runs it
   # (#503): the name that says so rides with the answers into every scope,
   # and is kept last, which is where inference looks for it.
-  answers + yielded + [[NATIVE_READING, ["boolean"]]]
+  answers + yielded + handed_arrays(pinned) + [[NATIVE_READING, ["boolean"]]]
 end
 
 # A yielding combination's block, or nil for a def that does not yield.
@@ -701,10 +813,16 @@ def rebound(bindings, name, type)
   return bindings if type == EMPTY_ARRAY && (type_at(found, 1) in ["array", *])
   return bindings.map { it[0] == name ? [name, type] : it } if type_at(found, 1) == EMPTY_ARRAY && (type in ["array", *])
   # A name that holds nil at one binding and a value at another holds a
-  # maybe of that value (#505), whichever came first.
+  # maybe of that value (#505), whichever came first, and one that holds
+  # one struct and then another holds one of several (#572).
   held = type_at(found, 1)
-  return bindings if held == ["maybe", type] || (type == ["nil"] && (held in ["maybe", *]))
-  widened = type == ["nil"] ? maybe_of(held) : (held == ["nil"] ? maybe_of(type) : (type == ["maybe", held] ? type : nil))
+  # A value whose type is not known is not another type: the name keeps
+  # the one it has, and a later round reads the value once it is known
+  # (#572). Unpinned here, the name would starve the call that makes it
+  # known.
+  return bindings if concrete?(held) && !concrete?(type)
+  widened = joined_pair(held, type)
+  return bindings if widened == held
   return bindings.map { it[0] == name ? [name, widened] : it } if widened.some?
   bindings.map { it[0] == name ? [name, ["unknown"]] : it }
 end
@@ -843,6 +961,19 @@ def settle_pins(definitions, statements, names, fixed, starting, strict, progres
   Settled.new(pinned: pinned, fields: fields)
 end
 
+# A body's parameters, and each local a walk of the body bound, once, at
+# the type beneath any proof a guard bound ahead of it.
+def settled_bindings(parameters, bindings)
+  mutable start = parameters
+  mutable seen = parameters.map { it[0] }
+  bindings.reverse.each do |binding|
+    next if seen.include?(binding[0])
+    seen << binding[0]
+    start = [binding] + start if concrete?(type_at(binding, 1))
+  end
+  start
+end
+
 # Each struct's fields as bindings (#532): a field is bound to the type
 # its makings hand it, joined (#553). One handed types that do not join
 # keeps the first, and is named by `field_conflicts`. It is not dropped: a field left out is
@@ -858,6 +989,18 @@ def settled_fields(calls)
   bindings
 end
 
+# The bindings a body is read with from its first statement (#572): its
+# parameters, and each local at the one type it holds, which is what the
+# whole body leaves it as. Lowering gives a local one type throughout, so
+# a call written above the binding that widens a local is gathered with
+# the type lowering hands it. A local whose type is not known is left to
+# be bound where it is written, and one a guard proved more of is taken
+# at the type beneath the proof.
+def settled_start(body, parameters, answers, names)
+  walked = pin_statements(body, PinWalk.new(bindings: parameters, calls: []), answers, names)
+  settled_bindings(parameters, walked.bindings)
+end
+
 # A combination's answer with its parameters pinned. Read plainly first.
 # Where that is unknown — the def calls itself, or one that calls it
 # back — the answer is read from the ways out of its body that are known:
@@ -871,11 +1014,24 @@ def solved_answer(definition, key, parameters, answers, names, strict)
   plain = body_answer(definition.body, parameters, others, names)
   return plain if concrete?(plain)
   known = unique_types(answer_candidates(definition.body, parameters, answers, names).select { concrete?(it) })
-  return ["unknown"] unless known.length == 1
-  found = known.first or ["unknown"]
+  # The ways out that are known answer one type, or types that join.
+  found = joined_types(known) or return ["unknown"]
   return found unless strict
   whole = body_answer(definition.body, parameters, [[key, found]] + others, names)
   whole == found ? found : ["unknown"]
+end
+
+# The calls a body makes, read twice (#572): once with each local as it
+# is bound going down the body, and once with each at the one type the
+# body leaves it. The second is what lowering asks for. The first is
+# kept beside it: a local bound to what a call answers, and handed back
+# to that call, is read from the call the first walk names, and dropped,
+# that call would be pinned in one round and gone in the next.
+def twice_read_calls(body, parameters, answers, names)
+  first = pin_statements(body, PinWalk.new(bindings: parameters, calls: []), answers, names)
+  starting = settled_bindings(parameters, first.bindings)
+  return first.calls if starting == parameters
+  first.calls + pin_statements(body, PinWalk.new(bindings: starting, calls: []), answers, names).calls
 end
 
 # The methods of the core's types and of a program's structs as defs
@@ -928,6 +1084,8 @@ end
 def value_candidates(node, scope)
   plain = case_as_if(node)
   return value_candidates(plain, scope) if plain.some?
+  # A `panic` is no way out with an answer (#572).
+  return [] if (node in CallNode) && node.name == "panic"
   return [statement_answer(node, scope)] unless node in IfNode
   taken = node.then_body or []
   other = node.else_body or []

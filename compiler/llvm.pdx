@@ -128,6 +128,7 @@ LLVM_PRELUDE = [
   "declare ptr @portland_string_inspect(ptr)",
   "declare ptr @portland_array_to_string(ptr)",
   "declare zeroext i1 @portland_string_equal(ptr, ptr)",
+  "declare i64 @portland_string_order(ptr, ptr)",
   "declare zeroext i1 @portland_array_equal(ptr, ptr)",
   "declare zeroext i1 @portland_struct_equal(ptr, ptr)",
   "declare i64 @portland_integer_divide(i64, i64)",
@@ -150,6 +151,8 @@ LLVM_PRELUDE = [
   "declare ptr @portland_struct_new(ptr)",
   "declare void @portland_struct_release(ptr)",
   "declare ptr @portland_struct_to_string(ptr)",
+  "declare ptr @portland_struct_slot(ptr, ptr)",
+  "declare zeroext i1 @portland_struct_is(ptr, ptr)",
   "declare void @portland_retain(ptr)",
   "declare void @portland_release(ptr)",
   "declare void @portland_exit_check()",
@@ -976,6 +979,13 @@ def llvm_value(emitter, value)
     end
     sides = llvm_operands(second.emitter, operator, left.type, first.operand, right.type, second.operand)
     plain = llvm_plain(left.type)
+    # Strings order by their canonical text (ADR 0054), which the runtime
+    # reads: before, the same, or after, held against nothing.
+    if plain == ["string"] && !%w[== !=].include?(operator)
+      order = llvm_named(sides.emitter, "call i64 @portland_string_order(ptr #{sides.left}, ptr #{sides.right})")
+      released = llvm_drop(llvm_drop(order.emitter, plain, sides.left), plain, sides.right)
+      return llvm_named(released, "icmp #{llvm_comparison(operator)} i64 #{order.operand}, 0")
+    end
     if llvm_counted?(plain)
       equal = llvm_same(sides.emitter, plain, sides.left, sides.right)
       released = llvm_drop(llvm_drop(equal.emitter, plain, sides.left), plain, sides.right)
@@ -1252,6 +1262,41 @@ def llvm_value(emitter, value)
       read = llvm_element(slot.emitter, type, slot.operand)
     end
     LLVMValue.new(emitter: llvm_drop(read.emitter, record.type, asked.operand), operand: read.operand)
+  # A field of one of several structs (#572): the runtime finds its slot
+  # by name in whichever struct this is, and it is then read as any
+  # field is.
+  in IntermediateSought(type:, record:, name:)
+    asked = llvm_value(emitter, record)
+    label = llvm_literal(asked.emitter, name)
+    slot = llvm_named(label.emitter, "call ptr @portland_struct_slot(ptr #{asked.operand}, ptr #{label.operand})")
+    mutable read = nil
+    if type in ["maybe", *]
+      maybe_shape = llvm_type(type)
+      inner_shape = llvm_type(type_at(type, 1))
+      field_flag = llvm_element(slot.emitter, ["boolean"], slot.operand)
+      value_slot = llvm_named(field_flag.emitter, "getelementptr i64, ptr #{slot.operand}, i64 1")
+      field_value = llvm_element(value_slot.emitter, type_at(type, 1), value_slot.operand)
+      half_made = llvm_named(field_value.emitter, "insertvalue #{maybe_shape} undef, i1 #{field_flag.operand}, 0")
+      read = llvm_named(half_made.emitter, "insertvalue #{maybe_shape} #{half_made.operand}, #{inner_shape} #{field_value.operand}, 1")
+    else
+      read = llvm_element(slot.emitter, type, slot.operand)
+    end
+    LLVMValue.new(emitter: llvm_drop(read.emitter, record.type, asked.operand), operand: read.operand)
+  # Whether one of several structs is the one named (#572): its shape is
+  # the second word of its block, and a struct's shape is written once.
+  in IntermediateShaped(value: tested, name:)
+    asked = llvm_value(emitter, tested)
+    # A maybe is the struct named only where it is there, which the
+    # runtime asks of an address that may be nothing.
+    if tested.type in ["maybe", *]
+      held = llvm_named(asked.emitter, "extractvalue #{llvm_type(tested.type)} #{asked.operand}, 1")
+      named = llvm_named(held.emitter, "call zeroext i1 @portland_struct_is(ptr #{held.operand}, ptr #{llvm_shape_name(name)})")
+      return LLVMValue.new(emitter: llvm_drop(named.emitter, tested.type, asked.operand), operand: named.operand)
+    end
+    place = llvm_named(asked.emitter, "getelementptr i64, ptr #{asked.operand}, i64 1")
+    shape = llvm_named(place.emitter, "load ptr, ptr #{place.operand}")
+    same = llvm_named(shape.emitter, "icmp eq ptr #{shape.operand}, #{llvm_shape_name(name)}")
+    LLVMValue.new(emitter: llvm_drop(same.emitter, tested.type, asked.operand), operand: same.operand)
   # A `yield` calls the block this function was handed, with its frame
   # and then what is yielded.
   in IntermediateYield(type:, arguments:, leaves:)

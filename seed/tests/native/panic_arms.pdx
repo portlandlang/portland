@@ -1,0 +1,39 @@
+# An arm that ends in `panic` answers nothing, so an `if` or a `case`
+# with one answers what its other arms do (#572).
+struct Circle
+  radius
+end
+
+struct Square
+  side
+end
+
+def decoded(letter)
+  case letter
+  when "n" then "newline"
+  when "t" then "tab"
+  else
+    panic "unknown letter #{letter}"
+  end
+end
+
+def sized(side)
+  width = side > 0 ? side : panic("no size")
+  width * 2
+end
+
+def shaped(round, size)
+  shape = if round
+    Circle.new(radius: size)
+  else
+    Square.new(side: size)
+  end
+  shape
+end
+
+puts decoded("n")
+puts decoded("t")
+puts sized(4)
+p(shaped(true, 1))
+p(shaped(false, 2))
+puts decoded("q")

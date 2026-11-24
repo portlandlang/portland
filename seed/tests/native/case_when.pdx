@@ -69,3 +69,16 @@ when "x" then "hexadecimal"
 else "octal"
 end
 puts base
+
+# A subject read by a place worked out from names and numbers.
+def base_of(letters, offset)
+  case letters[offset + 1].downcase
+  when "b" then 2
+  when "x" then 16
+  else 8
+  end
+end
+
+puts base_of(["0", "X", "f"], 0)
+puts base_of(["-", "0", "b", "1"], 1)
+puts base_of(["0", "7"], 0)

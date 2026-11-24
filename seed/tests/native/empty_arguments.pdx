@@ -1,0 +1,46 @@
+# An empty array handed to a def is the array the def's other calls hand
+# it in that place (#572), by place and by name.
+def counted(label, words)
+  "#{label}: #{words.length}"
+end
+
+def joined(words, extra: ["none"])
+  (words + extra).join(" ")
+end
+
+def listed(label, numbers)
+  mutable total = 0
+  numbers.each do |number|
+    total += number
+  end
+  "#{label} #{total}"
+end
+
+puts counted("none", [])
+puts counted("two", ["a", "b"])
+puts joined(["a"], extra: [])
+puts joined([], extra: ["b"])
+puts joined(["c"])
+puts listed("sum", [1, 2, 3])
+puts listed("sum", [])
+
+# An empty array answered by a def is the array the def answers.
+def names_before(words, stop)
+  mutable names = []
+  words.each do |word|
+    return [] if word == stop
+    names << word
+  end
+  names
+end
+
+p(names_before(["a", "b"], "z"))
+p(names_before(["a", "b"], "b"))
+
+# An empty array handed to a struct's field is the array the field holds.
+struct Shelf
+  books
+end
+
+p(Shelf.new(books: ["one"]))
+p(Shelf.new(books: []))

@@ -1,0 +1,35 @@
+# A maybe returned below a guard that found it there answers its value
+# (#572): `return found unless found.nil?` in a def that otherwise answers
+# the value, and one that calls itself.
+struct Step
+  node
+  position
+end
+
+struct Word
+  text
+end
+
+struct Mark
+  sign
+end
+
+def refusal(tokens, method, owner)
+  return nil unless method.node in Word
+  return nil unless method.position < tokens.length
+  Step.new(node: Mark.new(sign: "no #{owner}"), position: method.position)
+end
+
+def parse_item(tokens, position)
+  return Step.new(node: Mark.new(sign: "end"), position: position) if position >= tokens.length
+  if tokens[position] == "("
+    inner = parse_item(tokens, position + 1)
+    guarded = refusal(tokens, inner, "trait")
+    return guarded unless guarded.nil?
+    return inner
+  end
+  Step.new(node: Word.new(text: (tokens[position] or "")), position: position + 1)
+end
+
+p(parse_item(["(", "(", "a", "b"], 0))
+p(parse_item(["(", "a"], 0))
