@@ -1698,10 +1698,6 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             "flags = [true]\nif flags[0]\n  puts 1\nend\n",
             format!("{compiles} — a condition that is a Boolean? on line 2 is unbuilt (#443)"),
         ),
-        (
-            "numbers = [1, 2]\nheld = [numbers[0]]\n",
-            format!("{compiles} — an array of Integer? on line 2 is unbuilt (#443)"),
-        ),
         // A walk the core does not write is the floor's, and unbuilt; so is a
         // call of one it does write in a shape the method does not answer
         // (#525).

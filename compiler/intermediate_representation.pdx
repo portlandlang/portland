@@ -964,7 +964,9 @@ def lower_value(node, bindings, context)
     return IntermediateLocal.new(type: type_at(found, 1), name: name) if found.some?
     lower_call(node, name, [], bindings, inner, nil)
   in ArrayNode(elements:)
-    values = elements.map { lower_value(it, bindings, inner) }
+    # A maybe written into an array is opened first, as one appended is
+    # (#566): an array holds no maybe.
+    values = elements.map { opened_for(lower_value(it, bindings, inner), "[]") }
     return IntermediateArray.new(type: EMPTY_ARRAY, elements: []) if values.empty?
     # An empty array among arrays is one of them, whatever they hold.
     named = values.find { it.type != EMPTY_ARRAY }

@@ -1599,10 +1599,12 @@ end
 
 def synthesize_array(node, types)
   return ["array", ["unknown"]] if node.elements.empty?
-  first = synthesize(node.elements.first, types)
+  # Read as the native build runs it, a maybe written into an array is
+  # opened first, as one appended is (#566).
+  first = opened_natively(synthesize(node.elements.first, types), types)
   mutable uniform = true
   node.elements.each do |element|
-    uniform = false unless synthesize(element, types) == first
+    uniform = false unless opened_natively(synthesize(element, types), types) == first
   end
   return ["array", first] if uniform
   # Read as the native build runs it, a literal of more than one struct
@@ -1610,7 +1612,7 @@ def synthesize_array(node, types)
   if native_reading?(types)
     mutable joined = first
     node.elements.each do |element|
-      joined = joined.nil? ? nil : joined_plain(joined, synthesize(element, types))
+      joined = joined.nil? ? nil : joined_plain(joined, opened_natively(synthesize(element, types), types))
     end
     return ["array", joined] if joined.some?
   end

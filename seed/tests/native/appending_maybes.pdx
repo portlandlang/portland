@@ -29,3 +29,13 @@ p(copied(words).length)
 lines = [Line.new(text: "one", size: 3), Line.new(text: words[0], size: 1)]
 p(texts(lines))
 puts texts(lines).join("-")
+
+# A maybe written into an array literal is opened the same way.
+def listed(words, place)
+  found = words[place]
+  return [found, "after"] if found.some?
+  ["nothing"]
+end
+
+p(listed(["one", "two"], 1))
+p(listed(["one", "two"], 5))
