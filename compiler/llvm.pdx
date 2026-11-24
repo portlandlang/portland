@@ -331,12 +331,14 @@ end
 # One function, as the emitter that wrote it: its lines, the constants
 # its String literals became, and the blocks written in it.
 def llvm_function(function, prefix)
-  entry = function.name == "main"
+  # The entry function is the one with no combination: a program's own def
+  # may be named `main` too.
+  entry = function.key.nil?
   named = function.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }
   # A def that yields is handed its block: the function, and the frame
   # to call it with.
   parameters = function.block.nil? ? named : named + ["ptr #{LLVM_BLOCK}", "ptr #{LLVM_BLOCK_FRAME}"]
-  header = entry ? "define i32 @main() {" : "define #{llvm_type(function.answer)} #{llvm_function_name(function.name)}(#{parameters.join(", ")}) {"
+  header = entry ? "define i32 @main() {" : "define #{llvm_type(function.answer)} #{llvm_function_name(function.key)}(#{parameters.join(", ")}) {"
   llvm_routine(header, [], false, function.parameters, function.locals, function.body, prefix, entry)
 end
 
@@ -819,7 +821,7 @@ def llvm_value(emitter, value)
     flagged = llvm_named(chosen.emitter, "insertvalue #{llvm_type(type)} zeroinitializer, i1 #{inside.operand}, 0")
     made = llvm_named(flagged.emitter, "insertvalue #{llvm_type(type)} #{flagged.operand}, #{llvm_type(element)} #{chosen.operand}, 1")
     LLVMValue.new(emitter: llvm_drop(made.emitter, array.type, held.operand), operand: made.operand)
-  in IntermediateCall(type:, name:, arguments:, block:)
+  in IntermediateCall(type:, target:, arguments:, block:)
     mutable current = emitter
     mutable operands = []
     arguments.each do |argument|
@@ -832,7 +834,7 @@ def llvm_value(emitter, value)
       current = handed.emitter
       operands << "ptr #{handed.function}, ptr #{handed.frame}"
     end
-    call = "call #{llvm_type(type)} #{llvm_function_name(name)}(#{operands.join(", ")})"
+    call = "call #{llvm_type(type)} #{llvm_function_name(target)}(#{operands.join(", ")})"
     # A call that answers nothing has no result to name.
     return LLVMValue.new(emitter: llvm_line(current, call), operand: "") if type == NOTHING
     llvm_named(current, call)

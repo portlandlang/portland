@@ -77,6 +77,9 @@ end
 struct IntermediateCall
   type
   name
+  # The combination of the def this call names, which is the function
+  # it calls.
+  target
   arguments
   block
 end
@@ -137,6 +140,10 @@ end
 # answers, and its statements.
 struct IntermediateFunction
   name
+  # The name the compiled function takes: its combination's (ADR 0097),
+  # since a def is one function for each combination of types it is
+  # called with. The entry function has none.
+  key
   parameters
   answer
   locals
@@ -285,8 +292,9 @@ struct LoweringContext
   # Whether the statement in hand is inside a loop, where `break` and
   # `next` have somewhere to go.
   looping
-  # The yielding defs' blocks by name, as [name, PinnedBlock].
-  blocks
+  # Every combination pinning settled, each a PinnedDef: a call finds the
+  # one it names here.
+  combinations
   # The block the function being lowered is handed, where it yields.
   yielding
   # Whether the statement in hand is inside a block, where `return` and
@@ -423,16 +431,20 @@ end
 def lower_call(node, name, arguments, bindings, context)
   arity = context.arities.find { it[0] == name }
   refuse_native("a call to #{name}", node) if arity.nil?
-  answer = context.answers.find { it[0] == name } or refuse_native("a call to #{name}", node)
   lowered = arguments.map { lower_value(it, bindings, context) }
-  handed = context.blocks.find { it[0] == name }
+  types = lowered.map { it.type }
   # A def called by its bare name is a name and not a call, and is
   # handed no block.
   written = (node in CallNode) ? node.block : nil
-  refuse_native("a block handed to #{name}, which does not yield", node) if written.some? && handed.nil?
-  refuse_native("a call to #{name} without the block it yields to", node) if written.nil? && handed.some?
-  block = written.nil? ? nil : lower_block(written, type_at(handed, 1), bindings, context)
-  IntermediateCall.new(type: type_at(answer, 1), name: name, arguments: lowered, block: block)
+  # The call names a combination of the def's types (ADR 0097): what it
+  # is handed, and what its block answers, read as pinning read it.
+  scope = bindings + yielding_answers(context.answers, context.yielding)
+  handed = written.nil? ? nil : native_block_answer(node, types, scope)
+  key = combination_key(name, types, handed)
+  found = context.combinations.find { it.key == key } or refuse_native("a call to #{key}, a combination of types the build did not settle,", node)
+  refuse_native("a block handed to #{name}, which does not yield", node) if written.some? && found.block.nil?
+  block = written.nil? ? nil : lower_block(written, found.block, bindings, context)
+  IntermediateCall.new(type: found.answer, name: name, target: key, arguments: lowered, block: block)
 end
 
 def lower_condition(node, bindings, context)
@@ -453,7 +465,7 @@ def lower_function(definition, found, context)
   inside = context.with(procedure: found.answer == NOTHING, yielding: found.block, answer: found.answer, pinned: settled.bindings)
   lowered = lower_body(definition.body, definition, "a def", found.parameters, found.answer, inside)
   locals = lowered.bindings.reject { |binding| found.parameters.any? { it[0] == binding[0] } }
-  IntermediateFunction.new(name: definition.name, parameters: found.parameters, answer: found.answer, locals: locals.reverse, body: lowered.nodes, block: found.block)
+  IntermediateFunction.new(name: definition.name, key: found.key, parameters: found.parameters, answer: found.answer, locals: locals.reverse, body: lowered.nodes, block: found.block)
 end
 
 def lower_program(nodes)
@@ -464,13 +476,13 @@ def lower_program(nodes)
   pinned.defs.each do |found|
     if found.pinned?
       called << found
-    elsif found.reason != "nothing calls it"
+    elsif found.key.some?
       definition = definitions.find { it.name == found.name }
       line = definition.nil? ? "" : " on line #{definition.line}"
       panic("the native build needs one type for every value — def #{found.name}#{line} has none: #{found.reason}")
     end
   end
-  context = LoweringContext.new(answers: pinned_answers(called), arities: called.map { [it.name, it.parameters.length] }, procedure: false, looping: false, blocks: called.reject { it.block.nil? }.map { [it.name, it.block] }, yielding: nil, inside_block: false, answer: nil, pinned: pinned.bindings)
+  context = LoweringContext.new(answers: pinned_answers(called), arities: unique_types(called.map { [it.name, it.parameters.length] }), procedure: false, looping: false, combinations: called, yielding: nil, inside_block: false, answer: nil, pinned: pinned.bindings)
   mutable functions = []
   called.each do |found|
     definition = definitions.find { it.name == found.name }
@@ -478,7 +490,7 @@ def lower_program(nodes)
     functions << lower_function(definition, found, context)
   end
   entry = lower_statements(statements, [], context)
-  functions << IntermediateFunction.new(name: "main", parameters: [], answer: ["nil"], locals: entry.bindings.reverse, body: entry.nodes, block: nil)
+  functions << IntermediateFunction.new(name: "main", key: nil, parameters: [], answer: ["nil"], locals: entry.bindings.reverse, body: entry.nodes, block: nil)
   IntermediateProgram.new(functions: functions)
 end
 

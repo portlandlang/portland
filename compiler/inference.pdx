@@ -70,6 +70,16 @@ require_relative "parser"
 # such name, and withholds both opinions.
 NATIVE_READING = "native&"
 
+# What a def that produces no value answers. `puts` produces none (#185),
+# so a def that ends in one has nothing to hand back, and neither has a
+# def that ends in a loop or in a call to such a def. It is a type only
+# under the native reading: the checker has no word for it, and a program
+# cannot hold one.
+NOTHING = ["nothing"]
+
+# The name a `yield` is read under: a keyword, so no local has it.
+YIELD = "yield"
+
 def accumulator_type(argument_types)
   initial = type_at(argument_types, 0)
   return ["unknown"] if initial.nil?
@@ -599,6 +609,16 @@ def class_answer(receiver)
   end
 end
 
+# The name one combination of a def goes by under the native reading
+# (ADR 0097): the def, the types it is called with, and where it is
+# handed a block, what the block answers. A def is compiled once for
+# each, so each has an answer of its own.
+def combination_key(name, arguments, handed)
+  types = arguments.map { render_native_type(it) }.join(", ")
+  return "#{name}(#{types})" if handed.nil?
+  "#{name}(#{types}) { #{render_native_type(handed)} }"
+end
+
 # `x == nil` and `x != nil`, either way round.
 def comparison_proof(node, types)
   return no_proof unless node.operator == "==" || node.operator == "!="
@@ -786,7 +806,64 @@ def narrowings(condition, types)
   [captured + when_true(proof), captured + when_false(proof)]
 end
 
-def native_reading?(types) = types.any? { it[0] == NATIVE_READING }
+# What a block handed to one of the program's defs answers, under the
+# native reading: its parameters bound to what that combination of the
+# def yields, and its body read as any body is. A block that ends in
+# what produces no value answers nothing; so does one whose answer is
+# nil, or a value or nil, or not known, since nothing can read it then
+# and the block is run for what it does.
+def native_block_answer(node, arguments, types)
+  yielded = types.find { it[0] == yields_key(node.name, arguments) }
+  mutable inner = types
+  mutable index = 0
+  node.block.parameters.each do |parameter|
+    type = yielded.nil? ? nil : type_at(type_at(yielded, 1), index)
+    inner = [[parameter, (type or ["unknown"])]] + inner
+    index += 1
+  end
+  return NOTHING if native_nothing?(node.block.body, inner)
+  found = synthesize_body(node.block.body, inner)
+  return NOTHING if found == ["nil"] || (found in ["maybe", *]) || render_type(found).include?("Unknown")
+  found
+end
+
+# What a call to one of the program's defs answers under the native
+# reading: the answer of the combination the call names, or unknown
+# where there is none.
+def native_call_answer(node, types)
+  arguments = node.arguments.map { synthesize(it, types) }
+  handed = node.block.nil? ? nil : native_block_answer(node, arguments, types)
+  found = types.find { it[0] == combination_key(node.name, arguments, handed) }
+  found.nil? ? ["unknown"] : type_at(found, 1)
+end
+
+# Whether a body ends in what produces no value: `puts`, a loop, an
+# `if` whose arms each do and a missing `else` among them, a `yield`
+# whose block answers nothing, or a call to a def that does.
+def native_nothing?(body, types)
+  last = body.last
+  return false if last.nil?
+  return true if last in WhileNode
+  if last in IfNode
+    other = last.else_body or []
+    return native_nothing?((last.then_body or []), types) && (other.empty? || native_nothing?(other, types))
+  end
+  if last in YieldNode
+    handed = types.find { it[0] == YIELD }
+    return handed.some? && type_at(handed, 1) == NOTHING
+  end
+  return false unless last in CallNode
+  return true if last.name == "puts"
+  synthesize(last, types) == NOTHING
+end
+
+# Whether these bindings are the native build's: its name is the last of
+# them, where pinning keeps it, so a checker's bindings answer no after
+# one look and are never walked for it.
+def native_reading?(types)
+  last = types.last
+  last.some? && last[0] == NATIVE_READING
+end
 
 def nil_arm?(branch) = (branch.pattern in NilNode) && branch.guard.nil?
 
@@ -943,6 +1020,9 @@ def register_struct(node, mutable types)
   end
   types
 end
+
+# A type as a combination's name writes it.
+def render_native_type(type) = type == NOTHING ? "nothing" : render_type(type)
 
 # How a type is written back out, for the debug driver. This rendering is
 # NOT ratified surface — the error-voice decision owns the real spelling —
@@ -1125,7 +1205,12 @@ def synthesize_bare_call(node, types)
   # a bare `Rational` names.
   return ["rational"] if node.name == "Rational" && synthesize_name(node.name, types) == ["type", "Rational"]
   return ["complex"] if node.name == "Complex" && synthesize_name(node.name, types) == ["type", "Complex"]
-  synthesize_name(node.name, types)
+  found = synthesize_name(node.name, types)
+  # A call that answers nothing known may be to one of the program's defs
+  # under the native reading, where a def is kept by the types it is
+  # called with and not by its name.
+  return found unless found == ["unknown"] && native_reading?(types)
+  native_call_answer(node, types)
 end
 
 # The arithmetic and comparison operators, ADR 0018's shapes: whole numbers
@@ -1308,7 +1393,14 @@ def synthesize_hash(node, types)
 end
 
 def synthesize_identifier(node, types)
-  synthesize_name(node.name, types)
+  found = types.find { it[0] == node.name }
+  return type_at(found, 1) if found.some?
+  plain = synthesize_name(node.name, types)
+  # A def with no parameters is called by its bare name; under the
+  # native reading it is kept by its combination, which has none.
+  return plain unless plain == ["unknown"] && native_reading?(types)
+  called = types.find { it[0] == combination_key(node.name, [], nil) }
+  called.nil? ? plain : type_at(called, 1)
 end
 
 # An if in value position (the ternary desugars here too, ADR 0046):
@@ -1524,3 +1616,7 @@ end
 def when_false(proof) = type_at(proof, 1)
 
 def when_true(proof) = type_at(proof, 0)
+
+# The name what a combination yields goes by: the def and the types it
+# is called with, whatever its block answers.
+def yields_key(name, arguments) = combination_key(name, arguments, nil) + "&"
