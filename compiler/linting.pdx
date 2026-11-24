@@ -103,9 +103,12 @@ def lint_order(path, nodes)
   findings
 end
 
-# A file that does not parse cannot be read for anything else.
+# A file that does not parse cannot be read for anything else. The
+# trouble may be anywhere in it (#551): the parser leaves an error where
+# it met one, inside a def or a block as much as at the top, so every
+# node is looked at, and each is named in the parser's own words.
 def lint_parse(path, nodes)
-  nodes.select { it.kind == "error" }.map { LintFinding.new(path: path, line: (it.line or 1), message: "this does not parse") }
+  walked(nodes).select { it in ErrorNode }.map { LintFinding.new(path: path, line: (it.line or 1), message: "this does not parse — #{it.message}") }
 end
 
 # Every finding in one file's text.

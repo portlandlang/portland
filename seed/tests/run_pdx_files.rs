@@ -1421,6 +1421,36 @@ fn pdx_runs_lint_and_report_by_name() {
     }
 }
 
+/// The linter refuses a file that does not parse, wherever in it the
+/// trouble is (#551): inside a def or a block as much as at the top, and
+/// in the parser's own words. Nothing else is said of such a file.
+#[test]
+fn portland_lint_names_what_does_not_parse_anywhere_in_a_file() {
+    let driver = format!("{}/../compiler/lint.pdx", env!("CARGO_MANIFEST_DIR"));
+    let sample = std::env::temp_dir().join("lint_unparsed_sample.pdx");
+    std::fs::write(
+        &sample,
+        "def picked(list)\n  list.map do |number|\n    next 5 if number == 1\n    number\n  end\nend\n\ndef other(value)\n  if value\n    next [] if value\n  end\nend\n",
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        !output.status.success(),
+        "a file that does not parse should refuse"
+    );
+    let path = sample.display();
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        format!(
+            "{path}:3: this does not parse — expected newline after statement, got 5\n{path}:10: this does not parse — expected newline after statement, got [\n"
+        )
+    );
+}
+
 /// The linter holds a file to its order (#509): requires, constants,
 /// traits, structs, defs, and then what it runs, each kind alphabetical,
 /// the methods of a struct among themselves too. A constant built from
