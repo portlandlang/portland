@@ -63,6 +63,21 @@
 # `each` is a loop written where the call is, calling the block's
 # function once for each element.
 #
+# A block that can leave, by `return` or `break`, does so by a flag passed
+# up (ADR 0097). Its function answers a pair: where it is leaving to, and
+# its answer, the first being nothing when it only finished. A def handed
+# such a block answers a pair too, since the leaving passes through it.
+# Where a block leaves to is an address that names the frame: for a
+# `return`, the place its def keeps the answer, which the block stores
+# into first; for a `break`, a token the call it was handed to made for
+# the purpose. Whoever called a block that can leave, or a def handed
+# one, looks at the first of the pair. Nothing: it goes on. Its own
+# address: it has arrived, and a def then answers what was stored, while
+# a call that was broken out of is simply over. Any other address: it
+# releases what it holds and answers the same pair to its own caller.
+# Only a combination handed a block that can leave is compiled this way;
+# the rest have no pair and no test.
+#
 # A maybe is a flag beside the value (ADR 0096): a pair of a bit saying
 # whether there is one, and the value, which is all zeroes where there
 # is none. It is one form for every type. A maybe of a String or of an
@@ -82,6 +97,9 @@ require_relative "intermediate_representation"
 LLVM_BLOCK = "%\".block\""
 
 LLVM_BLOCK_FRAME = "%\".block.frame\""
+
+# The token a block's own `break` leaves to, read out of its frame.
+LLVM_BREAK = "%\".break\""
 
 LLVM_FRAME = "%\".frame\""
 
@@ -131,6 +149,10 @@ LLVM_PRELUDE = [
   "}"
 ]
 
+# Where a `return` in a block leaves its answer and leaves to: in a def,
+# the place itself; in a block, the address of it, read out of the frame.
+LLVM_RETURN = "%\".return\""
+
 # The text so far: its lines, the next number for a temporary or a label,
 # and the label of the block being written, which a value chosen between
 # two arms has to name.
@@ -155,6 +177,12 @@ struct LLVMEmitter
   # The blocks written in this function, each a finished function's
   # lines, written out after it.
   routines
+  # What this function answers, whether it answers it as a pair with
+  # where it is leaving to (ADR 0097), and whether it is a def a block
+  # returns into, which then has a place for that answer.
+  answer
+  paired
+  returned
 end
 
 # A block written and its frame built: the text so far, the block's
@@ -163,6 +191,9 @@ struct LLVMHanded
   emitter
   function
   frame
+  # The token a `break` in the block names the call by, or nil where the
+  # block has none.
+  token
 end
 
 # Two operands written, each as a plain value: the text so far, and how
@@ -173,10 +204,54 @@ struct LLVMPair
   right
 end
 
+# What a function is written from: a def's, the entry function's, or a
+# block's.
+struct LLVMRoutine
+  header
+  prefix
+  entry
+  parameters
+  locals
+  body
+  answer
+  # A block's: what it captures, and what else its frame carries.
+  captures
+  onward
+  returns
+  breaks
+  # Whether it answers a pair, and whether it is a def a block returns
+  # into.
+  paired
+  returned
+end
+
 # A value written: the text so far, and how to refer to the value.
 struct LLVMValue
   emitter
   operand
+end
+
+# What a function answers as LLVM's: its answer, or where it can leave,
+# a pair of where it is leaving to and its answer (ADR 0097). One that
+# answers nothing answers only where it is leaving to.
+def llvm_answer_type(answer, paired)
+  return llvm_type(answer) unless paired
+  answer == NOTHING ? "ptr" : "{ ptr, #{llvm_type(answer)} }"
+end
+
+# The way out of the function being written: its answer, with where it
+# is leaving to where it answers a pair. `value` is nil where there is
+# no answer to give, which is so when it is leaving.
+def llvm_answered(emitter, target, value)
+  unless emitter.paired
+    return llvm_line(emitter, value.nil? ? "ret void" : "ret #{llvm_type(emitter.answer)} #{value}")
+  end
+  return llvm_line(emitter, "ret ptr #{target}") if emitter.answer == NOTHING
+  shape = llvm_answer_type(emitter.answer, true)
+  aimed = llvm_named(emitter, "insertvalue #{shape} zeroinitializer, ptr #{target}, 0")
+  return llvm_line(aimed.emitter, "ret #{shape} #{aimed.operand}") if value.nil?
+  filled = llvm_named(aimed.emitter, "insertvalue #{shape} #{aimed.operand}, #{llvm_type(emitter.answer)} #{value}, 1")
+  llvm_line(filled.emitter, "ret #{shape} #{filled.operand}")
 end
 
 # One element appended. A slot is a word: an Integer as it is, a Boolean
@@ -201,31 +276,80 @@ def llvm_array_kind(type)
   end
 end
 
+# A call that may come back leaving (ADR 0097): of a block that can
+# leave, or of a def handed one. It answers where the leaving is to,
+# which is nothing when the call only finished. Otherwise: the token of
+# this call's own block means a `break`, and the call is over, at
+# `broken` where a walk has somewhere of its own to go; the place this
+# def keeps a returned answer means a `return` into it, and the def
+# answers what is there; and anything else is on its way further out, so
+# this function lets go of what it holds, `extra` among it, and answers
+# the same.
+def llvm_arrived(emitter, answer, call, token, broken, extra)
+  shape = llvm_answer_type(answer, true)
+  result = llvm_named(emitter, call)
+  target = answer == NOTHING ? result : llvm_named(result.emitter, "extractvalue #{shape} #{result.operand}, 0")
+  leaving = llvm_named(target.emitter, "icmp ne ptr #{target.operand}, null")
+  number = leaving.emitter.counter
+  stay = "leave#{number}.stay"
+  mutable current = llvm_label(llvm_line(leaving.emitter, "br i1 #{leaving.operand}, label %leave#{number}.out, label %#{stay}"), "leave#{number}.out")
+  if token.some?
+    own = llvm_named(current, "icmp eq ptr #{target.operand}, #{token}")
+    current = llvm_label(llvm_line(own.emitter, "br i1 #{own.operand}, label %#{broken or stay}, label %leave#{number}.past"), "leave#{number}.past")
+  end
+  if current.returned
+    home = llvm_named(current, "icmp eq ptr #{target.operand}, #{LLVM_RETURN}")
+    arrived = llvm_label(llvm_line(home.emitter, "br i1 #{home.operand}, label %leave#{number}.home, label %leave#{number}.on"), "leave#{number}.home")
+    released = llvm_release_held(extra.nil? ? arrived : llvm_drop(arrived, type_at(extra, 0), type_at(extra, 1)))
+    answered = if current.answer == NOTHING
+      llvm_answered(released, "null", nil)
+    else
+      kept = llvm_named(released, "load #{llvm_type(current.answer)}, ptr #{LLVM_RETURN}")
+      llvm_answered(kept.emitter, "null", kept.operand)
+    end
+    current = llvm_label(answered, "leave#{number}.on")
+  end
+  # Past here the leaving is to somewhere further out, which only a
+  # function that answers a pair can pass on. One that does not has no
+  # caller the leaving could be to, so nothing reaches this.
+  passed = if current.paired
+    llvm_answered(llvm_release_held(extra.nil? ? current : llvm_drop(current, type_at(extra, 0), type_at(extra, 1))), target.operand, nil)
+  else
+    llvm_line(current, "unreachable")
+  end
+  stayed = llvm_label(passed, stay)
+  return LLVMValue.new(emitter: stayed, operand: "") if answer == NOTHING
+  llvm_named(stayed, "extractvalue #{shape} #{result.operand}, 1")
+end
+
 # A block handed over: its function written, and its frame built.
 def llvm_block(emitter, block)
   number = emitter.counter
   name = "@\"portland.block.#{emitter.prefix}.#{number}\""
   named = block.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }
-  header = "define internal #{llvm_type(block.answer)} #{name}(#{(["ptr #{LLVM_FRAME}"] + named).join(", ")}) {"
-  written = llvm_routine(header, block.captures, block.onward, block.parameters, block.locals, block.body, "#{emitter.prefix}.b#{number}", false)
+  header = "define internal #{llvm_answer_type(block.answer, block.leaves)} #{name}(#{(["ptr #{LLVM_FRAME}"] + named).join(", ")}) {"
+  written = llvm_routine(LLVMRoutine.new(header: header, prefix: "#{emitter.prefix}.b#{number}", entry: false, parameters: block.parameters, locals: block.locals, body: block.body, answer: block.answer, captures: block.captures, onward: block.onward, returns: block.returns, breaks: block.breaks, paired: block.leaves, returned: false))
   mutable current = emitter.with(counter: number + 1, globals: emitter.globals + written.globals, routines: emitter.routines + [""] + written.lines + ["}"] + written.routines)
-  return LLVMHanded.new(emitter: current, function: name, frame: "null") if block.captures.empty? && !block.onward
+  carried = llvm_frame_carried(block.captures, block.onward, block.returns, block.breaks)
+  return LLVMHanded.new(emitter: current, function: name, frame: "null", token: nil) if carried.empty?
   frame = "%\"frame.#{number}\""
-  shape = llvm_frame_shape(block.captures, block.onward)
-  current = current.with(frames: current.frames + ["  #{frame} = alloca #{shape}"])
+  token = block.breaks ? "%\"break.#{number}\"" : nil
+  reserved = ["  #{frame} = alloca [#{carried.length} x ptr]"] + (token.nil? ? [] : ["  #{token} = alloca i8"])
+  current = current.with(frames: current.frames + reserved)
   mutable position = 0
-  block.captures.each do |capture|
-    place = llvm_named(current, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position}")
-    current = llvm_line(place.emitter, "store ptr #{llvm_slot(capture[0])}, ptr #{place.operand}")
+  carried.each do |kind|
+    address = case kind
+              when "block" then LLVM_BLOCK
+              when "block frame" then LLVM_BLOCK_FRAME
+              when "return" then LLVM_RETURN
+              when "break" then (token or "null")
+              else llvm_slot(kind)
+              end
+    place = llvm_named(current, "getelementptr [#{carried.length} x ptr], ptr #{frame}, i64 0, i64 #{position}")
+    current = llvm_line(place.emitter, "store ptr #{address}, ptr #{place.operand}")
     position += 1
   end
-  if block.onward
-    function = llvm_named(current, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position}")
-    stored = llvm_line(function.emitter, "store ptr #{LLVM_BLOCK}, ptr #{function.operand}")
-    carried = llvm_named(stored, "getelementptr #{shape}, ptr #{frame}, i64 0, i64 #{position + 1}")
-    current = llvm_line(carried.emitter, "store ptr #{LLVM_BLOCK_FRAME}, ptr #{carried.operand}")
-  end
-  LLVMHanded.new(emitter: current, function: name, frame: frame)
+  LLVMHanded.new(emitter: current, function: name, frame: frame, token: token)
 end
 
 # A text's bytes as LLVM writes them between quotes: a printable ASCII
@@ -322,7 +446,16 @@ def llvm_equal_maybes(emitter, left_type, left, right_type, right)
   LLVMValue.new(emitter: llvm_drop(llvm_drop(equal.emitter, left_type, left), right_type, right), operand: equal.operand)
 end
 
-# A frame's shape: a place for each captured slot's address, and two more
+# What a block's frame carries, in order: each captured local by its
+# name, then, as each applies, the block its writer was handed and that
+# block's frame, the place its def keeps a returned answer, and the token
+# its own `break` leaves to. A local's name is never one of those words
+# with a space in it or bare `block`, `return`, or `break`, which are
+# keywords.
+def llvm_frame_carried(captures, onward, returns, breaks)
+  captures.map { it[0] } + (onward ? ["block", "block frame"] : []) + (returns ? ["return"] : []) + (breaks ? ["break"] : [])
+end
+
 # where the block yields.
 def llvm_frame_shape(captures, onward)
   "[#{captures.length + (onward ? 2 : 0)} x ptr]"
@@ -336,10 +469,11 @@ def llvm_function(function, prefix)
   entry = function.key.nil?
   named = function.parameters.map { "#{llvm_type(type_at(it, 1))} #{llvm_local(it[0])}" }
   # A def that yields is handed its block: the function, and the frame
-  # to call it with.
+  # to call it with. Handed one that can leave, it answers a pair.
   parameters = function.block.nil? ? named : named + ["ptr #{LLVM_BLOCK}", "ptr #{LLVM_BLOCK_FRAME}"]
-  header = entry ? "define i32 @main() {" : "define #{llvm_type(function.answer)} #{llvm_function_name(function.key)}(#{parameters.join(", ")}) {"
-  llvm_routine(header, [], false, function.parameters, function.locals, function.body, prefix, entry)
+  paired = function.block.some? && function.block.leaves
+  header = entry ? "define i32 @main() {" : "define #{llvm_answer_type(function.answer, paired)} #{llvm_function_name(function.key)}(#{parameters.join(", ")}) {"
+  llvm_routine(LLVMRoutine.new(header: header, prefix: prefix, entry: entry, parameters: function.parameters, locals: function.locals, body: function.body, answer: function.answer, captures: [], onward: false, returns: false, breaks: false, paired: paired, returned: function.returned))
 end
 
 # A def's name as LLVM's. Quoted, since a Portland name may end in `?`, and
@@ -481,39 +615,45 @@ end
 # entry function's, or a block's. A block's captures are read out of its
 # frame first, each as the address of a slot that lives in its writer,
 # and after them, where the block yields, what its writer was handed.
-def llvm_routine(header, captures, onward, parameters, locals, body, prefix, entry)
-  held = (parameters + locals).select { llvm_counted?(type_at(it, 1)) }
-  mutable emitter = LLVMEmitter.new(lines: [header, "entry:"], counter: 0, block: "entry", globals: [], prefix: prefix, held: held, loops: [], frames: [], routines: [])
-  shape = llvm_frame_shape(captures, onward)
+def llvm_routine(routine)
+  held = (routine.parameters + routine.locals).select { llvm_counted?(type_at(it, 1)) }
+  mutable emitter = LLVMEmitter.new(lines: [routine.header, "entry:"], counter: 0, block: "entry", globals: [], prefix: routine.prefix, held: held, loops: [], frames: [], routines: [], answer: routine.answer, paired: routine.paired, returned: routine.returned)
+  carried = llvm_frame_carried(routine.captures, routine.onward, routine.returns, routine.breaks)
   mutable position = 0
-  captures.each do |capture|
-    place = llvm_named(emitter, "getelementptr #{shape}, ptr #{LLVM_FRAME}, i64 0, i64 #{position}")
-    emitter = llvm_line(place.emitter, "#{llvm_slot(capture[0])} = load ptr, ptr #{place.operand}")
+  carried.each do |kind|
+    name = case kind
+           when "block" then LLVM_BLOCK
+           when "block frame" then LLVM_BLOCK_FRAME
+           when "return" then LLVM_RETURN
+           when "break" then LLVM_BREAK
+           else llvm_slot(kind)
+           end
+    place = llvm_named(emitter, "getelementptr [#{carried.length} x ptr], ptr #{LLVM_FRAME}, i64 0, i64 #{position}")
+    emitter = llvm_line(place.emitter, "#{name} = load ptr, ptr #{place.operand}")
     position += 1
   end
-  if onward
-    function = llvm_named(emitter, "getelementptr #{shape}, ptr #{LLVM_FRAME}, i64 0, i64 #{position}")
-    loaded = llvm_line(function.emitter, "#{LLVM_BLOCK} = load ptr, ptr #{function.operand}")
-    frame = llvm_named(loaded, "getelementptr #{shape}, ptr #{LLVM_FRAME}, i64 0, i64 #{position + 1}")
-    emitter = llvm_line(frame.emitter, "#{LLVM_BLOCK_FRAME} = load ptr, ptr #{frame.operand}")
+  # A def a block returns into keeps a place for the answer, whose
+  # address is also what such a block leaves to.
+  if routine.returned
+    emitter = llvm_line(emitter, "#{LLVM_RETURN} = alloca #{routine.answer == NOTHING ? "i8" : llvm_type(routine.answer)}")
   end
-  (parameters + locals).each do |slot|
+  (routine.parameters + routine.locals).each do |slot|
     emitter = llvm_line(emitter, "#{llvm_slot(slot[0])} = alloca #{llvm_type(type_at(slot, 1))}")
   end
   # A local that holds a counted value starts empty, so releasing it before
   # it is bound does nothing.
-  locals.each do |local|
+  routine.locals.each do |local|
     starting = type_at(local, 1)
     emitter = llvm_line(emitter, "store #{llvm_type(starting)} #{llvm_zero(starting)}, ptr #{llvm_slot(local[0])}") if llvm_counted?(starting)
   end
-  parameters.each do |parameter|
+  routine.parameters.each do |parameter|
     type = llvm_type(type_at(parameter, 1))
     emitter = llvm_line(emitter, "store #{type} #{llvm_local(parameter[0])}, ptr #{llvm_slot(parameter[0])}")
   end
-  emitter = llvm_statements(emitter, body)
+  emitter = llvm_statements(emitter, routine.body)
   # Every path through a def or a block has returned by here; the entry
   # function falls off its end and answers success.
-  finished = if entry
+  finished = if routine.entry
     llvm_line(llvm_line(llvm_release_held(emitter), "call void @portland_exit_check()"), "ret i32 0")
   else
     llvm_line(emitter, "unreachable")
@@ -599,16 +739,28 @@ def llvm_statement(emitter, statement)
     llvm_label(stopped, "after#{stopped.counter}")
   in IntermediateReturn(value:)
     returned = if value.nil?
-      llvm_line(llvm_release_held(emitter), "ret void")
+      llvm_line(llvm_release_held(emitter), emitter.paired ? "ret ptr null" : "ret void")
     else
       # The value is computed first: it may read a local the release
       # after it lets go of.
       written = llvm_value(emitter, value)
-      llvm_line(llvm_release_held(written.emitter), "ret #{llvm_type(value.type)} #{written.operand}")
+      llvm_answered(llvm_release_held(written.emitter), "null", written.operand)
     end
     # Whatever is written after a return needs a block of its own to sit
     # in, though nothing reaches it.
     llvm_label(returned, "after#{returned.counter}")
+  # `return` or `break` in a block: a `return` stores what its def is to
+  # answer in the place the def keeps for it, and either answers where it
+  # is leaving to, with nothing for the block's own answer.
+  in IntermediateLeave(kind:, value:)
+    stored = if value.nil?
+      emitter
+    else
+      written = llvm_value(emitter, value)
+      llvm_line(written.emitter, "store #{llvm_type(value.type)} #{written.operand}, ptr #{LLVM_RETURN}")
+    end
+    left = llvm_answered(llvm_release_held(stored), kind == "return" ? LLVM_RETURN : LLVM_BREAK, nil)
+    llvm_label(left, "after#{left.counter}")
   in IntermediatePrint(value:)
     written = llvm_value(emitter, value)
     if value.type == ["string"]
@@ -829,12 +981,16 @@ def llvm_value(emitter, value)
       current = written.emitter
       operands << "#{llvm_type(argument.type)} #{written.operand}"
     end
+    mutable handed = nil
     if block.some?
       handed = llvm_block(current, block)
       current = handed.emitter
       operands << "ptr #{handed.function}, ptr #{handed.frame}"
     end
-    call = "call #{llvm_type(type)} #{llvm_function_name(target)}(#{operands.join(", ")})"
+    leaves = block.some? && block.leaves
+    call = "call #{llvm_answer_type(type, leaves)} #{llvm_function_name(target)}(#{operands.join(", ")})"
+    # A def handed a block that can leave answers where the leaving is to.
+    return llvm_arrived(current, type, call, handed.token, nil, nil) if leaves
     # A call that answers nothing has no result to name.
     return LLVMValue.new(emitter: llvm_line(current, call), operand: "") if type == NOTHING
     llvm_named(current, call)
@@ -869,14 +1025,18 @@ def llvm_value(emitter, value)
     offset = llvm_named(inside, "add i64 #{index.operand}, 4")
     slot = llvm_named(offset.emitter, "getelementptr i64, ptr #{walked.operand}, i64 #{offset.operand}")
     read = llvm_element(slot.emitter, type_at(type, 1), slot.operand)
-    called = llvm_line(read.emitter, "call void #{handed.function}(ptr #{handed.frame}, #{element} #{read.operand})")
+    call = "call #{llvm_answer_type(NOTHING, block.leaves)} #{handed.function}(ptr #{handed.frame}, #{element} #{read.operand})"
+    # A block that can leave ends the walk: a `break` of its own goes
+    # straight to the walk's end, and anything else leaves this function,
+    # letting go of the array the walk was holding.
+    called = block.leaves ? llvm_arrived(read.emitter, NOTHING, call, handed.token, "walk#{number}.done", [type, walked.operand]).emitter : llvm_line(read.emitter, call)
     following = llvm_named(called, "add i64 #{index.operand}, 1")
     stepped = llvm_line(following.emitter, "store i64 #{following.operand}, ptr #{turn}")
     finished = llvm_label(llvm_line(stepped, "br label %walk#{number}.test"), "walk#{number}.done")
     LLVMValue.new(emitter: finished, operand: walked.operand)
   # A `yield` calls the block this function was handed, with its frame
   # and then what is yielded.
-  in IntermediateYield(type:, arguments:)
+  in IntermediateYield(type:, arguments:, leaves:)
     mutable current = emitter
     mutable operands = ["ptr #{LLVM_BLOCK_FRAME}"]
     arguments.each do |argument|
@@ -884,7 +1044,10 @@ def llvm_value(emitter, value)
       current = written.emitter
       operands << "#{llvm_type(argument.type)} #{written.operand}"
     end
-    call = "call #{llvm_type(type)} #{LLVM_BLOCK}(#{operands.join(", ")})"
+    call = "call #{llvm_answer_type(type, leaves)} #{LLVM_BLOCK}(#{operands.join(", ")})"
+    # A block that can leave answers where to, which is never here: it is
+    # the caller's block, leaving to somewhere past this function.
+    return llvm_arrived(current, type, call, nil, nil, nil) if leaves
     return LLVMValue.new(emitter: llvm_line(current, call), operand: "") if type == NOTHING
     llvm_named(current, call)
   in IntermediateChoice(type:, condition:, then_value:, else_value:)

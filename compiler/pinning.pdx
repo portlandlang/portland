@@ -39,6 +39,9 @@ COMBINATION_LIMIT = 48
 # are: an empty literal, named by its first append.
 EMPTY_ARRAY = ["array", ["unknown"]]
 
+# The name a `return` is gathered under: a keyword, so no def has it.
+RETURN = "return"
+
 # How many rounds pinning takes before it is not going to settle. A
 # round reaches one call deeper, so a program needs as many as its calls
 # nest; past this, two rounds are answering each other back and forth.
@@ -46,19 +49,22 @@ ROUND_LIMIT = 200
 
 # What a walk over statements has gathered: the bindings in scope, and the
 # calls seen, each as [def name, argument types, what the block it was
-# handed answers or nil]. A `yield` is gathered the same way, under the
-# name `yield`, with what it hands over.
+# handed answers or nil, whether that block can leave]. A `yield` is
+# gathered the same way, under the name `yield`, with what it hands over,
+# and a `return` under the name `return`, with what it answers.
 struct PinWalk
   bindings
   calls
 end
 
-# A yielding def's block: the types of what it is yielded, in order, and
-# the type it answers, or the reason the two could not be pinned.
+# A yielding def's block: the types of what it is yielded, in order, the
+# type it answers, and whether it can leave the def before the def is
+# done (#523), or the reason these could not be pinned.
 struct PinnedBlock
   parameters
   answer
   reason
+  leaves
 end
 
 # One combination of a def's types (ADR 0097): its parameters as [name,
@@ -98,7 +104,7 @@ def answer_candidates(body, parameters, answers, names)
     last = value_candidates(statement, scope)
     walk = pin_statement(statement, walk, answers, names)
   end
-  found + last
+  found + returns_gathered(walk) + last
 end
 
 # Whether a body ends in what produces no value, read with the bindings
@@ -123,9 +129,12 @@ def body_answer(body, parameters, answers, names)
   end
   # A body that ends in `panic` hands nothing back that way, so its
   # answer is what its returns say (#505).
+  # A `return` inside a block leaves the def too (#523), so what it
+  # answers is one of the def's answers.
+  leaving = early + returns_gathered(walk)
   ending = body.last
-  return merge_answers(early) if (ending in CallNode) && ending.name == "panic" && !early.empty?
-  merge_answers(early + [last])
+  return merge_answers(leaving) if (ending in CallNode) && ending.name == "panic" && !leaving.empty?
+  merge_answers(leaving + [last])
 end
 
 # Whether a type says everything a code generator needs: no unknown in it.
@@ -156,6 +165,7 @@ def pin_block_call(node, walk, answers, names)
   scope = current.bindings + answers
   arguments = node.arguments.map { synthesize(it, scope) }
   answer = native_block_answer(node, arguments, scope)
+  leaves = native_block_leaves?(node.block, scope)
   yielded = answers.find { it[0] == yields_key(node.name, arguments) }
   mutable inner = current.bindings
   mutable index = 0
@@ -167,13 +177,13 @@ def pin_block_call(node, walk, answers, names)
   walked = pin_statements(node.block.body, current.with(bindings: inner), answers, names)
   outer = current.bindings.length
   kept = walked.bindings.slice(walked.bindings.length - outer, outer)
-  PinWalk.new(bindings: kept, calls: walked.calls + [[node.name, arguments, answer]])
+  PinWalk.new(bindings: kept, calls: walked.calls + [[node.name, arguments, answer, leaves]])
 end
 
 # One combination of a def's types: its parameters from the arguments,
 # what it yields from its body, and then its answer.
-def pin_combination(definition, arguments, handed, answers, names, strict)
-  key = combination_key(definition.name, arguments, handed)
+def pin_combination(definition, arguments, handed, leaves, answers, names, strict)
+  key = combination_key(definition.name, arguments, handed, leaves)
   unpinned = PinnedDef.new(name: definition.name, key: key, parameters: [], answer: ["unknown"], reason: nil, block: nil)
   if arguments.length != definition.parameters.length
     return unpinned.with(reason: "it takes #{definition.parameters.length} and one call hands it #{arguments.length}")
@@ -185,7 +195,7 @@ def pin_combination(definition, arguments, handed, answers, names, strict)
     parameters << [parameter.name, (type_at(arguments, index) or ["unknown"])]
     index += 1
   end
-  block = pinned_block(definition, parameters, handed, answers, names, strict)
+  block = pinned_block(definition, parameters, handed, leaves, answers, names, strict)
   # A combination refused for its block keeps what it yields, which a
   # call site reads its block with.
   return unpinned.with(parameters: parameters, reason: block.reason, block: block) if block.some? && block.reason.some?
@@ -202,12 +212,12 @@ def pin_combinations(definitions, calls, answers, names, strict)
   mutable pinned = []
   definitions.each do |definition|
     sites = calls.select { it[0] == definition.name }
-    met = unique_types(sites.map { [type_at(it, 1), type_at(it, 2)] })
+    met = unique_types(sites.map { [type_at(it, 1), type_at(it, 2), type_at(it, 3) == true] })
     met.each do |combination|
       arguments = type_at(combination, 0)
       handed = type_at(combination, 1)
       next unless arguments.all? { concrete?(it) } && (handed.nil? || concrete?(handed))
-      pinned << pin_combination(definition, arguments, handed, answers, names, strict)
+      pinned << pin_combination(definition, arguments, handed, type_at(combination, 2), answers, names, strict)
     end
   end
   pinned
@@ -221,16 +231,16 @@ def pin_expression(node, walk, answers, names)
   mutable current = walk
   if (node in CallNode) && names.include?(node.name)
     scope = current.bindings + answers
-    current = current.with(calls: current.calls + [[node.name, node.arguments.map { synthesize(it, scope) }, nil]])
+    current = current.with(calls: current.calls + [[node.name, node.arguments.map { synthesize(it, scope) }, nil, false]])
   end
   if node in YieldNode
     scope = current.bindings + answers
-    current = current.with(calls: current.calls + [[YIELD, node.values.map { synthesize(it, scope) }, nil]])
+    current = current.with(calls: current.calls + [[YIELD, node.values.map { synthesize(it, scope) }, nil, false]])
   end
   # A def with no parameters is called by its bare name, which parses as a
   # name and not as a call; a local of that name would be the local.
   if (node in IdentifierNode) && names.include?(node.name) && current.bindings.none? { it[0] == node.name }
-    current = current.with(calls: current.calls + [[node.name, [], nil]])
+    current = current.with(calls: current.calls + [[node.name, [], nil, false]])
   end
   children_of(node).each do |child|
     current = pin_statement(child, current, answers, names)
@@ -276,6 +286,12 @@ def pin_statement(statement, walk, answers, names)
     return walk if value.nil?
     seen = pin_expression(value, walk, answers, names)
     seen.with(bindings: rebound(seen.bindings, name, synthesize(value, seen.bindings + answers)))
+  # A `return` is gathered with what it answers, wherever it is written:
+  # one inside a block leaves the def as one outside it does (#523).
+  in ReturnNode(value:)
+    return walk.with(calls: walk.calls + [[RETURN, [["nil"]], nil, false]]) if value.nil?
+    seen = pin_expression(value, walk, answers, names)
+    seen.with(calls: seen.calls + [[RETURN, [synthesize(value, seen.bindings + answers)], nil, false]])
   in WhileNode(condition:, body:)
     pin_statements(body, pin_expression(condition, walk, answers, names), answers, names)
   in IfNode(condition:, then_body:, else_body:)
@@ -338,12 +354,12 @@ end
 # read off the def's yields, which must agree, as a def's ways out must.
 # Unless strict, a type not known is passed over, to be read again once
 # more is pinned.
-def pinned_block(definition, parameters, handed, answers, names, strict)
+def pinned_block(definition, parameters, handed, leaves, answers, names, strict)
   return nil unless yields?(definition.body)
   mutable reason = nil
   reason = "it yields, and one call hands it no block" if handed.nil?
   answer = handed or ["unknown"]
-  walked = pin_statements(definition.body, PinWalk.new(bindings: parameters, calls: []), [[YIELD, answer]] + answers, names)
+  walked = pin_statements(definition.body, PinWalk.new(bindings: parameters, calls: []), yield_bindings(answer, leaves) + answers, names)
   yields = walked.calls.select { it[0] == YIELD }.map { type_at(it, 1) }
   counts = unique_types(yields.map { it.length })
   reason = (reason or "it yields #{counts[0]} at one place and #{counts[1]} at another") if counts.length > 1
@@ -357,7 +373,7 @@ def pinned_block(definition, parameters, handed, answers, names, strict)
     types << (seen.length == 1 ? seen[0] : ["unknown"])
     index += 1
   end
-  PinnedBlock.new(parameters: types, answer: answer, reason: reason)
+  PinnedBlock.new(parameters: types, answer: answer, reason: reason, leaves: leaves)
 end
 
 def rebound(bindings, name, type)
@@ -397,13 +413,19 @@ end
 # A yielding def's block as the dump writes it: what it is handed between
 # bars, and what it answers.
 def render_pinned_block(block)
-  answer = "-> #{render_pinned_type(block.answer)}"
+  answer = "-> #{render_pinned_type(block.answer)}#{block.leaves ? ", leaving" : ""}"
   return "{ #{answer} }" if block.parameters.empty?
   "{ |#{block.parameters.map { render_type(it) }.join(", ")}| #{answer} }"
 end
 
 # A pinned type as the dump and the refusals write it.
 def render_pinned_type(type) = type == NOTHING ? "nothing" : render_type(type)
+
+# What every `return` a walk passed answers, the ones inside blocks among
+# them.
+def returns_gathered(walk)
+  walk.calls.select { it[0] == RETURN }.map { type_at(type_at(it, 1), 0) }
+end
 
 # Rounds of pinning until one changes nothing. Each round walks the top
 # level and the body of every combination pinned so far, gathers the
@@ -477,15 +499,15 @@ def with_article(type)
   "#{article} #{rendered}"
 end
 
+# What a def's body reads a `yield` by: what its block answers, and
+# whether that block can leave.
+def yield_bindings(answer, leaves)
+  leaves ? [[YIELD, answer], [YIELD_LEAVES, ["boolean"]]] : [[YIELD, answer]]
+end
+
 # The answers a def's own body is read with: the program's, and what its
 # block answers where it yields.
 def yielding_answers(answers, block)
   return answers if block.nil?
-  [[YIELD, block.answer]] + answers
-end
-
-# Whether a body yields anywhere, the blocks written in it included: a
-# `yield` inside one reaches the def's own block.
-def yields?(body)
-  body.any? { (it in YieldNode) || yields?(children_of(it)) }
+  yield_bindings(block.answer, block.leaves) + answers
 end
