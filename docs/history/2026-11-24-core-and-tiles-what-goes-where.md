@@ -129,33 +129,33 @@ A second thread from the same conversation. Portland runs on Apple silicon only,
 
 ### Built
 
-| What | Size in the seed | The system offers | Could it replace ours |
-| --- | --- | --- | --- |
-| Regex Unicode tables | the largest file in the seed by far, generated | ICU character properties (`uchar.h`, in the SDK) | Probably, for the property lookups |
-| Regex engine | large | ICU regex (`uregex.h`), POSIX `regex.h` | No. Neither has Ruby's syntax or semantics, and the linear-time guarantee is Portland's own |
-| Number formatting (`format`) | medium | `snprintf` | No. Ruby rounds `2.675` to `2.68`; libc gives the correctly rounded `2.67` |
-| JSON | medium | Nothing in C, as [ADR 0064](../adr/0064-2026-10-25-the-standard-library-core-default-tiles-external-tiles.md) found | No |
-| Normalization and grapheme clusters | two crates | CoreFoundation's string functions; ICU's public headers include neither | Yes, with the version cost below |
-| Random | small | `arc4random` | In part ([#548](https://github.com/portlandlang/portland/issues/548)) |
-| Math | small | libm | It is the system's, through Rust |
-| Clocks, entropy, files | small | libc | It is the system's |
-| Line editing in the console | the `rustyline` crate | `libedit` | Yes |
+| What                                | Size in the seed                               | The system offers                                                                                                   | Could it replace ours                                                                       |
+| ----------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Regex Unicode tables                | the largest file in the seed by far, generated | ICU character properties (`uchar.h`, in the SDK)                                                                    | Probably, for the property lookups                                                          |
+| Regex engine                        | large                                          | ICU regex (`uregex.h`), POSIX `regex.h`                                                                             | No. Neither has Ruby's syntax or semantics, and the linear-time guarantee is Portland's own |
+| Number formatting (`format`)        | medium                                         | `snprintf`                                                                                                          | No. Ruby rounds `2.675` to `2.68`; libc gives the correctly rounded `2.67`                  |
+| JSON                                | medium                                         | Nothing in C, as [ADR 0064](../adr/0064-2026-10-25-the-standard-library-core-default-tiles-external-tiles.md) found | No                                                                                          |
+| Normalization and grapheme clusters | two crates                                     | CoreFoundation's string functions; ICU's public headers include neither                                             | Yes, with the version cost below                                                            |
+| Random                              | small                                          | `arc4random`                                                                                                        | In part ([#548](https://github.com/portlandlang/portland/issues/548))                       |
+| Math                                | small                                          | libm                                                                                                                | It is the system's, through Rust                                                            |
+| Clocks, entropy, files              | small                                          | libc                                                                                                                | It is the system's                                                                          |
+| Line editing in the console         | the `rustyline` crate                          | `libedit`                                                                                                           | Yes                                                                                         |
 
 ### Not built
 
-| What | The system offers | Fit |
-| --- | --- | --- |
-| `together` running in parallel | Grand Central Dispatch (`dispatch`, a C interface) | Strong. A scheduler tuned for these cores is the thing least worth writing |
-| Time zones and the calendar | libc's `localtime_r` and `strftime`, and the zone database the OS keeps up to date | Strong. It removes the question of zone data as a tile |
-| `digest` (MD5, SHA) | CommonCrypto | Strong |
-| `securerandom` and UUIDs | `arc4random_buf`, `uuid` | Strong |
-| Compression | `libz`, `libcompression` | Strong |
-| Spawning a process ([#179](https://github.com/portlandlang/portland/issues/179)) | `posix_spawn` | Strong |
-| Copying a file | `copyfile`, which clones on APFS | Strong |
-| HTTP and TLS | the Network framework's C interface; `libcurl` ships | Strong, and it avoids a port of `openssl` |
-| A `logger` sink | `os_log` | Optional |
-| Hash and Set tables for native | nothing suitable | Portland's to write |
-| Leak checking in the debug runtime | `leaks` and malloc's debugging | Beside Portland's own check, not in place of it |
+| What                                                                             | The system offers                                                                  | Fit                                                                        |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `together` running in parallel                                                   | Grand Central Dispatch (`dispatch`, a C interface)                                 | Strong. A scheduler tuned for these cores is the thing least worth writing |
+| Time zones and the calendar                                                      | libc's `localtime_r` and `strftime`, and the zone database the OS keeps up to date | Strong. It removes the question of zone data as a tile                     |
+| `digest` (MD5, SHA)                                                              | CommonCrypto                                                                       | Strong                                                                     |
+| `securerandom` and UUIDs                                                         | `arc4random_buf`, `uuid`                                                           | Strong                                                                     |
+| Compression                                                                      | `libz`, `libcompression`                                                           | Strong                                                                     |
+| Spawning a process ([#179](https://github.com/portlandlang/portland/issues/179)) | `posix_spawn`                                                                      | Strong                                                                     |
+| Copying a file                                                                   | `copyfile`, which clones on APFS                                                   | Strong                                                                     |
+| HTTP and TLS                                                                     | the Network framework's C interface; `libcurl` ships                               | Strong, and it avoids a port of `openssl`                                  |
+| A `logger` sink                                                                  | `os_log`                                                                           | Optional                                                                   |
+| Hash and Set tables for native                                                   | nothing suitable                                                                   | Portland's to write                                                        |
+| Leak checking in the debug runtime                                               | `leaks` and malloc's debugging                                                     | Beside Portland's own check, not in place of it                            |
 
 ### What decides each case
 
