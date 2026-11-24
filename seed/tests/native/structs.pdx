@@ -1,0 +1,59 @@
+# A struct (#532): a counted block holding a field in each slot, each
+# field one type, and its methods defs that are handed `self`.
+struct Point
+  horizontal
+  vertical
+
+  def sum = horizontal + vertical
+
+  def moved(by) = Point.new(horizontal: horizontal + by, vertical: vertical)
+
+  def wide?(than) = horizontal > than
+end
+
+struct Named
+  label
+  place
+  seen
+end
+
+def farthest(points)
+  mutable best = nil
+  points.each do |point|
+    best = point if best.nil? || point.sum > best.sum
+  end
+  best
+end
+
+origin = Point.new(horizontal: 1, vertical: 2)
+puts origin.horizontal
+puts origin.sum
+p(origin)
+puts origin
+shifted = origin.moved(5)
+p(shifted)
+puts shifted.wide?(3)
+home = Named.new(label: "home", place: origin, seen: true)
+p(home)
+puts home.place.vertical
+puts home.label + "!"
+points = [origin, shifted]
+p(points)
+points.each { |point| puts point.sum }
+p(Point.new(vertical: 3, horizontal: 4))
+puts "at #{origin}"
+p(points.map { |point| point.moved(1) })
+p(points.select { |point| point.wide?(3) })
+p(points.find { |point| point.sum > 100 })
+p(farthest(points))
+p(points[0])
+p(points[5])
+mutable line = []
+mutable index = 0
+while index < 3
+  line << Point.new(horizontal: index, vertical: index * index)
+  index += 1
+end
+p(line)
+labels = [Named.new(label: "a", place: origin, seen: false)]
+p(labels.map { |named| named.label })

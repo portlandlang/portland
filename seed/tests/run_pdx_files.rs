@@ -1534,6 +1534,23 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             "panic(5)\n",
             format!("{compiles} — panic of an Integer on line 1 is unbuilt (#443)"),
         ),
+        // A struct outside the first step (#532).
+        (
+            "struct Pair\n  left\n  right\nend\nfirst = Pair.new(left: 1, right: 2)\nsecond = Pair.new(left: \"one\", right: 2)\np(first)\n",
+            "the native build gives each field of a struct one type — Pair.left is an Integer where one is made and a String where another is (#532)".to_string(),
+        ),
+        (
+            "struct Pair\n  left\n  right\nend\nfirst = Pair.new(left: 1)\n",
+            format!("{compiles} — Pair.new without right on line 5 is unbuilt (#443)"),
+        ),
+        (
+            "struct Pair\n  left\nend\nfirst = Pair.new(left: 1)\nputs first == first\n",
+            format!("{compiles} — '==' between structs on line 5 is unbuilt (#443)"),
+        ),
+        (
+            "struct Pair\n  left\nend\nfirst = Pair.new(left: 1)\nother = first.with(left: 2)\n",
+            format!("{compiles} — a call with a dot, .with on line 5 is unbuilt (#443)"),
+        ),
         // A maybe outside the first step (#503).
         (
             "numbers = [1, 2]\nputs numbers[\"a\"]\n",
@@ -1848,6 +1865,19 @@ fn a_native_build_that_refuses_leaves_nothing_behind() {
     assert!(
         stderr.contains("a float on line 1 is unbuilt (#443)"),
         "expected the native refusal, got: {stderr}"
+    );
+    // A refusal that names a type says it under the build's own driver
+    // too, where the checker's helpers are loaded beside pinning's (#532).
+    std::fs::write(
+        &sample,
+        "def twice(value) = value + value\nputs twice(1)\nputs twice(1.5)\n",
+    )
+    .unwrap();
+    let typed = native_build(&sample, &[]);
+    let stderr = String::from_utf8(typed.stderr).unwrap();
+    assert!(
+        stderr.contains("a parameter that is a Float on line 1 is unbuilt (#443)"),
+        "expected the refusal to name the type, got: {stderr}"
     );
     assert!(!text.exists(), "a refused build should leave no IR");
     assert!(!binary.exists(), "a refused build should leave no binary");

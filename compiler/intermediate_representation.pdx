@@ -143,6 +143,13 @@ struct IntermediateEvaluate
   value
 end
 
+# A struct's field read, by where it stands among the fields.
+struct IntermediateField
+  type
+  record
+  index
+end
+
 # A function: parameters and locals as [name, type] pairs, the type it
 # answers, and its statements.
 struct IntermediateFunction
@@ -253,6 +260,17 @@ end
 # as the entry function, `main`.
 struct IntermediateProgram
   functions
+  # The program's structs (#532), each as [its name, its fields as
+  # [name, type] pairs in the order written]: what the output writes
+  # into the binary for the runtime to free a struct and print one by.
+  structs
+end
+
+# A struct made (#532): its fields' values in the order the struct
+# declares them.
+struct IntermediateRecord
+  type
+  fields
 end
 
 # A way out of a function, with the value it answers, or with none where
@@ -315,6 +333,8 @@ struct LoweringContext
   # Every combination pinning settled, each a PinnedDef: a call finds the
   # one it names here.
   combinations
+  # The program's structs, each a StructDefNode (#532).
+  structs
   # The block the function being lowered is handed, where it yields.
   yielding
   # Whether the statement in hand is inside a block, where `return` and
@@ -519,6 +539,9 @@ def lower_program(nodes, core: nil)
   pinned = pin_program(nodes, core: core)
   definitions = pinned.definitions
   statements = nodes.reject { it in DefNode }
+  # A field has one type (#532), as an array's elements have.
+  conflict = pinned.conflicts.first
+  panic("the native build gives each field of a struct one type — #{conflict} (#532)") if conflict.some?
   mutable called = []
   pinned.defs.each do |found|
     if found.pinned?
@@ -529,7 +552,7 @@ def lower_program(nodes, core: nil)
       panic("the native build needs one type for every value — def #{found.name}#{line} has none: #{found.reason}")
     end
   end
-  context = LoweringContext.new(answers: pinned.shapes + pinned_answers(called), arities: unique_types(called.map { [it.name, it.parameters.length] }), procedure: false, looping: false, combinations: called, yielding: nil, inside_block: false, answer: nil, home: nil, root: nil, pinned: pinned.bindings)
+  context = LoweringContext.new(answers: pinned.shapes + pinned_answers(called), arities: unique_types(called.map { [it.name, it.parameters.length] }), procedure: false, looping: false, combinations: called, structs: pinned.structs, yielding: nil, inside_block: false, answer: nil, home: nil, root: nil, pinned: pinned.bindings)
   mutable functions = []
   called.each do |found|
     definition = definitions.find { it.name == found.name }
@@ -538,7 +561,29 @@ def lower_program(nodes, core: nil)
   end
   entry = lower_statements(statements, [], context)
   functions << IntermediateFunction.new(name: "main", key: nil, parameters: [], answer: ["nil"], locals: entry.bindings.reverse, body: entry.nodes, block: nil, returned: false)
-  IntermediateProgram.new(functions: functions)
+  IntermediateProgram.new(functions: functions, structs: pinned.structs.map { |made| [made.name, struct_fields(made, context)] })
+end
+
+# `Name.new(field: value)` (#532): each field of the struct handed its
+# value by name, in any order, and lowered in the order the struct
+# declares them. A field has the one type pinning settled for it.
+def lower_record(node, made, bindings, context)
+  refuse_native("#{made.name}.new with a block", node) unless node.block.nil?
+  labelled = node.arguments.select { it in KeywordArgumentNode }
+  refuse_native("#{made.name}.new handed a value without its field's name", node) unless labelled.length == node.arguments.length
+  fields = struct_fields(made, context)
+  labelled.each do |argument|
+    refuse_native("#{made.name}.new handed #{argument.label}, which is not one of its fields", node) unless fields.any? { it[0] == argument.label }
+  end
+  values = fields.map do |field|
+    argument = labelled.find { it.label == field[0] } or refuse_native("#{made.name}.new without #{field[0]}", node)
+    written = lower_value(argument.value, bindings, context)
+    type = type_at(field, 1)
+    refuse_native("a field, #{made.name}.#{field[0]}, that is #{with_article(written.type)}", node) unless native_value?(written.type)
+    refuse_native("#{made.name}.#{field[0]} handed #{with_article(written.type)} where it is #{with_article(type)}", node) unless written.type == type
+    written
+  end
+  IntermediateRecord.new(type: ["struct", made.name], fields: values)
 end
 
 def lower_statement(statement, bindings, context)
@@ -555,6 +600,9 @@ def lower_statement(statement, bindings, context)
     refuse_native("a binding of #{with_article(stored.type)}", statement) unless native_type?(stored.type) || stored.type == EMPTY_ARRAY
     after = found.nil? ? [[name, stored.type]] + bindings : bindings
     Lowered.new(nodes: [IntermediateStore.new(name: name, value: stored)], bindings: after)
+  # A struct or a trait written out declares, and runs nothing.
+  in StructDefNode then Lowered.new(nodes: [], bindings: bindings)
+  in TraitDefNode then Lowered.new(nodes: [], bindings: bindings)
   in WhileNode(condition:, body:)
     test = lower_condition(condition, bindings, context)
     inner = lower_statements(body, bindings, context.with(looping: true))
@@ -646,11 +694,20 @@ def lower_value(node, bindings, context)
     scope = bindings + yielding_answers(context.answers, context.yielding)
     called = native_method_call(node, synthesize(node.receiver, scope), scope)
     return lower_value(called, bindings, context) if called.some?
+    # `Name.new(field: value)` makes one of the program's structs (#532).
+    if node.name == "new" && (node.receiver in IdentifierNode) && bindings.none? { it[0] == node.receiver.name }
+      made = context.structs.find { it.name == node.receiver.name }
+      return lower_record(node, made, bindings, inner) if made.some?
+    end
   end
   case node
   in IntegerNode(value:) then IntermediateConstant.new(type: ["integer"], value: value)
   in BooleanNode(value:) then IntermediateConstant.new(type: ["boolean"], value: value)
   in StringNode(value:) then IntermediateConstant.new(type: ["string"], value: value)
+  # A maybe handed to a method as its receiver is opened for it.
+  in OpenedNode(value:, name:)
+    held = lower_value(value, bindings, inner)
+    IntermediateOpen.new(type: plain_of(held.type), value: held, name: name)
   # `self` is a method's first parameter (#525).
   in SelfNode
     receiver = bindings.find { it[0] == "self" } or refuse_native("self outside a method", node)
@@ -711,6 +768,9 @@ def lower_value(node, bindings, context)
     refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == after
     refuse_native("'#{operator}' between Booleans", node) if before == ["boolean"] && !%w[== !=].include?(operator)
     refuse_native("'#{operator}' between arrays", node) if before in ["array", *]
+    # A struct equals another by what its fields hold, which is unbuilt;
+    # comparing the two as they are held would compare where they live.
+    refuse_native("'#{operator}' between structs", node) if before in ["struct", *]
     # Strings are equal or not (ADR 0038); ordering them is unbuilt.
     refuse_native("'#{operator}' between Strings", node) if before == ["string"] && !%w[== !=].include?(operator)
     IntermediateComparison.new(type: ["boolean"], operator: operator, left: first, right: second)
@@ -774,6 +834,14 @@ def lower_value(node, bindings, context)
     if (asked.type in ["array", *]) && %w[first last].include?(name)
       position = IntermediateConstant.new(type: ["integer"], value: name == "first" ? 0 : -1)
       return IntermediateIndex.new(type: ["maybe", type_at(asked.type, 1)], array: asked, index: position)
+    end
+    # A struct's field is read by its name (#532), a maybe opened for it.
+    if plain_of(asked.type) in ["struct", *]
+      made = context.structs.find { it.name == type_at(plain_of(asked.type), 1) }
+      fields = made.nil? ? [] : struct_fields(made, context)
+      place = fields.find_index { it[0] == name }
+      holder = (asked.type in ["maybe", *]) ? IntermediateOpen.new(type: plain_of(asked.type), value: asked, name: name) : asked
+      return IntermediateField.new(type: type_at(type_at(fields, place), 1), record: holder, index: place) if place.some?
     end
     # Every other method is asked of the value, a maybe opened for it.
     answer = native_method_answer(plain_of(asked.type), name)
@@ -862,6 +930,7 @@ end
 
 def native_value?(type)
   return true if type == ["integer"] || type == ["boolean"] || type == ["string"]
+  return true if type in ["struct", *]
   (type in ["array", *]) && native_value?(type_at(type, 1))
 end
 
@@ -953,6 +1022,8 @@ def render_value(value)
     "(call #{([name] + arguments.map { render_value(it) } + handed).join(" ")})"
   in IntermediateYield(arguments:) then "(yield#{arguments.map { " #{render_value(it)}" }.join("")})"
   in IntermediateArray(elements:) then "(array#{elements.map { " #{render_value(it)}" }.join("")})"
+  in IntermediateRecord(type:, fields:) then "(new #{type_at(type, 1)}#{fields.map { " #{render_value(it)}" }.join("")})"
+  in IntermediateField(record:, index:) then "(field #{render_value(record)} #{index})"
   in IntermediateIndex(array:, index:) then "([] #{render_value(array)} #{render_value(index)})"
   in IntermediateOpen(value: held, name:) then "(open #{render_value(held)} #{name})"
   in IntermediateDefault(value: held, fallback:) then "(|| #{render_value(held)} #{render_value(fallback)})"
@@ -988,13 +1059,22 @@ def settled_empty(lowered, name, bindings, context)
   lowered.with(type: type_at(pinned, 1))
 end
 
+# A struct's fields as [name, type] pairs, in the order written, each at
+# the type pinning settled for it. A field nothing ever made has none.
+def struct_fields(made, context)
+  made.fields.map do |field|
+    settled = context.answers.find { it[0] == field_key(made.name, field) }
+    [field, settled.nil? ? ["unknown"] : type_at(settled, 1)]
+  end
+end
+
 # A value as `puts`, `to_s`, and interpolation write it: a String is
 # itself, and an Integer, a Boolean, or an array is written out.
 def written_out(value, node)
   # A maybe is opened first, and nil refuses as the seed's `to_s` does.
   return written_out(IntermediateOpen.new(type: type_at(value.type, 1), value: value, name: "to_s"), node) if value.type in ["maybe", *]
   return value if value.type == ["string"]
-  writable = value.type == ["integer"] || value.type == ["boolean"] || (value.type in ["array", *])
+  writable = value.type == ["integer"] || value.type == ["boolean"] || (value.type in ["array", *]) || (value.type in ["struct", *])
   refuse_native("writing out #{with_article(value.type)}", node) unless writable
   IntermediateText.new(type: ["string"], value: value)
 end

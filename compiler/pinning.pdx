@@ -40,6 +40,10 @@ COMBINATION_LIMIT = 48
 # are: an empty literal, named by its first append.
 EMPTY_ARRAY = ["array", ["unknown"]]
 
+# The name a struct being made is gathered under (#532), with the struct
+# and the type of each field it was handed.
+MAKING = "new"
+
 # The name a `return` is gathered under: a keyword, so no def has it.
 RETURN = "return"
 
@@ -48,9 +52,9 @@ RETURN = "return"
 # nest; past this, two rounds are answering each other back and forth.
 ROUND_LIMIT = 200
 
-# The core's methods as the native build compiles them (#525): each a def
-# that takes `self` first, and the shapes of call each answers, as
-# bindings.
+# The methods of the core's types and of a program's structs as the
+# native build compiles them (#525, #532): each a def that takes `self`
+# first, and the shapes of call each answers, as bindings.
 struct CoreMethods
   definitions
   shapes
@@ -103,6 +107,17 @@ struct PinnedProgram
   bindings
   definitions
   shapes
+  # The program's structs, and for each field made with more than one
+  # type, a sentence saying so (#532).
+  structs
+  conflicts
+end
+
+# What rounds of pinning settle: the combinations of each def's types,
+# and the type of each struct's fields, as bindings.
+struct Settled
+  pinned
+  fields
 end
 
 # Every way out of a body, each with the type it answers: the early
@@ -153,32 +168,62 @@ end
 # Whether a type says everything a code generator needs: no unknown in it.
 def concrete?(type) = type == NOTHING || !render_type(type).include?("Unknown")
 
-# The core's methods as defs (#525). In the core, `class Array` gives the
-# builtin array its methods (ADR 0093), its own and those of the traits
-# it includes. Each becomes a def named for the type and the method,
-# taking `self` first, and is then pinned and compiled as any def is.
-def core_methods(core)
-  return CoreMethods.new(definitions: [], shapes: []) if core.nil?
-  traits = core.select { it in TraitDefNode }
-  mutable definitions = []
-  mutable shapes = []
-  core.each do |node|
-    next unless (node in StructDefNode) && core_type_name?(node.name)
-    mutable methods = node.methods
-    node.includes.each do |included|
-      found = traits.find { it.name == included }
-      next if found.nil?
-      found.methods.each do |method|
-        methods = methods + [method] unless methods.any? { it.name == method.name }
+# For each field of a struct made with more than one type, a sentence
+# saying so (#532). The native build gives a field one type, as it gives
+# an array's elements one.
+def field_conflicts(calls)
+  mutable sentences = []
+  made_fields(calls).each do |made|
+    types = unique_types(type_at(made, 1).select { concrete?(it) })
+    next unless types.length > 1
+    sentences << "#{made[0]} is #{with_article(types[0])} where one is made and #{with_article(types[1])} where another is"
+  end
+  sentences
+end
+
+# A struct's fields that a method reads by their bare names, each bound
+# ahead of the method's body from `self` (#532). In a method a field is
+# in scope as a name; as a def handed `self`, it is a local read out of
+# it.
+def field_prelude(fields, method)
+  read = fields.select { |field| reads_name?(method.body, field) }
+  read.map do |field|
+    receiver = SelfNode.new(kind: "self", line: method.line)
+    value = MethodCallNode.new(kind: "method_call", receiver: receiver, name: field, arguments: [], block: nil, line: method.line)
+    AssignmentNode.new(kind: "assignment", name: field, value: value, rebindable: false, line: method.line)
+  end
+end
+
+# The calls every body reached names: the top level's, and those of each
+# combination pinned so far, read with its own parameters.
+def gathered_calls(definitions, statements, names, answers, pinned)
+  mutable walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
+  pinned.each do |found|
+    definition = definitions.find { it.name == found.name }
+    next if definition.nil? || found.parameters.length != definition.parameters.length
+    inner = pin_statements(definition.body, PinWalk.new(bindings: found.parameters, calls: walk.calls), yielding_answers(answers, found.block), names)
+    walk = walk.with(calls: inner.calls)
+  end
+  walk
+end
+
+# Every field the gathered calls made, as [its key, the types it was
+# handed], one entry for each field.
+def made_fields(calls)
+  mutable fields = []
+  calls.select { it[0] == MAKING }.each do |call|
+    made = type_at(call, 1)
+    type_at(made, 1).each do |handed|
+      key = field_key(made[0], handed[0])
+      found = fields.find { it[0] == key }
+      if found.nil?
+        fields << [key, [type_at(handed, 1)]]
+      else
+        fields = fields.map { it[0] == key ? [key, type_at(it, 1) + [type_at(handed, 1)]] : it }
       end
     end
-    methods.each do |method|
-      receiver = IdentifierNode.new(kind: "identifier", name: "self", line: method.line)
-      definitions << method.with(name: method_def_name(node.name, method.name), parameters: [receiver] + method.parameters)
-      shapes << [method_shape(node.name, method.name, method.parameters.length, yields?(method.body)), ["boolean"]]
-    end
   end
-  CoreMethods.new(definitions: definitions, shapes: shapes)
+  fields
 end
 
 # The one type a body's ways out answer together. Where they are one
@@ -277,6 +322,16 @@ def pin_expression(node, walk, answers, names)
   end
   return pin_walk(node, walk, answers, names) if (node in MethodCallNode) && node.block.some?
   mutable current = walk
+  # A struct being made is gathered with what each field is handed
+  # (#532): a field has one type, read off every place the struct is made.
+  if (node in MethodCallNode) && node.name == "new"
+    reading = current.bindings + answers
+    made = synthesize(node.receiver, reading)
+    if made in ["type", *]
+      handed = node.arguments.select { it in KeywordArgumentNode }.map { [it.label, synthesize(it.value, reading)] }
+      current = current.with(calls: current.calls + [[MAKING, [type_at(made, 1), handed], nil, false]])
+    end
+  end
   if (node in CallNode) && names.include?(node.name)
     scope = current.bindings + answers
     current = current.with(calls: current.calls + [[node.name, node.arguments.map { synthesize(it, scope) }, nil, false]])
@@ -298,21 +353,27 @@ end
 
 def pin_program(nodes, core: nil)
   own = nodes.select { it in DefNode }
-  methods = core_methods(core)
+  structs = nodes.select { it in StructDefNode }
+  methods = type_methods(nodes, core)
   # The core's functions and methods are defs like the program's own, and
   # are compiled where the program calls them.
   definitions = own + (core or []).select { it in DefNode } + methods.definitions
   statements = nodes.reject { it in DefNode }
   names = definitions.map { it.name }
+  # What every scope reads beside the answers: the shapes of call the
+  # methods answer, and each struct's name as the type it is.
+  fixed = methods.shapes + structs.map { [it.name, ["type", it.name]] }
   # Two passes. The first pins from the arguments whose types are known,
   # since `double(double(3))` cannot say its outer argument until `double`
   # itself is pinned, and takes a def that calls itself at the answer its
   # known ways out give. The second holds each such answer to the def's
   # whole body.
-  reached = settle_pins(definitions, statements, names, methods.shapes, [], false)
-  pinned = settle_pins(definitions, statements, names, methods.shapes, reached, true)
-  answers = methods.shapes + pinned_answers(pinned)
-  walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
+  reached = settle_pins(definitions, statements, names, fixed, Settled.new(pinned: [], fields: []), false)
+  settled = settle_pins(definitions, statements, names, fixed, reached, true)
+  pinned = settled.pinned
+  answers = fixed + settled.fields + pinned_answers(pinned)
+  walk = gathered_calls(definitions, statements, names, answers, pinned)
+  top = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
   # A def with no combination is one nothing calls, or one called only
   # with a value whose type is not known. Of those, the program's own are
   # listed; the core's are most of the core.
@@ -326,7 +387,7 @@ def pin_program(nodes, core: nil)
       listed += combinations
     end
   end
-  PinnedProgram.new(defs: listed, bindings: walk.bindings.reverse, definitions: definitions, shapes: methods.shapes)
+  PinnedProgram.new(defs: listed, bindings: top.bindings.reverse, definitions: definitions, shapes: fixed + settled.fields, structs: structs, conflicts: field_conflicts(walk.calls))
 end
 
 # One statement: the calls inside it are recorded with the bindings above
@@ -429,6 +490,11 @@ def pinned_block(definition, parameters, handed, leaves, answers, names, strict)
   PinnedBlock.new(parameters: types, answer: answer, reason: reason, leaves: leaves)
 end
 
+# Whether a name is read anywhere inside a body.
+def reads_name?(body, name)
+  body.any? { ((it in IdentifierNode) && it.name == name) || reads_name?(children_of(it), name) }
+end
+
 def rebound(bindings, name, type)
   found = bindings.find { it[0] == name }
   return [[name, type]] + bindings if found.nil?
@@ -484,29 +550,38 @@ end
 # level and the body of every combination pinned so far, gathers the
 # combinations those calls name, and pins them; a combination's body may
 # name another, which the next round reaches.
-def settle_pins(definitions, statements, names, shapes, starting, strict)
-  mutable pinned = starting
+def settle_pins(definitions, statements, names, fixed, starting, strict)
+  mutable pinned = starting.pinned
+  mutable fields = starting.fields
   mutable round = 0
   while round <= ROUND_LIMIT
-    answers = shapes + pinned_answers(pinned)
-    mutable walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
-    pinned.each do |found|
-      definition = definitions.find { it.name == found.name }
-      next if definition.nil? || found.parameters.length != definition.parameters.length
-      inner = pin_statements(definition.body, PinWalk.new(bindings: found.parameters, calls: walk.calls), yielding_answers(answers, found.block), names)
-      walk = walk.with(calls: inner.calls)
-    end
+    answers = fixed + fields + pinned_answers(pinned)
+    walk = gathered_calls(definitions, statements, names, answers, pinned)
     settled = pin_combinations(definitions, walk.calls, answers, names, strict)
-    break if settled == pinned
+    made = settled_fields(walk.calls)
+    break if settled == pinned && made == fields
     busiest = definitions.find { |definition| settled.count { it.name == definition.name } > COMBINATION_LIMIT }
     if busiest.some?
       panic("the native build compiles a def once for each combination of types it is called with, and stopped at #{COMBINATION_LIMIT} — def #{busiest.name} on line #{busiest.line} is called with a new one each time it is called")
     end
     pinned = settled
+    fields = made
     round += 1
   end
   panic("the native build's types did not settle in #{ROUND_LIMIT} rounds") if round > ROUND_LIMIT
-  pinned
+  Settled.new(pinned: pinned, fields: fields)
+end
+
+# Each struct's fields as bindings (#532): a field whose every making
+# hands it one known type is bound to it. One handed more than one is
+# left out here and named by `field_conflicts`.
+def settled_fields(calls)
+  mutable bindings = []
+  made_fields(calls).each do |made|
+    types = unique_types(type_at(made, 1).select { concrete?(it) })
+    bindings << [made[0], types[0]] if types.length == 1
+  end
+  bindings
 end
 
 # A combination's answer with its parameters pinned. Read plainly first.
@@ -529,6 +604,37 @@ def solved_answer(definition, key, parameters, answers, names, strict)
   whole == found ? found : ["unknown"]
 end
 
+# The methods of the core's types and of a program's structs as defs
+# (#525, #532). In the core, `class Array` gives the builtin array its
+# methods (ADR 0093); a program's struct has its own. Each method, and
+# each of the traits the type includes, becomes a def named for the type
+# and the method, taking `self` first, and is then pinned and compiled
+# as any def is. A struct's method has the fields it reads bound ahead
+# of its body.
+def type_methods(nodes, core)
+  library = core or []
+  traits = (library + nodes).select { it in TraitDefNode }
+  owners = library.select { (it in StructDefNode) && core_type_name?(it.name) } + nodes.select { it in StructDefNode }
+  mutable definitions = []
+  mutable shapes = []
+  owners.each do |node|
+    mutable methods = node.methods
+    node.includes.each do |included|
+      found = traits.find { it.name == included }
+      next if found.nil?
+      found.methods.each do |method|
+        methods = methods + [method] unless methods.any? { it.name == method.name }
+      end
+    end
+    methods.each do |method|
+      receiver = IdentifierNode.new(kind: "identifier", name: "self", line: method.line)
+      definitions << method.with(name: method_def_name(node.name, method.name), parameters: [receiver] + method.parameters, body: field_prelude(node.fields, method) + method.body)
+      shapes << [method_shape(node.name, method.name, method.parameters.length, yields?(method.body)), ["boolean"]]
+    end
+  end
+  CoreMethods.new(definitions: definitions, shapes: shapes)
+end
+
 def unique_types(types)
   mutable unique = []
   types.each do |type|
@@ -548,8 +654,8 @@ end
 
 def with_article(type)
   rendered = render_type(type)
-  article = %w[A E I O U].include?(rendered.slice(0, 1)) ? "an" : "a"
-  "#{article} #{rendered}"
+  determiner = %w[A E I O U].include?(rendered.slice(0, 1)) ? "an" : "a"
+  "#{determiner} #{rendered}"
 end
 
 # What a def's body reads a `yield` by: what its block answers, and
