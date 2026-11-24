@@ -2987,8 +2987,11 @@ struct HandedBlock {
     /// Enumerable struct's `each` is read into elements.
     collects: bool,
     home: usize,
-    /// The method this block was handed to, for a refusal to name.
+    /// The method this block was handed to, for a refusal to name, and
+    /// whether the language defines that method (#487): one written in the
+    /// core, and not a program's own def or a struct's own method.
     method: String,
+    language: bool,
     /// The writer's own handed block — what a `yield` inside this block
     /// reaches, the way Ruby's `yield` always means the lexically enclosing
     /// method's block.
@@ -4527,6 +4530,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         block,
                         collects: false,
                         method: name.to_string(),
+                        language: false,
                         home: self.home_depth,
                         outer: self.current_block.clone(),
                         scope: self.variables.clone(),
@@ -5024,6 +5028,7 @@ impl<W: std::io::Write> Interpreter<W> {
             collects: true,
             home: self.home_depth,
             method: "each".to_string(),
+            language: false,
             outer: self.current_block.clone(),
             scope: self.variables.clone(),
         }));
@@ -6111,6 +6116,7 @@ impl<W: std::io::Write> Interpreter<W> {
                     block: block.clone(),
                     collects: false,
                     method: name.to_string(),
+                    language: true,
                     home: self.home_depth,
                     outer: self.current_block.clone(),
                     scope: self.variables.clone(),
@@ -6151,6 +6157,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         block: block.clone(),
                         collects: false,
                         method: name.to_string(),
+                        language: false,
                         home: self.home_depth,
                         outer: self.current_block.clone(),
                         scope: self.variables.clone(),
@@ -9867,16 +9874,24 @@ impl<W: std::io::Write> Interpreter<W> {
     /// method written in the core reads its block this way.
     fn no_value_sentence(&self, expression: &Expression) -> String {
         match (expression, &self.current_block) {
+            // A method the language defines says where the writer most
+            // likely meant to go; a program's own is only named (#487).
             (Expression::Yield(_), Some(handed)) => {
-                Self::silent_block_sentence(&handed.borrow().method)
+                let handed = handed.borrow();
+                if handed.language {
+                    Self::silent_block_sentence(&handed.method)
+                } else {
+                    format!("{}'s block produced no value", handed.method)
+                }
             }
             (other, _) => format!("{other:?} produced no value"),
         }
     }
 
-    /// What to say of a block that answered nothing where the method it was
-    /// handed to reads its answer (#484). A walk that gathers each answer is
-    /// most often written where `each` was meant, and says so.
+    /// What to say of a block that answered nothing where a method the
+    /// language defines reads its answer (#484). A walk that gathers each
+    /// answer is most often written where `each` was meant, and says so:
+    /// the receiver of the language's `map` has an `each` (#487).
     fn silent_block_sentence(name: &str) -> String {
         match name {
             "map" | "collect" | "flat_map" => format!(
