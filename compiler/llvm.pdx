@@ -63,6 +63,13 @@
 # `each` is a loop written where the call is, calling the block's
 # function once for each element.
 #
+# A struct is a pointer to a block the runtime lays out (#532): a count,
+# the address of its shape, and its fields, one word each, as an array's
+# elements are. A shape is written into the binary once for each struct
+# the program declares: its name, how many fields it has, and for each
+# the kind of slot and the field's name. The runtime frees a struct and
+# writes one out by it.
+#
 # A block that can leave, by `return` or `break`, does so by a flag passed
 # up (ADR 0097). Its function answers a pair: where it is leaving to, and
 # its answer, the first being nothing when it only finished. A def handed
@@ -135,6 +142,9 @@ LLVM_PRELUDE = [
   "declare void @portland_refuse_nil_method(ptr)",
   "declare void @portland_refuse_nil_puts()",
   "declare void @portland_refuse_nil_operand(ptr, ptr, ptr)",
+  "declare ptr @portland_struct_new(ptr)",
+  "declare void @portland_struct_release(ptr)",
+  "declare ptr @portland_struct_to_string(ptr)",
   "declare void @portland_retain(ptr)",
   "declare void @portland_release(ptr)",
   "declare void @portland_exit_check()",
@@ -258,11 +268,7 @@ end
 # widened to one, and a String or an array as its address, whose hold
 # the array takes over.
 def llvm_append(emitter, array, type, operand)
-  word = case type
-         in ["integer"] then LLVMValue.new(emitter: emitter, operand: operand)
-         in ["boolean"] then llvm_named(emitter, "zext i1 #{operand} to i64")
-         else llvm_named(emitter, "ptrtoint ptr #{operand} to i64")
-         end
+  word = llvm_word(emitter, type, operand)
   llvm_named(word.emitter, "call ptr @portland_array_append(ptr #{array}, i64 #{word.operand}, i64 #{llvm_array_kind(type)})")
 end
 
@@ -272,6 +278,7 @@ def llvm_array_kind(type)
   in ["integer"] then 0
   in ["boolean"] then 1
   in ["string"] then 2
+  in ["struct", *] then 4
   else 3
   end
 end
@@ -401,7 +408,7 @@ end
 # array, or a maybe of either.
 def llvm_counted?(type)
   return llvm_counted?(type_at(type, 1)) if type in ["maybe", *]
-  type == ["string"] || (type in ["array", *])
+  type == ["string"] || (type in ["array", *]) || (type in ["struct", *])
 end
 
 # A value that was handed over and is done with: released if it is
@@ -413,6 +420,7 @@ def llvm_drop(emitter, type, operand)
     return llvm_drop(held.emitter, type_at(type, 1), held.operand)
   end
   return llvm_line(emitter, "call void @portland_release(ptr #{operand})") if type == ["string"]
+  return llvm_line(emitter, "call void @portland_struct_release(ptr #{operand})") if type in ["struct", *]
   llvm_line(emitter, "call void @portland_array_release(ptr #{operand})")
 end
 
@@ -670,6 +678,31 @@ def llvm_same(emitter, type, left, right)
   llvm_named(emitter, "icmp eq #{llvm_type(type)} #{left}, #{right}")
 end
 
+# A struct's shape, as the lines that write it into the binary (#532):
+# its name and each field's name as Strings that are never freed, and
+# the shape itself, which is the name, the count of fields, and for each
+# field the kind of slot it is and its name.
+def llvm_shape(name, fields)
+  mutable lines = [llvm_text_constant("#{llvm_shape_text(name)}", name)]
+  mutable words = []
+  mutable place = 0
+  fields.each do |field|
+    label = "@\".shape.#{name}.#{place}\""
+    lines << llvm_text_constant(label, field[0])
+    words << "i64 #{llvm_array_kind(type_at(field, 1))}"
+    words << "i64 ptrtoint (ptr #{label} to i64)"
+    place += 1
+  end
+  listed = "[#{words.length} x i64] [#{words.join(", ")}]"
+  lines << "#{llvm_shape_name(name)} = private constant { ptr, i64, [#{words.length} x i64] } { ptr #{llvm_shape_text(name)}, i64 #{fields.length}, #{listed} }"
+  lines
+end
+
+# The name a struct's shape goes by in the output, and its name's text.
+def llvm_shape_name(name) = "@\".shape.#{name}\""
+
+def llvm_shape_text(name) = "@\".shape.#{name}.name\""
+
 # A maybe in its source form: its value's, or `nil`. Only the arm taken
 # makes a String, so nothing is made that is not handed on.
 def llvm_shown_maybe(emitter, type, operand)
@@ -708,6 +741,7 @@ def llvm_source(emitter, type, operand)
     held = llvm_named(flag.emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
     written = llvm_source(held.emitter, type_at(type, 1), held.operand)
     llvm_named(written.emitter, "select i1 #{flag.operand}, ptr #{written.operand}, ptr null")
+  in ["struct", *] then llvm_named(emitter, "call ptr @portland_struct_to_string(ptr #{operand})")
   else llvm_named(emitter, "call ptr @portland_array_to_string(ptr #{operand})")
   end
 end
@@ -810,6 +844,9 @@ def llvm_text(program)
   mutable globals = []
   mutable bodies = []
   mutable index = 0
+  program.structs.each do |made|
+    globals += llvm_shape(made[0], type_at(made, 1))
+  end
   program.functions.each do |function|
     written = llvm_function(function, "f#{index}")
     globals += written.globals
@@ -819,12 +856,20 @@ def llvm_text(program)
   (globals + LLVM_PRELUDE + bodies).join("\n") + "\n"
 end
 
+# A String written into the binary under a name: the block a literal is,
+# with the count that says it is never freed.
+def llvm_text_constant(name, text)
+  length = text.bytesize
+  "#{name} = private unnamed_addr constant { i64, i64, [#{length} x i8] } { i64 -1, i64 #{length}, [#{length} x i8] c\"#{llvm_bytes(text)}\" }"
+end
+
 def llvm_type(type)
   case type
   in ["integer"] then "i64"
   in ["boolean"] then "i1"
   in ["string"] then "ptr"
   in ["array", *] then "ptr"
+  in ["struct", *] then "ptr"
   in ["maybe", *] then "{ i1, #{llvm_type(type_at(type, 1))} }"
   in ["nothing"] then "void"
   else panic("llvm.pdx: no machine type for #{render_type(type)}")
@@ -856,7 +901,8 @@ def llvm_value(emitter, value)
     written = llvm_value(emitter, shown)
     return llvm_named(written.emitter, "call ptr @portland_string_from_integer(i64 #{written.operand})") if shown.type == ["integer"]
     return llvm_named(written.emitter, "call ptr @portland_string_from_boolean(i1 zeroext #{written.operand})") if shown.type == ["boolean"]
-    made = llvm_named(written.emitter, "call ptr @portland_array_to_string(ptr #{written.operand})")
+    writer = (shown.type in ["struct", *]) ? "portland_struct_to_string" : "portland_array_to_string"
+    made = llvm_named(written.emitter, "call ptr @#{writer}(ptr #{written.operand})")
     LLVMValue.new(emitter: llvm_drop(made.emitter, shown.type, written.operand), operand: made.operand)
   in IntermediateInspect(value: shown)
     written = llvm_value(emitter, shown)
@@ -1034,6 +1080,28 @@ def llvm_value(emitter, value)
     stepped = llvm_line(following.emitter, "store i64 #{following.operand}, ptr #{turn}")
     finished = llvm_label(llvm_line(stepped, "br label %walk#{number}.test"), "walk#{number}.done")
     LLVMValue.new(emitter: finished, operand: walked.operand)
+  # A struct made: a block of its shape from the runtime, and each field
+  # stored as a word, in order. A counted field's hold passes to the
+  # struct.
+  in IntermediateRecord(type:, fields:)
+    mutable made = llvm_named(emitter, "call ptr @portland_struct_new(ptr #{llvm_shape_name(type_at(type, 1))})")
+    record = made.operand
+    mutable place = 0
+    fields.each do |field|
+      written = llvm_value(made.emitter, field)
+      word = llvm_word(written.emitter, field.type, written.operand)
+      slot = llvm_named(word.emitter, "getelementptr i64, ptr #{record}, i64 #{place + 2}")
+      made = LLVMValue.new(emitter: llvm_line(slot.emitter, "store i64 #{word.operand}, ptr #{slot.operand}"), operand: record)
+      place += 1
+    end
+    made
+  # A field read: its word, held by whoever asked where it is counted, and
+  # the struct asked let go of once it has answered.
+  in IntermediateField(type:, record:, index:)
+    asked = llvm_value(emitter, record)
+    slot = llvm_named(asked.emitter, "getelementptr i64, ptr #{asked.operand}, i64 #{index + 2}")
+    read = llvm_element(slot.emitter, type, slot.operand)
+    LLVMValue.new(emitter: llvm_drop(read.emitter, record.type, asked.operand), operand: read.operand)
   # A `yield` calls the block this function was handed, with its frame
   # and then what is yielded.
   in IntermediateYield(type:, arguments:, leaves:)
@@ -1062,6 +1130,16 @@ def llvm_value(emitter, value)
     other_block = other.emitter.block
     joined = llvm_label(llvm_line(other.emitter, "br label %choice#{number}.done"), "choice#{number}.done")
     llvm_named(joined, "phi #{llvm_type(type)} [ #{taken.operand}, %#{taken_block} ], [ #{other.operand}, %#{other_block} ]")
+  end
+end
+
+# A value as the one word a slot holds: an Integer as it is, a Boolean
+# widened to one, and a String, an array, or a struct as its address.
+def llvm_word(emitter, type, operand)
+  case type
+  in ["integer"] then LLVMValue.new(emitter: emitter, operand: operand)
+  in ["boolean"] then llvm_named(emitter, "zext i1 #{operand} to i64")
+  else llvm_named(emitter, "ptrtoint ptr #{operand} to i64")
   end
 end
 
