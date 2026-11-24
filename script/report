@@ -1,0 +1,46 @@
+#!/bin/sh
+# Read a program's own loud choices back to it (#30): every `panic` with
+# the reason its writer gave, every `mutable` name with the lines that
+# rebind it, and every `together`. Written in Portland, in
+# compiler/reporting.pdx, and run on the seed.
+#
+#   script/report                        the implementation's files
+#   script/report FILE.pdx ...           the files named
+#   script/report panic FILE.pdx ...     one concern: panic, mutable, or
+#                                        together
+#
+# It judges nothing. There is no number of sites that is too many, and a
+# run never fails for what it finds. With PDX set to a built seed, that
+# seed runs it and none is built.
+set -e
+invoked_from=$(pwd)
+cd "$(dirname "$0")/.."
+
+. script/lib/rust.sh
+
+if [ -z "$PDX" ]; then
+  cargo build --quiet --package portland-seed --bin pdx
+  PDX=target/debug/pdx
+fi
+
+concern=
+case "$1" in
+  panic | mutable | together)
+    concern=$1
+    shift
+    ;;
+esac
+
+if [ $# -eq 0 ]; then
+  exec "$PDX" compiler/report.pdx $concern compiler/*.pdx core/*.pdx
+fi
+
+# The files named are relative to where the script was called from.
+for path in "$@"; do
+  case "$path" in
+    /*) set -- "$@" "$path" ;;
+    *) set -- "$@" "$invoked_from/$path" ;;
+  esac
+  shift
+done
+exec "$PDX" compiler/report.pdx $concern "$@"

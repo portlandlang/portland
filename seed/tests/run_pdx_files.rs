@@ -1342,6 +1342,41 @@ fn portland_lint_finds_a_line_at_the_margin_inside_a_statement() {
     assert_eq!(String::from_utf8(output.stdout).unwrap(), "ok\n");
 }
 
+/// `report.pdx` — a program's own loud choices read back to it (#30):
+/// every `panic` with the reason its writer gave, and every `mutable`
+/// name with the lines that rebind it. It judges nothing and never
+/// refuses, and a concern named first narrows it to that one.
+#[test]
+fn portland_report_reads_back_panics_and_mutables() {
+    let driver = format!("{}/../compiler/report.pdx", env!("CARGO_MANIFEST_DIR"));
+    let sample = std::env::temp_dir().join("report_sample.pdx");
+    std::fs::write(
+        &sample,
+        "def run(list)\n  mutable total = 0\n  list.each do |item|\n    total += item\n  end\n  mutable names = []\n  names << \"a\"\n  names[0] = \"b\"\n  total = total * 2\n  value = list.first or panic \"list #{list} is empty\"\n  panic(\"total is zero\") if total == 0\n  total\nend\n\nmutable started = false\nstarted = true\nmutable idle = 0\nputs run([1])\n",
+    )
+    .unwrap();
+    let path = sample.display();
+    let panics = format!(
+        "panic: 2 sites\n  {path}:10  list #{{list}} is empty\n  {path}:11  total is zero\n"
+    );
+    let mutables = format!(
+        "mutable: 4 names, 5 rebindings\n  {path}:2  total, rebound on lines 4, 9\n  {path}:6  names, rebound on lines 7, 8\n  {path}:15  started, rebound on line 16\n  {path}:17  idle, never rebound\n"
+    );
+    let run = |arguments: &[&str]| {
+        let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&driver)
+            .args(arguments)
+            .arg(&sample)
+            .output()
+            .expect("failed to run pdx");
+        assert!(output.status.success(), "a report never refuses");
+        String::from_utf8(output.stdout).unwrap()
+    };
+    assert_eq!(run(&[]), format!("{panics}{mutables}together: 0 sites\n"));
+    assert_eq!(run(&["panic"]), panics);
+    assert_eq!(run(&["mutable"]), mutables);
+}
+
 /// The linter holds a file to its order (#509): requires, constants,
 /// traits, structs, defs, and then what it runs, each kind alphabetical,
 /// the methods of a struct among themselves too. A constant built from
