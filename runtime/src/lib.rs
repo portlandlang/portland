@@ -813,6 +813,44 @@ pub unsafe extern "C" fn portland_struct_release(record: *mut StructBlock) {
     }
 }
 
+/// Where the field of this name is in a struct that is one of several
+/// (#572): the compiled program knows the field's type, and the struct
+/// itself says where it keeps it. A struct with no such field refuses in
+/// the seed's words.
+///
+/// # Safety
+/// `record` points at a live struct whose fields are what its shape says,
+/// and `name` at a String.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_struct_slot(
+    record: *mut StructBlock,
+    name: *const StringBlock,
+) -> *mut i64 {
+    unsafe {
+        let shape = (*record).shape;
+        let wanted = bytes_of(name);
+        let mut slot = fields_of(record);
+        for index in 0..(*shape).fields as usize {
+            let (kind, field) = field_of(shape, index);
+            if bytes_of(field) == wanted {
+                return slot;
+            }
+            slot = slot.add(words_of(kind));
+        }
+        let struct_name = std::str::from_utf8_unchecked(bytes_of((*shape).name));
+        let article = if struct_name.starts_with(['A', 'E', 'I', 'O', 'U']) {
+            "an"
+        } else {
+            "a"
+        };
+        refuse_program(&format!(
+            "{} is {article} {struct_name}, which has no method '{}'",
+            struct_source(record),
+            std::str::from_utf8_unchecked(wanted)
+        ))
+    }
+}
+
 /// A struct's source form: its name, and each field by name with its
 /// value written as its kind says.
 ///

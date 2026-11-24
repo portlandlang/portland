@@ -328,19 +328,13 @@ def gathered_round(statements, names, answers, pinned, changed, mentions, read_b
 end
 
 # The one type a field made with these holds (#553), or nil where they do
-# not join: the same type throughout, or a value and nil or a maybe of
-# it, which is a maybe of it, as a local bound both ways is (#505).
+# not join: the same type throughout; a value and nil or a maybe of it,
+# which is a maybe of it, as a local bound both ways is (#505); or one
+# struct and another, which is one of several structs (#572).
 def joined_field(types)
   mutable joined = types.first
   types.each do |type|
-    next if joined.nil? || type == joined || joined == ["maybe", type]
-    joined = if type == ["nil"] || type == ["maybe", joined]
-      maybe_of(joined)
-    elsif joined == ["nil"]
-      maybe_of(type)
-    else
-      nil
-    end
+    joined = joined.nil? ? nil : joined_pair(joined, type)
   end
   joined
 end

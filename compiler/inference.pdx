@@ -19,6 +19,9 @@
 #   ["hash", key, value]
 #   ["maybe", inner]           — the wrapper, never a union (ADR 0040 §3)
 #   ["struct", "Name"]         — an instance
+#   ["struct", "*"]            — an instance of one of the program's structs,
+#                                whichever (#572): only the native build's
+#                                pinning makes it
 #   ["type", "Name"]           — the struct's name itself, what `new` is called on
 #   ["enum", "Name"]
 #   ["unknown"]                — the honest answer, and the default
@@ -60,6 +63,12 @@
 # on that read fired on the evaluator's own source.
 
 require_relative "parser"
+
+# A value that is one of the program's structs, whichever (#572): what
+# a field made with one struct in one place and another elsewhere holds.
+# No struct can be named `*`. It is a struct wherever one is asked for,
+# and the struct it holds says which it is.
+ANY_STRUCT = ["struct", "*"]
 
 # The methods of a String and of an array the native build holds by name
 # (#560), each as what it is asked of, its name, what it takes, what it
@@ -871,6 +880,23 @@ def infer_program(nodes)
   ordered_pairs(nodes, scan_program(nodes), "assignment")
 end
 
+# The one type two types make together where a field, a local, or an
+# answer is one in one place and the other elsewhere, or nil where they
+# make none. The same type is itself; a value and nil, or a maybe of it,
+# are a maybe of it (#505, #553); and two structs are one of several
+# structs (#572), a maybe of that where either was one.
+def joined_pair(first, second)
+  return first if first == second
+  return maybe_of(second) if first == ["nil"]
+  return maybe_of(first) if second == ["nil"]
+  plain_first = (first in ["maybe", *]) ? type_at(first, 1) : first
+  plain_second = (second in ["maybe", *]) ? type_at(second, 1) : second
+  maybe = plain_first != first || plain_second != second
+  return maybe_of(plain_first) if plain_first == plain_second
+  return nil unless (plain_first in ["struct", *]) && (plain_second in ["struct", *])
+  maybe ? maybe_of(ANY_STRUCT) : ANY_STRUCT
+end
+
 # A value's type and a maybe of it, either way round, as the maybe; a
 # maybe and nil as the maybe; anything else unknown.
 def joined_with_maybe(first, second)
@@ -1246,6 +1272,7 @@ def render_type(type)
   in ["array", element] then "[" + render_type(element) + "]"
   in ["hash", key, entry] then "{" + render_type(key) + " => " + render_type(entry) + "}"
   in ["maybe", inner] then render_type(inner) + "?"
+  in ["struct", "*"] then "Struct"
   in ["struct", name] then name
   in ["type", name] then name
   in ["enum", name] then name
@@ -1334,6 +1361,21 @@ def shape_answers?(shape, node)
   return false unless placed >= type_at(shape, 0) && placed <= type_at(shape, 1)
   return false unless node.block.some? == type_at(shape, 2)
   named.all? { type_at(shape, 3).include?(it) }
+end
+
+# The type a field of this name has, read off a value that is one of
+# several structs (#572): the one type every struct that is made with
+# such a field holds there, or nil where there is no such field or they
+# hold types that do not join.
+def shared_field(name, types)
+  ending = ".#{name}"
+  held = types.select { (it[0].end_with?(ending)) && !it[0].include?("#") && !it[0].include?("(") }
+  return nil if held.empty?
+  mutable joined = type_at(held[0], 1)
+  held.each do |entry|
+    joined = joined.nil? ? nil : joined_pair(joined, type_at(entry, 1))
+  end
+  joined
 end
 
 def signature_continues?(line)
@@ -1609,6 +1651,10 @@ def synthesize_call(node, types)
     # settled for it (#532).
     holder = opened_natively(receiver, types)
     if (holder in ["struct", *]) && node.arguments.empty? && node.block.nil?
+      # Asked of one of several structs, a field is read where every
+      # struct that has it holds one type there (#572).
+      shared = holder == ANY_STRUCT ? shared_field(node.name, types) : nil
+      return shared if shared.some?
       field = types.assoc(field_key(type_at(holder, 1), node.name))
       return type_at(field, 1) if field.some?
     end

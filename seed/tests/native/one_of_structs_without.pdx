@@ -1,0 +1,17 @@
+# A field asked of one of several structs (#572), where the struct it
+# turns out to be has none of that name, refuses as the seed does.
+struct Circle
+  radius
+end
+
+struct Square
+  side
+end
+
+struct Tile
+  shape
+end
+
+tiles = [Tile.new(shape: Square.new(side: 3)), Tile.new(shape: Circle.new(radius: 2))]
+puts tiles[0].shape.side
+puts tiles[1].shape.side

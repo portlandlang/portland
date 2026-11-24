@@ -301,10 +301,26 @@ struct IntermediateReturn
   value
 end
 
+# Whether a value that is one of several structs is the one named
+# (#572), which the struct itself says.
+struct IntermediateShaped
+  type
+  value
+  name
+end
+
 # A plain value bound where a maybe is held: a maybe that is there.
 struct IntermediateSome
   type
   value
+end
+
+# A field read off a value that is one of several structs (#572), found
+# by its name in whichever struct the value is.
+struct IntermediateSought
+  type
+  record
+  name
 end
 
 # `panic(message)` where a value was to be, on the right of an `or`
@@ -423,15 +439,21 @@ end
 
 # A value as the type that is to hold it (#505): itself where it is that
 # type, a maybe that is there where the type is a maybe of what it is,
-# and a maybe that is not there where it is nil. Nil where it does not
-# fit.
+# and a maybe that is not there where it is nil. A struct is itself
+# where the type is one of several structs (#572), being held the same
+# way. Nil where it does not fit.
 def fitted(value, type)
-  return value if value.type == type
+  return value if held_as?(value.type, type)
   return nil unless type in ["maybe", *]
   return IntermediateConstant.new(type: type, value: nil) if value.type == ["nil"]
-  return IntermediateSome.new(type: type, value: value) if type_at(type, 1) == value.type
+  return IntermediateSome.new(type: type, value: value) if held_as?(value.type, type_at(type, 1))
+  return value if (value.type in ["maybe", *]) && held_as?(type_at(value.type, 1), type_at(type, 1))
   nil
 end
+
+# Whether a value of one type is held as another with nothing done to
+# it: the same type, or a struct held as one of several (#572).
+def held_as?(type, holding) = type == holding || (holding == ANY_STRUCT && (type in ["struct", *]))
 
 # What a name first bound here holds: what it is bound to, unless
 # pinning settled it as a maybe of that, because another binding of the
@@ -887,6 +909,15 @@ def lower_value(node, bindings, context)
   # type settles before the program runs.
   in MatchTestNode(subject:, pattern:)
     refuse_native("an in test of anything but a type's name", node) unless (pattern in StructPatternNode) && pattern.fields.empty?
+    # Asked of one of several structs, the struct itself answers (#572).
+    named = inner.structs.find { it.name == pattern.name }
+    if named.some?
+      asked = lower_value(subject, bindings, inner)
+      refuse_native("an in test of #{with_article(asked.type)}", node) unless asked.type in ["struct", *]
+      return IntermediateShaped.new(type: ["boolean"], value: asked, name: pattern.name) if asked.type == ANY_STRUCT
+      refuse_native("an in test of anything but a local", node) unless subject in IdentifierNode
+      return IntermediateConstant.new(type: ["boolean"], value: type_at(asked.type, 1) == pattern.name)
+    end
     refuse_native("an in test of anything but a local", node) unless subject in IdentifierNode
     tested = lower_value(subject, bindings, inner)
     wanted = native_type_named(pattern.name) or refuse_native("an in test for #{pattern.name}", node)
@@ -1050,6 +1081,10 @@ def lower_value(node, bindings, context)
       fields = made.nil? ? [] : struct_fields(made, context)
       place = fields.find_index { it[0] == name }
       holder = (asked.type in ["maybe", *]) ? IntermediateOpen.new(type: plain_of(asked.type), value: asked, name: name) : asked
+      # Asked of one of several structs, the field is found by its name
+      # in whichever the struct is (#572).
+      shared = holder.type == ANY_STRUCT ? shared_field(name, context.answers) : nil
+      return IntermediateSought.new(type: shared, record: holder, name: name) if shared.some?
       return IntermediateField.new(type: type_at(type_at(fields, place), 1), record: holder, index: field_offset(fields, place)) if place.some?
     end
     # Every other method is asked of the value, a maybe opened for it:
@@ -1276,6 +1311,8 @@ def render_value(value)
   in IntermediateStop(message:) then "(panic #{render_value(message)})"
   in IntermediateRecord(type:, fields:) then "(new #{type_at(type, 1)}#{fields.map { " #{render_value(it)}" }.join("")})"
   in IntermediateField(record:, index:) then "(field #{render_value(record)} #{index})"
+  in IntermediateSought(record:, name:) then "(field #{render_value(record)} #{name})"
+  in IntermediateShaped(value: asked, name:) then "(in #{render_value(asked)} #{name})"
   in IntermediateIndex(array:, index:) then "([] #{render_value(array)} #{render_value(index)})"
   in IntermediateOpen(value: held, name:) then "(open #{render_value(held)} #{name})"
   in IntermediateDefault(value: held, fallback:) then "(|| #{render_value(held)} #{render_value(fallback)})"

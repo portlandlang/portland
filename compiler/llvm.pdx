@@ -150,6 +150,7 @@ LLVM_PRELUDE = [
   "declare ptr @portland_struct_new(ptr)",
   "declare void @portland_struct_release(ptr)",
   "declare ptr @portland_struct_to_string(ptr)",
+  "declare ptr @portland_struct_slot(ptr, ptr)",
   "declare void @portland_retain(ptr)",
   "declare void @portland_release(ptr)",
   "declare void @portland_exit_check()",
@@ -1252,6 +1253,34 @@ def llvm_value(emitter, value)
       read = llvm_element(slot.emitter, type, slot.operand)
     end
     LLVMValue.new(emitter: llvm_drop(read.emitter, record.type, asked.operand), operand: read.operand)
+  # A field of one of several structs (#572): the runtime finds its slot
+  # by name in whichever struct this is, and it is then read as any
+  # field is.
+  in IntermediateSought(type:, record:, name:)
+    asked = llvm_value(emitter, record)
+    label = llvm_literal(asked.emitter, name)
+    slot = llvm_named(label.emitter, "call ptr @portland_struct_slot(ptr #{asked.operand}, ptr #{label.operand})")
+    mutable read = nil
+    if type in ["maybe", *]
+      maybe_shape = llvm_type(type)
+      inner_shape = llvm_type(type_at(type, 1))
+      field_flag = llvm_element(slot.emitter, ["boolean"], slot.operand)
+      value_slot = llvm_named(field_flag.emitter, "getelementptr i64, ptr #{slot.operand}, i64 1")
+      field_value = llvm_element(value_slot.emitter, type_at(type, 1), value_slot.operand)
+      half_made = llvm_named(field_value.emitter, "insertvalue #{maybe_shape} undef, i1 #{field_flag.operand}, 0")
+      read = llvm_named(half_made.emitter, "insertvalue #{maybe_shape} #{half_made.operand}, #{inner_shape} #{field_value.operand}, 1")
+    else
+      read = llvm_element(slot.emitter, type, slot.operand)
+    end
+    LLVMValue.new(emitter: llvm_drop(read.emitter, record.type, asked.operand), operand: read.operand)
+  # Whether one of several structs is the one named (#572): its shape is
+  # the second word of its block, and a struct's shape is written once.
+  in IntermediateShaped(value: tested, name:)
+    asked = llvm_value(emitter, tested)
+    place = llvm_named(asked.emitter, "getelementptr i64, ptr #{asked.operand}, i64 1")
+    shape = llvm_named(place.emitter, "load ptr, ptr #{place.operand}")
+    same = llvm_named(shape.emitter, "icmp eq ptr #{shape.operand}, #{llvm_shape_name(name)}")
+    LLVMValue.new(emitter: llvm_drop(same.emitter, tested.type, asked.operand), operand: same.operand)
   # A `yield` calls the block this function was handed, with its frame
   # and then what is yielded.
   in IntermediateYield(type:, arguments:, leaves:)
