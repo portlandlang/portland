@@ -16,6 +16,7 @@ Nothing here records what has happened since it was written — not in the files
 - [Report: the decisions ahead](2026-07-22-open-decisions.md) — A map of every open decision at the close of the optionals arc, with options, tradeoffs, and a recommended order and answer for each.
 - [Symbols: first pass](2026-07-23-symbols-first-pass.md) — The audit that tabled symbols: which of their jobs Portland's ADRs had already reassigned, and why the residue is enum-shaped.
 - [pliron / MLIR hybrid — a backend architecture sketch](2026-07-24-pliron-mlir-hybrid.md) — A candidate #5 architecture: pliron hosts the Portland-specific middle IR in native Rust, real MLIR runs below a textual seam as pinned stock binaries and owns the hardware arrows.
+- [Core and tiles: what goes where](2026-11-24-core-and-tiles-what-goes-where.md) — A draft sorting of Portland's library surface into a core base, core tiles, default tiles, and external tiles, with Ruby's core and standard library put in the same terms.
 
 <!-- /generated -->
 
