@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **A native def takes a default and a parameter by name** ([#536](https://github.com/portlandlang/portland/issues/536), [#511](https://github.com/portlandlang/portland/issues/511)) — `def greet(name, greeting = "hello", mark: "!")` builds natively, called with any of its parameters left out and any of its names handed. It was the fourth thing the linter's native build refused, and most of the compiler's front end is written this way.
+  - Which parameters a call hands over, how many by place and which by name, is part of the combination it names, so each way of calling a def is a function of its own.
+  - A parameter left out takes its default, computed on the way in and in the order written, so a default may read a parameter before it.
+  - A method answers a call by the same fit: the count by place within what it takes, every name one it takes, and a block exactly when it yields.
+  - A parameter declared `mutable` is a parameter like any other.
 - **A native program reads its command line and a file** ([#534](https://github.com/portlandlang/portland/issues/534), [#511](https://github.com/portlandlang/portland/issues/511)) — `System.arguments` and `System.read_file` build natively, and so does `maybe or panic "…"`, whose right side stops the program and so leaves the whole the value's type. They were the third thing the linter's native build refused.
   - `System.read_file` answers a failure where a file cannot be read, and a failure is unbuilt. So it builds only with an `or` beside it, where the right side takes the failure's place and nothing can tell one from nil; read any other way it refuses at build by name.
   - The entry function takes the command line as the operating system hands it over, and gives it to the runtime before anything else runs.

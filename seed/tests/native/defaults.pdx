@@ -1,0 +1,54 @@
+# A parameter with a default, and a parameter handed by name (#536). Which
+# parameters a call hands over is part of the combination it names, and a
+# parameter left out takes its default on the way in.
+struct Tag
+  label
+  line
+
+  def shown(prefix = "#", suffix: "") = "#{prefix}#{label}:#{line}#{suffix}"
+end
+
+def greet(name, greeting = "hello", mark = greeting.length)
+  "#{greeting}, #{name} #{mark}"
+end
+
+def counted(items, start = 0)
+  mutable total = start
+  items.each { |item| total += item }
+  total
+end
+
+def framed(text, left: "[", right: "]", times: 1)
+  mutable built = text
+  mutable turn = 0
+  while turn < times
+    built = left + built + right
+    turn += 1
+  end
+  built
+end
+
+def tagged(label, line: 1) = Tag.new(label: label, line: line)
+
+def stepped(mutable position, by: 1)
+  position += by
+  position
+end
+
+puts greet("ada")
+puts greet("ada", "hi")
+puts greet("ada", "hey", 9)
+puts counted([1, 2])
+puts counted([1, 2], 10)
+puts framed("x")
+puts framed("x", right: ")")
+puts framed("x", times: 2, left: "<")
+puts framed("x", left: "(", right: ")", times: 3)
+p(tagged("a"))
+p(tagged("b", line: 7))
+puts tagged("c").shown
+puts tagged("c").shown("@")
+puts tagged("c").shown(suffix: "!")
+puts tagged("c", line: 3).shown("%", suffix: "?")
+puts stepped(4)
+puts stepped(4, by: 10)
