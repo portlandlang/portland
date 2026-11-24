@@ -1534,6 +1534,16 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             "panic(5)\n",
             format!("{compiles} — panic of an Integer on line 1 is unbuilt (#443)"),
         ),
+        // A failure is unbuilt, so `System.read_file` builds only where an
+        // `or` takes its place (#534).
+        (
+            "source = System.read_file(\"x\")\n",
+            format!("{compiles} — System.read_file read without an or beside it — it answers a failure where the file cannot be read, and a failure on line 1 is unbuilt (#443)"),
+        ),
+        (
+            "System.write_file(\"x\", \"y\")\n",
+            format!("{compiles} — System.write_file on line 1 is unbuilt (#443)"),
+        ),
         // A struct outside the first step (#532).
         (
             "struct Pair\n  left\n  right\nend\nfirst = Pair.new(left: 1, right: 2)\nsecond = Pair.new(left: \"one\", right: 2)\np(first)\n",
@@ -1680,7 +1690,7 @@ fn portland_build_writes_llvm_ir_for_a_program_inside_the_native_slice() {
     for expected in [
         "define i64 @\"portland.fib(Integer)\"(i64 %\"n\") {",
         "define i1 @\"portland.small?(Integer)\"(i64 %\"number\") {",
-        "define i32 @main() {",
+        "define i32 @main(i32 %\".count\", ptr %\".values\") {",
         "call {i64, i1} @llvm.sadd.with.overflow.i64(",
         "call void @portland.overflow(",
         "c\"%lld %s %lld overflows the 64-bit integers\\0A\\00\"",
@@ -1838,6 +1848,64 @@ fn a_required_file_that_binds_a_local_refuses_natively() {
         stderr.contains("binds counter at its top level on line 2, and a required file's locals do not cross into the file that requires it (#530)"),
         "expected the gathering refusal, got: {stderr}"
     );
+}
+
+/// A native program reads its command line and a file (#534), and says
+/// what the seed says: the arguments it was started with, the text of a
+/// file one of them names, and the message after `or panic` where a file
+/// cannot be read, with the seed's exit status.
+#[test]
+fn a_native_program_reads_its_command_line_and_a_file() {
+    let directory = std::env::temp_dir().join("native_system_probe");
+    std::fs::create_dir_all(&directory).unwrap();
+    let program = directory.join("reader.pdx");
+    std::fs::write(
+        &program,
+        "paths = System.arguments\np(paths)\npaths.each do |path|\n  source = System.read_file(path) or panic \"cannot read #{path}\"\n  puts source.length\n  puts source\nend\n",
+    )
+    .unwrap();
+    let text = directory.join("text.txt");
+    std::fs::write(&text, "caf\u{e9}\nsecond line\n").unwrap();
+    let built = native_build(&program, &[]);
+    assert!(
+        built.status.success(),
+        "the reader should build: {}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let binary = String::from_utf8(built.stdout).unwrap().trim().to_string();
+    let cases: [Vec<&std::path::Path>; 3] = [
+        vec![],
+        vec![&text],
+        vec![&text, std::path::Path::new("/nonexistent/portland/file")],
+    ];
+    for arguments in cases {
+        let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&program)
+            .args(&arguments)
+            .output()
+            .expect("failed to run pdx");
+        let native = Command::new(&binary)
+            .args(&arguments)
+            .output()
+            .expect("failed to run the native binary");
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout),
+            String::from_utf8_lossy(&seed.stdout),
+            "{arguments:?} prints differently natively"
+        );
+        assert_eq!(
+            native.status.code(),
+            seed.status.code(),
+            "{arguments:?} exits differently natively"
+        );
+        if !seed.status.success() {
+            assert_eq!(
+                String::from_utf8_lossy(&native.stderr).trim(),
+                seed_refusal_sentence(&String::from_utf8_lossy(&seed.stderr)),
+                "{arguments:?} refuses in other words natively"
+            );
+        }
+    }
 }
 
 /// A program outside the native slice refuses at build (#448): the

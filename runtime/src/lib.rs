@@ -795,6 +795,53 @@ pub unsafe extern "C" fn portland_struct_to_string(record: *mut StructBlock) -> 
     unsafe { string_from(&[struct_source(record).as_bytes()]) }
 }
 
+/// What the process was started with, after its own name: kept from the
+/// entry function's first act for `System.arguments` to answer.
+static ARGUMENTS: std::sync::OnceLock<Vec<Vec<u8>>> = std::sync::OnceLock::new();
+
+/// The entry function's first act (#534): the command line, as the
+/// operating system handed it over, kept for the program to ask for.
+///
+/// # Safety
+/// `values` points at `count` strings that end in a zero byte, as `main`
+/// is handed them.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_start(count: i32, values: *const *const libc::c_char) {
+    let mut arguments = Vec::new();
+    for index in 1..count.max(0) as usize {
+        let value = unsafe { std::ffi::CStr::from_ptr(values.add(index).read()) };
+        arguments.push(value.to_bytes().to_vec());
+    }
+    let _ = ARGUMENTS.set(arguments);
+}
+
+/// `System.arguments` (ADR 0068): what the process was started with, as
+/// a new array of new Strings, held once.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_system_arguments() -> *mut ArrayBlock {
+    let arguments = ARGUMENTS.get().map(Vec::as_slice).unwrap_or(&[]);
+    let mut array = array_with(STRINGS, arguments.len());
+    for argument in arguments {
+        array = unsafe { portland_array_append(array, string_from(&[argument]) as i64, STRINGS) };
+    }
+    array
+}
+
+/// `System.read_file(path)` (ADR 0068): the file's text as a new String,
+/// held once, or nothing where it cannot be read or is not UTF-8. One
+/// crossing: open, read to the end, close.
+///
+/// # Safety
+/// `path` points at a live String, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_system_read_file(path: *const StringBlock) -> *mut StringBlock {
+    let path = unsafe { std::str::from_utf8_unchecked(bytes_of(path)) };
+    match std::fs::read_to_string(path) {
+        Ok(content) => string_from(&[content.as_bytes()]),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
 /// What a refusal calls a value: its source form, or `nil` where there
 /// is none.
 ///

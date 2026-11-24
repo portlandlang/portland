@@ -285,10 +285,26 @@ struct IntermediateSome
   value
 end
 
+# `panic(message)` where a value was to be, on the right of an `or`
+# (#534): the program stops, so it answers nothing, and is given the
+# type of what it stands beside.
+struct IntermediateStop
+  type
+  message
+end
+
 # A local bound or rebound.
 struct IntermediateStore
   name
   value
+end
+
+# A member of `System` (#534): `arguments`, or `read_file` with the path
+# it is handed.
+struct IntermediateSystem
+  type
+  name
+  arguments
 end
 
 # An Integer, a Boolean, or an array written out as a String, as `puts`,
@@ -683,6 +699,25 @@ def lower_statements(statements, bindings, context)
   Lowered.new(nodes: nodes, bindings: current)
 end
 
+# A member of `System` (#534). `arguments` is what the process was
+# started with. `read_file` answers the file's text or a failure, and a
+# failure is unbuilt, so it builds only on the left of an `or`, where
+# the right side takes the failure's place and nothing can tell a
+# failure from nil.
+def lower_system(node, bindings, context, root)
+  refuse_native("System.#{node.name} with a block", node) unless node.block.nil?
+  if node.name == "arguments" && node.arguments.empty?
+    return IntermediateSystem.new(type: ["array", ["string"]], name: "arguments", arguments: [])
+  end
+  if node.name == "read_file" && node.arguments.length == 1
+    refuse_native("System.read_file read without an or beside it — it answers a failure where the file cannot be read, and a failure", node) unless root == "or"
+    named = lower_value(node.arguments[0], bindings, context)
+    refuse_native("System.read_file of #{with_article(named.type)}", node) unless named.type == ["string"]
+    return IntermediateSystem.new(type: ["maybe", ["string"]], name: "read_file", arguments: [named])
+  end
+  refuse_native("System.#{node.name}", node)
+end
+
 # An expression, as a value with its type.
 def lower_value(node, bindings, context)
   # What is lowered below this value sits inside a larger expression,
@@ -694,6 +729,10 @@ def lower_value(node, bindings, context)
     scope = bindings + yielding_answers(context.answers, context.yielding)
     called = native_method_call(node, synthesize(node.receiver, scope), scope)
     return lower_value(called, bindings, context) if called.some?
+    # `System` is the floor's (ADR 0068), where no local has the name.
+    if (node.receiver in IdentifierNode) && node.receiver.name == "System" && bindings.none? { it[0] == "System" }
+      return lower_system(node, bindings, inner, context.root)
+    end
     # `Name.new(field: value)` makes one of the program's structs (#532).
     if node.name == "new" && (node.receiver in IdentifierNode) && bindings.none? { it[0] == node.receiver.name }
       made = context.structs.find { it.name == node.receiver.name }
@@ -795,10 +834,20 @@ def lower_value(node, bindings, context)
     yielded
   in LogicalNode(operator:, left:, right:)
     refuse_native("the operator '#{operator}'", node) unless %w[&& ||].include?(operator)
-    first = lower_value(left, bindings, inner)
+    # Read on the left of an `or`, a failure's place is taken by the right
+    # side, so `System.read_file` may stand there (#534).
+    first = lower_value(left, bindings, inner.with(root: operator == "||" ? "or" : nil))
     # `maybe || fallback` (#503): the value, or the fallback where there
     # is none. The fallback is a value of the same type, or another maybe.
     if operator == "||" && (first.type in ["maybe", *])
+      # `maybe or panic "…"`: the right side stops the program, so the
+      # whole is the value (#534).
+      if (right in CallNode) && right.name == "panic" && right.arguments.length == 1 && right.block.nil?
+        message = lower_value(right.arguments[0], bindings, inner)
+        refuse_native("panic of #{with_article(message.type)}", right) unless message.type == ["string"]
+        plain = type_at(first.type, 1)
+        return IntermediateDefault.new(type: plain, value: first, fallback: IntermediateStop.new(type: plain, message: message))
+      end
       fallback = lower_value(right, bindings, inner)
       fits = fallback.type == first.type || fallback.type == type_at(first.type, 1)
       refuse_native("'||' between #{with_article(first.type)} and #{with_article(fallback.type)}", node) unless fits
@@ -1022,6 +1071,8 @@ def render_value(value)
     "(call #{([name] + arguments.map { render_value(it) } + handed).join(" ")})"
   in IntermediateYield(arguments:) then "(yield#{arguments.map { " #{render_value(it)}" }.join("")})"
   in IntermediateArray(elements:) then "(array#{elements.map { " #{render_value(it)}" }.join("")})"
+  in IntermediateSystem(name:, arguments:) then "(System #{([name] + arguments.map { render_value(it) }).join(" ")})"
+  in IntermediateStop(message:) then "(panic #{render_value(message)})"
   in IntermediateRecord(type:, fields:) then "(new #{type_at(type, 1)}#{fields.map { " #{render_value(it)}" }.join("")})"
   in IntermediateField(record:, index:) then "(field #{render_value(record)} #{index})"
   in IntermediateIndex(array:, index:) then "([] #{render_value(array)} #{render_value(index)})"
