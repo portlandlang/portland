@@ -11,3 +11,14 @@ mutable grown = [4]
 grown = grown + [5]
 grown += [6]
 p(grown)
+
+# An array that starts empty and is only ever joined onto.
+def gathered(groups)
+  mutable all = []
+  groups.each do |group|
+    all += group
+  end
+  all
+end
+
+p(gathered([["a", "b"], ["c"]]))

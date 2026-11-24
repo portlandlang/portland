@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Native: an array that starts empty and is joined onto holds what it is joined with** ([#572](https://github.com/portlandlang/portland/issues/572)) — `all += group` onto `[]` left the array with no element type, and the build refused it. Beneath that, the runtime read the joined array's kind off the empty literal, which every type shares, so Strings joined onto `[]` were written out as addresses; it reads the kind off an array that holds something.
 - **Native: `value&.name`** ([#572](https://github.com/portlandlang/portland/issues/572)) — a safe call builds where its receiver is a name, a field, or an element: nil where the value is not there, and the method asked of it where it is.
 - **Native: Strings order** ([#572](https://github.com/portlandlang/portland/issues/572)) — `<`, `<=`, `>`, and `>=` between two Strings build, where only `==` and `!=` did. They order by their canonical text, code point by code point (ADR 0054), as on the seed.
 - **The parser names a node before asking what it is** ([#572](https://github.com/portlandlang/portland/issues/572)) — where it asked `step.node in DefNode` and then read `step.node.name`, the node is bound to a local first, and the local is asked and read. The native build knows a name is the struct `in` proved it to be, and knows nothing of the kind about a field read twice. Nothing it parses reads differently.

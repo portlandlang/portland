@@ -1701,6 +1701,11 @@ def synthesize_binary(node, types)
   when "+", "-", "*", "%"
     return tower_answer(left, right) if numeric?(left) && numeric?(right)
     return ["string"] if left == ["string"] && right == ["string"]
+    # Read as the native build runs it, two arrays joined are an array of
+    # what theirs make together, and an empty one is the other (#572).
+    if native_reading?(types) && node.operator == "+" && (left in ["array", *]) && (right in ["array", *])
+      return (joined_plain(left, right) or left)
+    end
     return left if (left in ["array", *]) && (right in ["array", *])
     # A set's union and difference answer a set (ADR 0082).
     return ["set"] if left == ["set"] && (node.operator == "+" || node.operator == "-")
