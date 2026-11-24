@@ -462,7 +462,12 @@ end
 # way. Nil where it does not fit.
 def fitted(value, type)
   return value if held_as?(value.type, type)
+  # An empty array is the array it is held as, whatever that holds.
+  return value.with(type: type) if value.type == EMPTY_ARRAY && (type in ["array", *])
   return nil unless type in ["maybe", *]
+  if value.type == EMPTY_ARRAY && (type_at(type, 1) in ["array", *])
+    return IntermediateSome.new(type: type, value: value.with(type: type_at(type, 1)))
+  end
   return IntermediateConstant.new(type: type, value: nil) if value.type == ["nil"]
   return IntermediateSome.new(type: type, value: value) if held_as?(value.type, type_at(type, 1))
   return value if (value.type in ["maybe", *]) && held_as?(type_at(value.type, 1), type_at(type, 1))

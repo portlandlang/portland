@@ -23,3 +23,16 @@ puts joined([], extra: ["b"])
 puts joined(["c"])
 puts listed("sum", [1, 2, 3])
 puts listed("sum", [])
+
+# An empty array answered by a def is the array the def answers.
+def names_before(words, stop)
+  mutable names = []
+  words.each do |word|
+    return [] if word == stop
+    names << word
+  end
+  names
+end
+
+p(names_before(["a", "b"], "z"))
+p(names_before(["a", "b"], "b"))
