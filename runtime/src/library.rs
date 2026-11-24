@@ -342,3 +342,84 @@ pub unsafe extern "C" fn portland_string_strip(text: *const StringBlock) -> *mut
 pub unsafe extern "C" fn portland_string_upcase(text: *const StringBlock) -> *mut StringBlock {
     unsafe { string_of(&text_of(text).to_uppercase()) }
 }
+
+/// Where a range starts and ends in a collection of this length, as the
+/// seed's `slice_bounds` reads one: a negative end counts from the far
+/// end, everything past either end is brought in, and a range that runs
+/// backwards holds nothing. `mode` says whether the range leaves its last
+/// place out (1), has no end (2), or both.
+fn bounds_of(length: usize, start: i64, end: i64, mode: i64) -> (usize, usize) {
+    let length = length as i64;
+    let resolve = |bound: i64| if bound < 0 { length + bound } else { bound };
+    let from = resolve(start).clamp(0, length);
+    let to = if mode & 2 != 0 {
+        length
+    } else {
+        let bound = resolve(end);
+        (if mode & 1 != 0 { bound } else { bound.saturating_add(1) }).clamp(0, length)
+    };
+    (from as usize, to.max(from) as usize)
+}
+
+/// `array[start..end]`: a new array of the run, each element held once
+/// more.
+///
+/// # Safety
+/// `array` is null or points at a live array.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_array_range(
+    array: *mut ArrayBlock,
+    start: i64,
+    end: i64,
+    mode: i64,
+) -> *mut ArrayBlock {
+    unsafe {
+        if array.is_null() {
+            return array_with(INTEGERS, SMALLEST_ROOM);
+        }
+        let (from, to) = bounds_of((*array).length as usize, start, end, mode);
+        portland_array_slice(array, from as i64, (to - from) as i64)
+    }
+}
+
+/// `text[index]`: the character there, counting from the end where the
+/// index is negative, or nothing past either end.
+///
+/// # Safety
+/// `text` points at a live String, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_string_character(
+    text: *const StringBlock,
+    index: i64,
+) -> *mut StringBlock {
+    unsafe {
+        let characters: Vec<&str> = text_of(text).graphemes(true).collect();
+        let place = if index < 0 {
+            index + characters.len() as i64
+        } else {
+            index
+        };
+        match usize::try_from(place).ok().and_then(|place| characters.get(place)) {
+            Some(character) => string_of(character),
+            None => std::ptr::null_mut(),
+        }
+    }
+}
+
+/// `text[start..end]`: the run of characters.
+///
+/// # Safety
+/// `text` points at a live String, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_string_range(
+    text: *const StringBlock,
+    start: i64,
+    end: i64,
+    mode: i64,
+) -> *mut StringBlock {
+    unsafe {
+        let characters: Vec<&str> = text_of(text).graphemes(true).collect();
+        let (from, to) = bounds_of(characters.len(), start, end, mode);
+        string_of(&characters[from..to].concat())
+    }
+}

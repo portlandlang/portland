@@ -84,7 +84,12 @@ NATIVE_LIBRARY = [
   [["string"], "split", [["string"]], ["array", ["string"]], "portland_string_split"],
   [["string"], "start_with?", [["string"]], ["boolean"], "portland_string_start_with"],
   [["string"], "strip", [], ["string"], "portland_string_strip"],
-  [["string"], "upcase", [], ["string"], "portland_string_upcase"]
+  [["string"], "upcase", [], ["string"], "portland_string_upcase"],
+  # `text[index]`, and `text[from..to]` and an array's, which are written
+  # with brackets and reach the library under these names.
+  [["string"], "[]", [["integer"]], ["maybe", ["string"]], "portland_string_character"],
+  [["string"], "[..]", [["integer"], ["integer"], ["integer"]], ["string"], "portland_string_range"],
+  [["array", ["element"]], "[..]", [["integer"], ["integer"], ["integer"]], ["self"], "portland_array_range"]
 ]
 
 # The name the native build's pinning reads under (#503): bound by it and
@@ -1671,6 +1676,15 @@ end
 def synthesize_index(node, types)
   return ["unknown"] unless native_reading?(types)
   receiver = synthesize(node.receiver, types)
+  # A run read by a range is the collection's own type, never a maybe
+  # (ADR 0019), and a String read by a number is a character or nothing
+  # (#563). A maybe is opened for either.
+  opened = opened_natively(receiver, types)
+  if node.index in RangeNode
+    return opened if opened == ["string"] || (opened in ["array", *])
+    return ["unknown"]
+  end
+  return ["maybe", ["string"]] if opened == ["string"] && synthesize(node.index, types) == ["integer"]
   return ["unknown"] unless (receiver in ["array", *]) && synthesize(node.index, types) == ["integer"]
   maybe_of(type_at(receiver, 1))
 end

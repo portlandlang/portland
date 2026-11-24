@@ -456,6 +456,13 @@ def joined_type(first, second)
   nil
 end
 
+# A call of the library's row for this name, asked of a value already
+# opened and handed values already lowered (#563).
+def library_call(name, holder, handed, node)
+  entry = native_library_entry(holder.type, name, handed.map { it.type }) or refuse_native("#{name} asked of #{with_article(holder.type)}", node)
+  IntermediateLibrary.new(type: library_type(type_at(entry, 3), holder.type), symbol: type_at(entry, 4), receiver: holder, arguments: handed, words: type_at(entry, 2).map { it == ["element"] })
+end
+
 # `name << value` (#497). The parser writes it as a binding of the name
 # to the append, and that is the one shape built: the local takes the
 # grown array, or the String with the value after it.
@@ -662,6 +669,20 @@ def lower_program(written, core: nil, progress: nil)
   entry = lower_statements(statements, [], context)
   functions << IntermediateFunction.new(name: "main", key: nil, parameters: [], answer: ["nil"], locals: entry.bindings.reverse, body: entry.nodes, block: nil, returned: false)
   IntermediateProgram.new(functions: functions, structs: pinned.structs.map { |made| [made.name, struct_fields(made, context)] })
+end
+
+# `held[from..to]` (#563): the run a range reads, or nil where the index
+# is no range. The library is handed where the range starts and ends,
+# and whether it leaves its last place out (1), has no end (2), or both.
+def lower_ranged(node, held, bindings, context)
+  range = node.index
+  return nil unless range in RangeNode
+  zero = IntermediateConstant.new(type: ["integer"], value: 0)
+  start = range.start.nil? ? zero : lower_value(range.start, bindings, context)
+  finish = range.finish.nil? ? zero : lower_value(range.finish, bindings, context)
+  refuse_native("an index by a range whose ends are not Integers", node) unless start.type == ["integer"] && finish.type == ["integer"]
+  mode = IntermediateConstant.new(type: ["integer"], value: (range.exclusive ? 1 : 0) + (range.finish.nil? ? 2 : 0))
+  library_call("[..]", opened_for(held, "[]"), [start, finish, mode], node)
 end
 
 # `Name.new(field: value)` (#532): each field of the struct handed its
@@ -914,6 +935,15 @@ def lower_value(node, bindings, context)
   # `array[index]` (#503): the element, or nil past either end.
   in IndexNode(receiver:, index:)
     held = lower_value(receiver, bindings, inner)
+    # A range reads a run, of a String or of an array, and a number reads
+    # a String's character (#563).
+    ranged = lower_ranged(node, held, bindings, inner)
+    return ranged if ranged.some?
+    if plain_of(held.type) == ["string"]
+      place = lower_value(index, bindings, inner)
+      refuse_native("an index into a String by #{with_article(place.type)}", node) unless place.type == ["integer"]
+      return library_call("[]", opened_for(held, "[]"), [place], node)
+    end
     refuse_native("an index into #{with_article(held.type)}", node) unless held.type in ["array", *]
     position = lower_value(index, bindings, inner)
     refuse_native("an index that is #{with_article(position.type)}", node) unless position.type == ["integer"]

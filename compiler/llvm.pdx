@@ -510,6 +510,7 @@ end
 def llvm_library_answer(type)
   return "zeroext i1" if type == ["boolean"]
   return "i64" if type == ["maybe", ["integer"]]
+  return "ptr" if type in ["maybe", *]
   llvm_type(type)
 end
 
@@ -1034,7 +1035,14 @@ def llvm_value(emitter, value)
     passed.each do |given|
       done = llvm_drop(done, type_at(given, 0), type_at(given, 1))
     end
-    return LLVMValue.new(emitter: done, operand: answered.operand) unless type == ["maybe", ["integer"]]
+    return LLVMValue.new(emitter: done, operand: answered.operand) unless type in ["maybe", *]
+    # A String or an array that may not be there comes back as nothing.
+    unless type == ["maybe", ["integer"]]
+      shape = llvm_type(type)
+      there = llvm_named(done, "icmp ne ptr #{answered.operand}, null")
+      half = llvm_named(there.emitter, "insertvalue #{shape} undef, i1 #{there.operand}, 0")
+      return llvm_named(half.emitter, "insertvalue #{shape} #{half.operand}, ptr #{answered.operand}, 1")
+    end
     found = llvm_named(done, "icmp ne i64 #{answered.operand}, -9223372036854775808")
     flagged = llvm_named(found.emitter, "insertvalue { i1, i64 } undef, i1 #{found.operand}, 0")
     llvm_named(flagged.emitter, "insertvalue { i1, i64 } #{flagged.operand}, i64 #{answered.operand}, 1")
