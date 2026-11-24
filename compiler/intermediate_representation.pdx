@@ -1019,8 +1019,6 @@ def lower_value(node, bindings, context)
     # ordering them is unbuilt.
     refuse_native("'#{operator}' between arrays", node) if (before in ["array", *]) && !%w[== !=].include?(operator)
     refuse_native("'#{operator}' between structs", node) if (before in ["struct", *]) && !%w[== !=].include?(operator)
-    # Strings are equal or not (ADR 0038); ordering them is unbuilt.
-    refuse_native("'#{operator}' between Strings", node) if before == ["string"] && !%w[== !=].include?(operator)
     IntermediateComparison.new(type: ["boolean"], operator: operator, left: first, right: second)
   # `array[index]` (#503): the element, or nil past either end.
   in IndexNode(receiver:, index:)

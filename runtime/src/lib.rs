@@ -156,6 +156,35 @@ pub unsafe extern "C" fn portland_string_equal(
     }
 }
 
+/// Where one String stands against another: before it, the same, or after
+/// it, as less than nothing, nothing, or more. Strings order by their
+/// canonical text (ADR 0054), code point by code point, by the same crate
+/// the seed orders with; equal bytes and all-ASCII text take the short
+/// paths, as in the seed.
+///
+/// # Safety
+/// Both point at live Strings, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_string_order(
+    left: *const StringBlock,
+    right: *const StringBlock,
+) -> i64 {
+    use unicode_normalization::UnicodeNormalization;
+    unsafe {
+        let (first, second) = (bytes_of(left), bytes_of(right));
+        let ordering = if first == second {
+            std::cmp::Ordering::Equal
+        } else if first.is_ascii() && second.is_ascii() {
+            first.cmp(second)
+        } else {
+            let first = std::str::from_utf8_unchecked(first);
+            let second = std::str::from_utf8_unchecked(second);
+            first.nfc().cmp(second.nfc())
+        };
+        ordering as i64
+    }
+}
+
 /// One more name holds this String. A literal is not counted, and neither
 /// is the absence of a String: a local not yet bound.
 ///
