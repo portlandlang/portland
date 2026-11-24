@@ -49,3 +49,7 @@ letters.each do |letter|
   spelled << letter.upcase
 end
 puts spelled
+p("a\nb\n\nc\n".split("\n", -1))
+p("ab".split("", -1))
+p("a,b,c,d".split(",", 2))
+p(" one  two ".split(" ", -1))

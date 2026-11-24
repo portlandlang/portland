@@ -82,6 +82,7 @@ NATIVE_LIBRARY = [
   [["string"], "index", [["string"]], ["maybe", ["integer"]], "portland_string_index"],
   [["string"], "slice", [["integer"], ["integer"]], ["string"], "portland_string_slice"],
   [["string"], "split", [["string"]], ["array", ["string"]], "portland_string_split"],
+  [["string"], "split", [["string"], ["integer"]], ["array", ["string"]], "portland_string_split_limit"],
   [["string"], "start_with?", [["string"]], ["boolean"], "portland_string_start_with"],
   [["string"], "strip", [], ["string"], "portland_string_strip"],
   [["string"], "upcase", [], ["string"], "portland_string_upcase"],

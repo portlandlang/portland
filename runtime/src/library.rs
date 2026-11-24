@@ -277,10 +277,73 @@ pub unsafe extern "C" fn portland_string_slice(
     }
 }
 
-/// `text.split(separator)` by Ruby's rules, as the seed's `ruby_split`
-/// reads them with no limit: a single space splits on runs of
-/// whitespace, an empty separator into characters, and trailing empty
-/// fields drop.
+/// `String#split` by Ruby's rules, the seed's `ruby_split` line for line
+/// (#142): a single space splits on runs of whitespace, an empty
+/// separator into characters, a positive limit caps the pieces, and
+/// trailing empty fields drop unless a limit is given.
+fn ruby_split(text: &str, separator: Option<&str>, limit: i64) -> Vec<String> {
+    if text.is_empty() {
+        return Vec::new();
+    }
+    let cap = usize::try_from(limit).ok().filter(|cap| *cap > 0);
+    let full = |pieces: &Vec<String>| cap.is_some_and(|cap| pieces.len() + 1 == cap);
+    let mut pieces: Vec<String> = Vec::new();
+    // Ruby's whitespace is ASCII's six — a U+2008 punctuation space is not
+    // a field break.
+    let ascii_space =
+        |character: char| matches!(character, ' ' | '\t' | '\n' | '\u{b}' | '\u{c}' | '\r');
+    match separator {
+        None | Some(" ") => {
+            let mut rest = text.trim_start_matches(ascii_space);
+            let mut took_the_rest = false;
+            while !rest.is_empty() {
+                if full(&pieces) {
+                    pieces.push(rest.to_string());
+                    took_the_rest = true;
+                    break;
+                }
+                let end = rest.find(ascii_space).unwrap_or(rest.len());
+                pieces.push(rest[..end].to_string());
+                rest = rest[end..].trim_start_matches(ascii_space);
+            }
+            // Trailing whitespace is one empty field, which a limit keeps:
+            // `" 1 2 ".split(" ", 3)` is `["1", "2", ""]`, and `" "` with a
+            // limit is `[""]`. Without one it drops below with the rest.
+            if limit != 0 && !took_the_rest && text.ends_with(ascii_space) {
+                pieces.push(String::new());
+            }
+        }
+        Some("") => {
+            let characters: Vec<&str> = text.graphemes(true).collect();
+            for (index, character) in characters.iter().enumerate() {
+                if full(&pieces) {
+                    pieces.push(characters[index..].concat());
+                    break;
+                }
+                pieces.push((*character).to_string());
+            }
+            // A limit past the last character — or a negative one — keeps
+            // the empty field after it, as Ruby's `"ab".split("", -1)` does.
+            if limit < 0 || cap.is_some_and(|cap| cap > characters.len()) {
+                pieces.push(String::new());
+            }
+        }
+        Some(separator) => {
+            pieces = match cap {
+                Some(cap) => text.splitn(cap, separator).map(str::to_string).collect(),
+                None => text.split(separator).map(str::to_string).collect(),
+            };
+        }
+    }
+    if limit == 0 {
+        while pieces.last().is_some_and(String::is_empty) {
+            pieces.pop();
+        }
+    }
+    pieces
+}
+
+/// `text.split(separator)`.
 ///
 /// # Safety
 /// Both point at live Strings, whose bytes are UTF-8.
@@ -289,22 +352,22 @@ pub unsafe extern "C" fn portland_string_split(
     text: *const StringBlock,
     separator: *const StringBlock,
 ) -> *mut ArrayBlock {
+    unsafe { portland_string_split_limit(text, separator, 0) }
+}
+
+/// `text.split(separator, limit)`.
+///
+/// # Safety
+/// Both point at live Strings, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_string_split_limit(
+    text: *const StringBlock,
+    separator: *const StringBlock,
+    limit: i64,
+) -> *mut ArrayBlock {
     unsafe {
-        let text = text_of(text);
-        if text.is_empty() {
-            return strings_of(std::iter::empty());
-        }
-        let ascii_space =
-            |character: char| matches!(character, ' ' | '\t' | '\n' | '\u{b}' | '\u{c}' | '\r');
-        let mut pieces: Vec<&str> = match text_of(separator) {
-            " " => text.split(ascii_space).filter(|piece| !piece.is_empty()).collect(),
-            "" => text.graphemes(true).collect(),
-            separator => text.split(separator).collect(),
-        };
-        while pieces.last().is_some_and(|piece| piece.is_empty()) {
-            pieces.pop();
-        }
-        strings_of(pieces.into_iter())
+        let pieces = ruby_split(text_of(text), Some(text_of(separator)), limit);
+        strings_of(pieces.iter().map(String::as_str))
     }
 }
 
