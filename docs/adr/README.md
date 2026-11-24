@@ -108,6 +108,8 @@ Decisions made before this log exist as-built documentation in [`docs/language.m
 - [0094](0094-2026-11-22-a-native-spike-through-llvm-ir-text.md) — A native spike: `fib(30)` through LLVM IR as text
 - [0095](0095-2026-11-23-native-strings-a-runtime-and-reference-counting.md) — Native Strings, a runtime crate, and reference counting
 - [0096](0096-2026-11-23-native-blocks-arrays-and-maybes.md) — Native blocks, arrays, and maybes
+- [0097](0097-2026-11-23-a-def-compiled-for-each-combination-of-types-and-leaving-a-block.md) — A def compiled for each combination of types, and leaving a block
+- [0098](0098-2026-11-23-a-linter-written-in-portland-and-the-order-of-an-implementation-file.md) — A linter written in Portland, and the order of an implementation file
 
 <!-- /generated -->
 
