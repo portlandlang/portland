@@ -1442,6 +1442,17 @@ def returns_value?(nodes)
   nodes.reject { it.nil? }.any? { |node| ((node in ReturnNode) && node.value.some?) || returns_value?(children_of(node)) }
 end
 
+# `value&.name` as the `if` it means (#572): nil where the value is not
+# there, and the method asked of it where it is. Nil for anything else: a
+# node that is no safe call, one handed a block, or a receiver that may
+# not read the same each time.
+def safe_as_if(node)
+  return nil unless (node in SafeMethodCallNode) && node.block.nil? && steady_subject?(node.receiver)
+  absent = method_call_node(node.receiver, "nil?", [], nil, line: node.line)
+  asked = method_call_node(node.receiver, node.name, node.arguments, nil, line: node.line)
+  if_node(absent, [nil_node(line: node.line)], [asked], line: node.line)
+end
+
 def scan_program(nodes)
   mutable types = []
   nodes.each do |node|
@@ -2007,6 +2018,9 @@ end
 # form of ADR 0040 §3); on a plain receiver the same, since some(x) is x.
 def synthesize_safe_call(node, types)
   return type_function_answer(node) if builtin_type_function?(node, types)
+  # Read as the native build runs it, it is the `if` it means (#572).
+  guarded = native_reading?(types) ? safe_as_if(node) : nil
+  return synthesize(guarded, types) if guarded.some?
   receiver = synthesize(node.receiver, types)
   plain = if receiver in ["maybe", *] then type_at(receiver, 1) else receiver end
   maybe_of(call_answer(plain, node, types))

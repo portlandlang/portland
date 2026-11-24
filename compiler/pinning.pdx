@@ -553,6 +553,9 @@ end
 # The calls to the program's defs anywhere inside an expression, each with
 # its arguments' types as the bindings in scope give them.
 def pin_expression(node, walk, answers, names)
+  # `value&.name` is walked as the `if` it means (#572).
+  guarded = safe_as_if(node)
+  return pin_statement(guarded, walk, answers, names) if guarded.some?
   return pin_block_call(node, walk, answers, names) if (node in CallNode) && node.block.some? && names.include?(node.name)
   # A method the core writes for the receiver's type is a def (#525), and
   # the call is gathered as a call of it.

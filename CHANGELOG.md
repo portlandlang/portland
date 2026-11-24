@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Native: `value&.name`** ([#572](https://github.com/portlandlang/portland/issues/572)) — a safe call builds where its receiver is a name, a field, or an element: nil where the value is not there, and the method asked of it where it is.
 - **Native: Strings order** ([#572](https://github.com/portlandlang/portland/issues/572)) — `<`, `<=`, `>`, and `>=` between two Strings build, where only `==` and `!=` did. They order by their canonical text, code point by code point (ADR 0054), as on the seed.
 - **The parser names a node before asking what it is** ([#572](https://github.com/portlandlang/portland/issues/572)) — where it asked `step.node in DefNode` and then read `step.node.name`, the node is bound to a local first, and the local is asked and read. The native build knows a name is the struct `in` proved it to be, and knows nothing of the kind about a field read twice. Nothing it parses reads differently.
 - **A labelled part of a pattern is a struct in the compiler's tree** ([#572](https://github.com/portlandlang/portland/issues/572)) — a struct pattern's field, a hash pattern's pair, and an enum case pattern's payload entry were each an array of a label and a pattern, a String and a node in one array, which a native array cannot hold. Each is a `LabelledPattern` with a `label` and a `pattern`. Nothing it parses reads differently.

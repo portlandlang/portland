@@ -524,6 +524,9 @@ end
 # none.
 def joined_type(first, second)
   return first if first == second
+  # Nil beside a maybe is that maybe.
+  return second if first == ["nil"] && (second in ["maybe", *])
+  return first if second == ["nil"] && (first in ["maybe", *])
   return ["maybe", second] if first == ["nil"] && native_value?(second)
   return ["maybe", first] if second == ["nil"] && native_value?(first)
   return first if first == ["maybe", second]
@@ -962,6 +965,9 @@ def lower_value(node, bindings, context)
   as_if = case_as_if(node)
   return lower_value(as_if, bindings, context) if as_if.some?
   refuse_native(UNBUILT_CASE, node) if node in CaseNode
+  # `value&.name` is built as the `if` it means (#572).
+  guarded = safe_as_if(node)
+  return lower_value(guarded, bindings, context) if guarded.some?
   # `%w[a b]` is the array of its words (#562).
   if node in WordArrayNode
     words = word_array_elements(node.text).map { string_node(it, line: node.line) }

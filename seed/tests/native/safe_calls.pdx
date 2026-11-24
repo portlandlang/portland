@@ -1,0 +1,24 @@
+# `value&.name` (#572): nil where the value is not there, and the method
+# asked of it where it is.
+struct Label
+  text
+  line
+end
+
+def first_line(labels)
+  labels.first&.line
+end
+
+def first_length(words)
+  found = words.first
+  found&.length
+end
+
+p(first_line([Label.new(text: "a", line: 3)]))
+p(first_line([Label.new(text: "a", line: nil)]))
+p(first_length(["four", "to"]))
+words = ["x"]
+missing = words[4]
+p(missing&.length)
+p(missing&.upcase)
+p(words[0]&.upcase)
