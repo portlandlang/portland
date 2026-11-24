@@ -1,0 +1,41 @@
+# A def that ends in an `if` whose arms are more than one expression
+# (#559): each arm is a body of its own, and answers from inside.
+def described(count)
+  if count == 0
+    "none"
+  elsif count < 3
+    label = "few"
+    "#{label}: #{count}"
+  else
+    doubled = count * 2
+    return "a great many" if doubled > 100
+    "many: #{doubled}"
+  end
+end
+
+def found(words, wanted)
+  if wanted == ""
+    nil
+  else
+    first = words[0]
+    first == wanted ? "first" : "later"
+  end
+end
+
+def tally(count)
+  mutable total = 0
+  if count > 1
+    total += count
+    total * 2
+  end
+end
+
+puts described(0)
+puts described(2)
+puts described(9)
+puts described(70)
+puts(found(["a"], "") or "nothing")
+puts(found(["a"], "a") or "nothing")
+puts(found(["b"], "a") or "nothing")
+puts(tally(1) or 0)
+puts(tally(4) or 0)

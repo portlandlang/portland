@@ -563,6 +563,9 @@ end
 # are walked in place, so a name bound above them keeps its type inside
 # and after.
 def pin_statement(statement, walk, answers, names)
+  # A `case` over literals is walked as the `if`s it means (#558).
+  plain = case_as_if(statement)
+  return pin_statement(plain, walk, answers, names) if plain.some?
   case statement
   in AssignmentNode(name:, value:)
     return walk if value.nil?
@@ -900,6 +903,8 @@ def unique_types(types)
 end
 
 def value_candidates(node, scope)
+  plain = case_as_if(node)
+  return value_candidates(plain, scope) if plain.some?
   return [statement_answer(node, scope)] unless node in IfNode
   taken = node.then_body or []
   other = node.else_body or []

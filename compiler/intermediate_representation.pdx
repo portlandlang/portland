@@ -19,6 +19,9 @@
 
 require_relative "pinning"
 
+# What a `case` the native build does not hold is called (#558).
+UNBUILT_CASE = "a case whose subject is more than a name or a field, or whose when names more than literals,"
+
 # `name << value` on a local that holds an array: the local then holds
 # the array with the value after its last element. Values never mutate,
 # so an array another name holds is copied first, which the runtime
@@ -373,6 +376,22 @@ struct LoweringContext
   pinned
 end
 
+# Whether one arm of an `if` is more than an expression (#559).
+def arm_is_body?(arm)
+  only = arm.first
+  return true if arm.length > 1
+  return false if only.nil?
+  (only in AssignmentNode) || (only in ReturnNode) || (only in WhileNode) || arms_are_bodies?((case_as_if(only) or only))
+end
+
+# Whether an `if` at the end of a body must be built arm by arm (#559):
+# an arm is more than one expression, or is one statement that is not an
+# expression, or is itself such an `if`.
+def arms_are_bodies?(node)
+  return false unless node in IfNode
+  [(node.then_body or []), (node.else_body or [])].any? { arm_is_body?(it) }
+end
+
 # Where a field starts among its struct's words (#553): a field takes
 # one word, and a maybe two, whether it is there and then its value.
 def field_offset(fields, place)
@@ -519,6 +538,17 @@ def lower_body(body, owner, what, bindings, answer, context)
     value = fitted(held, answer) or refuse_native("#{what} whose last expression is #{with_article(held.type)} where it answers #{with_article(answer)}", last)
     return Lowered.new(nodes: lowered.nodes + stored.nodes + [IntermediateReturn.new(value: value)], bindings: stored.bindings)
   end
+  # An `if` whose arms are more than one expression each answers from
+  # inside the arm taken (#559): each arm is a body of its own, and one
+  # that is missing or empty answers nil.
+  ending = (case_as_if(last) or last)
+  if arms_are_bodies?(ending)
+    test = lower_condition(ending.condition, lowered.bindings, context)
+    nothing = [nil_node(line: ending.line)]
+    taken = lower_body(((ending.then_body or []).empty? ? nothing : ending.then_body), owner, what, lowered.bindings, answer, context)
+    other = lower_body(((ending.else_body or []).empty? ? nothing : ending.else_body), owner, what, taken.bindings, answer, context)
+    return Lowered.new(nodes: lowered.nodes + [IntermediateBranch.new(condition: test, then_body: taken.nodes, else_body: other.nodes)], bindings: other.bindings)
+  end
   written = lower_value(last, lowered.bindings, context.with(root: "value"))
   value = fitted(written, answer) or refuse_native("#{what} whose last expression is #{with_article(written.type)} where it answers #{with_article(answer)}", last)
   Lowered.new(nodes: lowered.nodes + [IntermediateReturn.new(value: value)], bindings: lowered.bindings)
@@ -628,6 +658,10 @@ def lower_record(node, made, bindings, context)
 end
 
 def lower_statement(statement, bindings, context)
+  # A `case` over literals is built as the `if`s it means (#558).
+  plain = case_as_if(statement)
+  return lower_statement(plain, bindings, context) if plain.some?
+  refuse_native(UNBUILT_CASE, statement) if statement in CaseNode
   case statement
   in AssignmentNode(name:, value:)
     refuse_native("a parameter declared mutable", statement) if value.nil?
@@ -745,6 +779,10 @@ end
 
 # An expression, as a value with its type.
 def lower_value(node, bindings, context)
+  # A `case` over literals is built as the `if`s it means (#558).
+  plain = case_as_if(node)
+  return lower_value(plain, bindings, context) if plain.some?
+  refuse_native(UNBUILT_CASE, node) if node in CaseNode
   # What is lowered below this value sits inside a larger expression,
   # where a call or a yield that can leave may not be written (#523).
   inner = context.with(root: nil)

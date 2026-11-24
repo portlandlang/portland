@@ -564,6 +564,27 @@ def call_answer(receiver, node, types)
   end
 end
 
+# A `case` over literals as the `if`s it means (#558): its subject
+# compared with each `when`'s values by `==`, the first branch that
+# matches taken, the `else` otherwise. Nil for anything else: a node that
+# is no `case`, a subject that may not read the same each time, or a
+# `when` that names a type, a range, or a regex, which match by `===`.
+def case_as_if(node)
+  return nil unless node in CaseNode
+  return nil unless steady_subject?(node.subject)
+  return nil unless node.branches.all? { |branch| branch.values.all? { compared_literal?(it) } }
+  mutable rest = node.else_body
+  node.branches.reverse.each do |branch|
+    mutable condition = nil
+    branch.values.each do |value|
+      test = binary_node("==", node.subject, value, line: branch.line)
+      condition = condition.nil? ? test : logical_node("||", condition, test, line: branch.line)
+    end
+    rest = [if_node(condition, branch.body, rest, line: branch.line)]
+  end
+  (rest or []).first
+end
+
 # A node's direct children — every expression and statement it holds,
 # blocks and branches included, patterns excluded — for a walk that looks
 # for something anywhere inside a body. Defs, structs, traits, and modules
@@ -646,6 +667,9 @@ def combination_key(name, arguments, handed, leaves)
   return "#{name}(#{types})" if handed.nil?
   "#{name}(#{types}) { #{render_native_type(handed)}#{leaves ? ", leaving" : ""} }"
 end
+
+# A literal a `when` names that `==` compares as `===` does.
+def compared_literal?(node) = (node in StringNode) || (node in IntegerNode) || (node in BooleanNode) || (node in NilNode)
 
 # `x == nil` and `x != nil`, either way round.
 def comparison_proof(node, types)
@@ -791,6 +815,14 @@ def infer_program(nodes)
   ordered_pairs(nodes, scan_program(nodes), "assignment")
 end
 
+# A value's type and a maybe of it, either way round, as the maybe; a
+# maybe and nil as the maybe; anything else unknown.
+def joined_with_maybe(first, second)
+  return first if first == ["maybe", second] || ((first in ["maybe", *]) && second == ["nil"])
+  return second if second == ["maybe", first] || ((second in ["maybe", *]) && first == ["nil"])
+  ["unknown"]
+end
+
 # `Math` (ADR 0083): the total functions answer a Float; one that may answer
 # a domain failure is unknown, as every fallible builtin is; `frexp` and
 # `lgamma` answer a pair.
@@ -922,6 +954,8 @@ end
 def native_nothing?(body, types)
   last = body.last
   return false if last.nil?
+  plain = case_as_if(last)
+  return native_nothing?(body.slice(0, body.length - 1) + [plain], types) if plain.some?
   return true if last in WhileNode
   if last in IfNode
     other = last.else_body or []
@@ -1244,6 +1278,14 @@ def statement_answer(statement, types)
   synthesize(statement, types)
 end
 
+# Whether an expression reads the same each time it is read, and costs
+# little to read again (#558): a name, `self`, or a method with no
+# arguments asked of one, as a field is.
+def steady_subject?(node)
+  return true if (node in IdentifierNode) || (node in SelfNode)
+  (node in MethodCallNode) && node.arguments.empty? && node.block.nil? && steady_subject?(node.receiver)
+end
+
 # Read a type off an expression. Synthesis mode only (ADR 0040's ladder —
 # checking mode is 3b): every arm answers what it can prove from the node
 # alone plus the bindings already typed.
@@ -1275,6 +1317,7 @@ def synthesize(node, types)
   # `sprintf` (ADR 0067) answer a string.
   in CallNode then synthesize_bare_call(node, types)
   in IfNode then synthesize_if(node, types)
+  in CaseNode then synthesize_case(node, types)
   in CaseInNode then synthesize_case_in(node, types)
   in AppendNode then synthesize_append(node, types)
   # A `yield` is what the block answers, which only the native build's
@@ -1493,6 +1536,13 @@ def synthesize_call(node, types)
   call_answer(asked, node, types)
 end
 
+# A `case` read as the native build runs it (#558), where it is one over
+# literals. The checker reads no type off a `case`.
+def synthesize_case(node, types)
+  plain = native_reading?(types) ? case_as_if(node) : nil
+  plain.nil? ? ["unknown"] : synthesize(plain, types)
+end
+
 # A `case/in` in value position: the arms' answers must agree, each arm
 # read with its captures bound (arm_bindings). An absent else answers nil
 # (ADR 0012) — unless an unguarded bare capture makes the arms total.
@@ -1553,7 +1603,12 @@ def synthesize_if(node, types)
   proof = narrowings(node.condition, types)
   yes = branch_answer(node.then_body, when_true(proof) + types)
   no = branch_answer(node.else_body, when_false(proof) + types)
-  merge_candidates([yes, no])
+  merged = merge_candidates([yes, no])
+  # Read as the native build runs it, a value on one side and a maybe of
+  # it on the other are a maybe of it (#558), as an `elsif` chain that
+  # ends in nil is.
+  return merged unless merged == ["unknown"] && native_reading?(types)
+  joined_with_maybe(yes, no)
 end
 
 # `array[index]` under the native reading: the element, or nil past
