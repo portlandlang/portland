@@ -1,0 +1,33 @@
+# `with` on a struct (#576): a new struct of the same type, each field
+# named taking the value handed and every other kept.
+struct Point
+  horizontal
+  vertical
+  label
+end
+
+struct Loading
+  files
+  count
+  note
+end
+
+def shifted(point, by) = point.with(horizontal: point.horizontal + by)
+
+def loaded(loading, path)
+  loading.with(files: loading.files + [path], count: loading.count + 1)
+end
+
+origin = Point.new(horizontal: 1, vertical: 2, label: "origin")
+moved = shifted(origin, 5)
+p(origin)
+p(moved)
+p(moved.with(label: "moved", vertical: 0))
+mutable current = Loading.new(files: ["a.pdx"], count: 1, note: nil)
+current = loaded(current, "b.pdx")
+current = loaded(current, "c.pdx")
+p(current)
+noted = current.with(note: "done")
+p(noted)
+p(current.note == nil)
+puts noted.files.join(", ")
