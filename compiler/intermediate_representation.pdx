@@ -609,6 +609,17 @@ def lower_body(body, owner, what, bindings, answer, context)
     other = lower_body(((ending.else_body or []).empty? ? nothing : ending.else_body), owner, what, narrowed_bindings(after_then, when_false(proof)), answer, context)
     return Lowered.new(nodes: lowered.nodes + [IntermediateBranch.new(condition: test, then_body: taken.nodes, else_body: other.nodes)], bindings: unnarrowed(lowered.bindings, other.bindings))
   end
+  # A loop at the end (#572): a `while true` is left only by a `return`
+  # inside it, so nothing follows it, and a loop that can end answers nil.
+  if last in WhileNode
+    turned = lower_statement(last, lowered.bindings, context)
+    if endless_loop?(last)
+      unreached = IntermediateConstant.new(type: ["string"], value: "a loop that does not end has ended")
+      return Lowered.new(nodes: lowered.nodes + turned.nodes + [IntermediatePanic.new(value: unreached)], bindings: turned.bindings)
+    end
+    nothing = fitted(IntermediateConstant.new(type: ["nil"], value: nil), answer) or refuse_native("#{what} that ends in a loop where it answers #{with_article(answer)}", last)
+    return Lowered.new(nodes: lowered.nodes + turned.nodes + [IntermediateReturn.new(value: nothing)], bindings: turned.bindings)
+  end
   written = lower_value(last, lowered.bindings, context.with(root: "value"))
   value = fitted(written, answer) or refuse_native("#{what} whose last expression is #{with_article(written.type)} where it answers #{with_article(answer)}", last)
   Lowered.new(nodes: lowered.nodes + [IntermediateReturn.new(value: value)], bindings: lowered.bindings)

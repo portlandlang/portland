@@ -153,6 +153,10 @@ def answer_candidates(body, parameters, answers, names)
     last = value_candidates(statement, scope)
     walk = pin_statement(statement, walk, answers, names)
   end
+  # A loop at the end answers nil where it can end, and nothing where it
+  # cannot (#572).
+  ending = body.last
+  last = endless_loop?(ending) ? [] : [["nil"]] if ending in WhileNode
   found + returns_gathered(walk) + last
 end
 
@@ -160,6 +164,8 @@ end
 # its statements above the last one leave.
 def answers_nothing?(body, parameters, answers, names)
   return false if body.empty?
+  # A `return` with a value is an answer, whatever the body ends in.
+  return false if returns_value?(body)
   above = pin_statements(body.slice(0, body.length - 1), PinWalk.new(bindings: parameters, calls: []), answers, names)
   native_nothing?(body, above.bindings + answers)
 end
@@ -183,6 +189,12 @@ def body_answer(body, parameters, answers, names)
   leaving = early + returns_gathered(walk)
   ending = body.last
   return merge_answers(leaving) if (ending in CallNode) && ending.name == "panic" && !leaving.empty?
+  # A body that ends in a loop with a `return` inside answers what its
+  # returns do (#572): a `while true` is left no other way, and a loop
+  # that can end answers nil where it does.
+  if (ending in WhileNode) && !leaving.empty?
+    return merge_answers(endless_loop?(ending) ? leaving : leaving + [["nil"]])
+  end
   merge_answers(leaving + [last])
 end
 
@@ -927,6 +939,8 @@ end
 def value_candidates(node, scope)
   plain = case_as_if(node)
   return value_candidates(plain, scope) if plain.some?
+  # A `panic` is no way out with an answer (#572).
+  return [] if (node in CallNode) && node.name == "panic"
   return [statement_answer(node, scope)] unless node in IfNode
   taken = node.then_body or []
   other = node.else_body or []

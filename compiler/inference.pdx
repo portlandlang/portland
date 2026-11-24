@@ -802,6 +802,9 @@ def element_type(receiver)
   ["unknown"]
 end
 
+# Whether a statement is a loop left only from inside: `while true`.
+def endless_loop?(node) = (node in WhileNode) && (node.condition in BooleanNode) && node.condition.value == "true"
+
 def entry_name(entry) = entry.split("/").first
 
 # Every node in a file, each before what it holds.
@@ -1395,6 +1398,12 @@ def returns_in_body(body, mutable types)
     types = bind_after(statement, types, [])
   end
   found
+end
+
+# Whether a `return` with a value is written anywhere in these
+# statements, a block's body among them.
+def returns_value?(nodes)
+  nodes.reject { it.nil? }.any? { |node| ((node in ReturnNode) && node.value.some?) || returns_value?(children_of(node)) }
 end
 
 def scan_program(nodes)
