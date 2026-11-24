@@ -486,7 +486,8 @@ def lower_append(statement, append, bindings, context)
     return lower_statement(statement.with(value: joined), bindings, context)
   end
   refuse_native("a << onto #{with_article(held)}", statement) unless held in ["array", *]
-  written = lower_value(append.value, bindings, context.with(root: "value"))
+  # A maybe appended is opened first (#566): an array holds no maybe.
+  written = opened_for(lower_value(append.value, bindings, context.with(root: "value")), "<<")
   # An empty array appended to an array of arrays is one of its elements.
   value = written.type == EMPTY_ARRAY && (type_at(held, 1) in ["array", *]) ? written.with(type: type_at(held, 1)) : written
   type = ["array", value.type]
