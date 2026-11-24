@@ -252,6 +252,16 @@ end
 # Whether a type says everything a code generator needs: no unknown in it.
 def concrete?(type) = type == NOTHING || !render_native_type(type).include?("Unknown")
 
+# A program with each constant bound at its top level as a def of that
+# name, with no parameters, answering its value (#562): a read of the
+# constant is then a call. Done twice, it is done once.
+def constants_as_defs(nodes)
+  nodes.map do |node|
+    constant = (node in AssignmentNode) && node.value.some? && constant_name?(node.name)
+    constant ? def_node(node.name, [], [node.value], false, line: node.line) : node
+  end
+end
+
 # Every def beside the names its body mentions (#537). A def reads an
 # answer, a field, or what a block is handed only by a name it writes,
 # save for the two a value is written out by, which every def is taken to
@@ -521,7 +531,8 @@ def pin_expression(node, walk, answers, names)
   current
 end
 
-def pin_program(nodes, core: nil, progress: nil)
+def pin_program(written, core: nil, progress: nil)
+  nodes = constants_as_defs(written)
   own = nodes.select { it in DefNode }
   structs = nodes.select { it in StructDefNode }
   methods = type_methods(nodes, core)
