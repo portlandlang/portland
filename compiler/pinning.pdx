@@ -55,6 +55,13 @@ ROUND_LIMIT = 200
 # The methods of the core's types and of a program's structs as the
 # native build compiles them (#525, #532): each a def that takes `self`
 # first, and the shapes of call each answers, as bindings.
+# One pinned combination beside the calls its body made when it was last
+# walked (#537).
+struct BodyRead
+  found
+  calls
+end
+
 struct CoreMethods
   definitions
   shapes
@@ -65,6 +72,14 @@ end
 # handed answers or nil, whether that block can leave]. A `yield` is
 # gathered the same way, under the name `yield`, with what it hands over,
 # and a `return` under the name `return`, with what it answers.
+# One round's gathering (#537): the walk with every call in it, each
+# combination's own calls, and how many bodies were walked to get them.
+struct GatheredRound
+  walk
+  read
+  again
+end
+
 struct PinWalk
   bindings
   calls
@@ -171,6 +186,16 @@ def body_answer(body, parameters, answers, names)
   merge_answers(leaving + [last])
 end
 
+# The calls one pinned combination's body makes, read with its
+# parameters bound. A body's calls are its own: nothing in the walk reads
+# the calls gathered before it, so each body is walked from none and the
+# lists are joined, which keeps a call from being copied once for every
+# call after it (#537).
+def body_calls(found, names, answers)
+  return [] if found.parameters.length != found.definition.parameters.length
+  pin_statements(found.definition.body, PinWalk.new(bindings: found.parameters, calls: []), yielding_answers(answers, found.block), names).calls
+end
+
 # One line of what the build is doing (#543), on standard error, with
 # the time since the build began. `started` is the clock's reading then.
 def build_note(started, message)
@@ -216,8 +241,25 @@ def called_definition(definition, placed, named)
   definition.with(parameters: parameters, body: prelude + definition.body)
 end
 
+# The names whose entries differ between one round's answers and the
+# next's (#537): each entry added, dropped, or changed gives the names in
+# its key.
+def changed_names(before, after)
+  differing = after.reject { before.include?(it) } + before.reject { after.include?(it) }
+  differing.flat_map { key_names(it[0]) }.uniq
+end
+
 # Whether a type says everything a code generator needs: no unknown in it.
 def concrete?(type) = type == NOTHING || !render_native_type(type).include?("Unknown")
+
+# Every def beside the names its body mentions (#537). A def reads an
+# answer, a field, or what a block is handed only by a name it writes,
+# save for the two a value is written out by, which every def is taken to
+# mention. Its own name is not among them unless it calls itself: what a
+# combination was pinned as is held beside it, and compared.
+def definition_mentions(definitions)
+  definitions.map { [it.name, (mentioned_names(it.body) + %w[inspect to_s]).uniq] }
+end
 
 # For each field of a struct made with more than one type, a sentence
 # saying so (#532). The native build gives a field one type, as it gives
@@ -248,13 +290,36 @@ end
 # The calls every body reached names: the top level's, and those of each
 # combination pinned so far, read with its own parameters.
 def gathered_calls(definitions, statements, names, answers, pinned)
-  mutable walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
+  gathered_round(statements, names, answers, pinned, nil, [], []).walk
+end
+
+# One round's gathering, keeping each body's calls beside the combination
+# they were read from. A body is walked again only where it must be
+# (#537): with `changed` the names whose entries differ from the round
+# before, a combination pinned as it was then, in a def that names none
+# of them, makes the calls it made then. With `changed` nil every body is
+# walked.
+def gathered_round(statements, names, answers, pinned, changed, mentions, read_before)
+  walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
+  mutable calls = walk.calls
+  mutable read = []
+  mutable again = 0
   pinned.each do |found|
-    next if found.parameters.length != found.definition.parameters.length
-    inner = pin_statements(found.definition.body, PinWalk.new(bindings: found.parameters, calls: walk.calls), yielding_answers(answers, found.block), names)
-    walk = walk.with(calls: inner.calls)
+    before = changed.nil? ? nil : read_before.find { it.found.key == found.key }
+    kept = before.some? && read_alike?(before.found, found) && unaffected?(found.definition.name, changed, mentions)
+    again += 1 unless kept
+    made = kept ? before.calls : body_calls(found, names, answers)
+    read << BodyRead.new(found: found, calls: made)
+    calls += made
   end
-  walk
+  GatheredRound.new(walk: walk.with(calls: calls), read: read, again: again)
+end
+
+# The names in an answer's key (#537): `Array#map([Token]) { Integer }`
+# gives `Array` and `map`, and `Token.text` gives `Token` and `text`.
+def key_names(key)
+  head = (key.split("(").first or key)
+  head.split("#").flat_map { it.split(".") }
 end
 
 # Every field the gathered calls made, as [its key, the types it was
@@ -274,6 +339,21 @@ def made_fields(calls)
     end
   end
   fields
+end
+
+# Every name written anywhere in a body (#537): a name read, a call, a
+# method, and a keyword's label.
+def mentioned_names(nodes)
+  nodes.reject { it.nil? }.flat_map do |node|
+    own = case node
+    in CallNode(name:)             then [name]
+    in IdentifierNode(name:)       then [name]
+    in KeywordArgumentNode(label:) then [label]
+    in MethodCallNode(name:)       then [name]
+    else []
+    end
+    own + mentioned_names(children_of(node))
+  end
 end
 
 # The one type a body's ways out answer together. Where they are one
@@ -354,17 +434,24 @@ end
 # Every combination the calls gathered name, the defs in written order
 # and each def's combinations in the order they were first met. A call
 # with an argument whose type is not known names none, and is read again
-# once more is pinned.
-def pin_combinations(definitions, calls, answers, names, strict)
+# once more is pinned. With `changed` the names whose entries differ from
+# the round before, a combination of a def that names none of them is
+# kept as `before` pinned it (#537); with `changed` nil each is pinned
+# afresh.
+def pin_combinations(definitions, calls, answers, names, strict, changed, mentions, before)
   mutable pinned = []
   definitions.each do |definition|
     sites = calls.select { it[0] == definition.name }
+    steady = changed.some? && unaffected?(definition.name, changed, mentions)
     met = unique_types(sites.map { [type_at(it, 1), type_at(it, 2), type_at(it, 3) == true] })
     met.each do |combination|
       arguments = type_at(combination, 0)
       handed = type_at(combination, 1)
       next unless arguments.all? { concrete?(it) } && (handed.nil? || concrete?(handed))
-      pinned << pin_combination(definition, arguments, handed, type_at(combination, 2), answers, names, strict)
+      leaves = type_at(combination, 2)
+      key = combination_key(definition.name, arguments, handed, leaves)
+      kept = steady ? before.find { it.key == key } : nil
+      pinned << (kept or pin_combination(definition, arguments, handed, leaves, answers, names, strict))
     end
   end
   pinned
@@ -551,6 +638,11 @@ def pinned_block(definition, parameters, handed, leaves, answers, names, strict)
   PinnedBlock.new(parameters: types, answer: answer, reason: reason, leaves: leaves)
 end
 
+# Whether a combination's body would be read as it was (#537): the same
+# parameters and the same block, which are all of a combination that a
+# walk of its body binds. Its def is the same by its key.
+def read_alike?(before, after) = before.parameters == after.parameters && before.block == after.block
+
 # Whether a name is read anywhere inside a body.
 def reads_name?(body, name)
   body.any? { ((it in IdentifierNode) && it.name == name) || reads_name?(children_of(it), name) }
@@ -640,11 +732,25 @@ def settle_pins(definitions, statements, names, fixed, starting, strict, progres
   # earlier one did, and is not the one before it, is a circle (#545).
   mutable seen = [known]
   mutable round = 0
+  # What the round before read and knew, which a round reuses where the
+  # names a def mentions have entries that did not change (#537). Reuse is
+  # a shortcut and is never the last word: a round that reused anything
+  # and found nothing new is followed by one that walks everything, and
+  # only that one ends the pass. Should the two disagree, the shortcut is
+  # dropped for the rest of the pass.
+  mentions = definition_mentions(definitions)
+  mutable moving_before = nil
+  mutable read_before = []
+  mutable reusing = true
+  mutable checking = false
   while round <= ROUND_LIMIT
     began = progress.nil? ? 0 : System.monotonic_time
-    answers = fixed + fields + pinned_answers(pinned)
-    walk = gathered_calls(definitions, statements, names, answers, pinned)
-    settled = pin_combinations(definitions, walk.calls, answers, names, strict)
+    moving = fields + pinned_answers(pinned)
+    answers = fixed + moving
+    changed = (reusing && !checking && moving_before.some?) ? changed_names(moving_before, moving) : nil
+    gathered = gathered_round(statements, names, answers, pinned, changed, mentions, read_before)
+    walk = gathered.walk
+    settled = pin_combinations(definitions, walk.calls, answers, names, strict, changed, mentions, pinned)
     made = settled_fields(walk.calls)
     found = round_entries(settled, made)
     # Said while it works, where the build was asked to (#543): a round
@@ -654,9 +760,23 @@ def settle_pins(definitions, statements, names, fixed, starting, strict, progres
       most = definitions.max_by { |definition| settled.count { it.name == definition.name } }
       crowded = most.nil? ? "" : "; most: #{most.name} with #{settled.count { it.name == most.name }}"
       pass = strict ? "second pass" : "first pass"
-      build_note(progress, "pinning, #{pass}, round #{round + 1}: #{settled.length} combinations, #{fresh} new, #{made.length} fields, #{walk.calls.length} calls read in #{seconds_between(began, System.monotonic_time)}#{crowded}")
+      walked = changed.nil? ? "every body walked" : "#{gathered.again} bodies walked again"
+      build_note(progress, "pinning, #{pass}, round #{round + 1}: #{settled.length} combinations, #{fresh} new, #{made.length} fields, #{walk.calls.length} calls read, #{walked}, in #{seconds_between(began, System.monotonic_time)}#{crowded}")
     end
-    break if found == known
+    moving_before = moving
+    read_before = gathered.read
+    if found == known
+      break if changed.nil?
+      checking = true
+      round += 1
+      next
+    end
+    if checking
+      # A round that walked everything found what the shortcut had not.
+      reusing = false
+      checking = false
+      seen = []
+    end
     if seen.include?(found)
       turning = (found.reject { known.include?(it) } + known.reject { found.include?(it) })
       shown = turning.slice(0, 6).join("; ")
@@ -741,6 +861,14 @@ def type_methods(nodes, core)
     end
   end
   CoreMethods.new(definitions: definitions, shapes: shapes)
+end
+
+# Whether a def mentions none of the names that changed (#537).
+def unaffected?(name, changed, mentions)
+  found = mentions.find { it[0] == name }
+  return false if found.nil?
+  mentioned = type_at(found, 1)
+  changed.none? { mentioned.include?(it) }
 end
 
 def unique_types(types)
