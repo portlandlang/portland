@@ -871,6 +871,8 @@ def lower_value(node, bindings, context)
   in IntegerNode(value:) then IntermediateConstant.new(type: ["integer"], value: value)
   in BooleanNode(value:) then IntermediateConstant.new(type: ["boolean"], value: value)
   in StringNode(value:) then IntermediateConstant.new(type: ["string"], value: value)
+  # The one encoding a String has (ADR 0069), by its name (#568).
+  in PathNode(parts: ["Encoding", "UTF_8"]) then IntermediateConstant.new(type: ["string"], value: "UTF-8")
   # A maybe handed to a method as its receiver is opened for it.
   in OpenedNode(value:, name:)
     held = lower_value(value, bindings, inner)

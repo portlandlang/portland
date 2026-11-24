@@ -521,7 +521,8 @@ def llvm_library_declarations
     taken = type_at(entry, 2).map { (it == ["integer"] || it == ["element"]) ? "i64" : "ptr" }
     answer = type_at(entry, 3)
     answered = answer == ["boolean"] ? "zeroext i1" : ((answer == ["integer"] || answer == ["maybe", ["integer"]]) ? "i64" : "ptr")
-    "declare #{answered} @#{type_at(entry, 4)}(#{(["ptr"] + taken).join(", ")})"
+    asked = type_at(entry, 0) == ["integer"] ? "i64" : "ptr"
+    "declare #{answered} @#{type_at(entry, 4)}(#{([asked] + taken).join(", ")})"
   end
 end
 
@@ -1014,7 +1015,7 @@ def llvm_value(emitter, value)
   in IntermediateLibrary(type:, symbol:, receiver:, arguments:, words:)
     asked = llvm_value(emitter, receiver)
     mutable calling = asked.emitter
-    mutable operands = ["ptr #{asked.operand}"]
+    mutable operands = ["#{llvm_type(receiver.type)} #{asked.operand}"]
     mutable passed = []
     mutable place = 0
     arguments.each do |argument|

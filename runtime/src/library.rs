@@ -542,3 +542,42 @@ pub unsafe extern "C" fn portland_string_count(
             .count() as i64
     }
 }
+
+/// `code.chr`: the character of an ASCII code. A byte above that is not
+/// UTF-8 text and refuses, naming the encoding, in the seed's sentence.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_integer_chr(code: i64) -> *mut StringBlock {
+    match u8::try_from(code) {
+        Ok(byte) if byte.is_ascii() => string_of(&char::from(byte).to_string()),
+        Ok(_) => refuse_program(&format!(
+            "{code}.chr is a single byte, which is not UTF-8 text here (ADR 0069) — write 'chr(Encoding::UTF_8)' for the character"
+        )),
+        Err(_) => refuse_program(&format!("{code} out of char range")),
+    }
+}
+
+/// `code.chr(Encoding::UTF_8)`: the character of any scalar value, in
+/// the seed's sentences at the edges.
+///
+/// # Safety
+/// `encoding` points at a live String, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_integer_chr_encoded(
+    code: i64,
+    encoding: *const StringBlock,
+) -> *mut StringBlock {
+    let encoding = unsafe { text_of(encoding) };
+    if !encoding.eq_ignore_ascii_case("UTF-8") && !encoding.eq_ignore_ascii_case("CP65001") {
+        refuse_program(&format!(
+            "'chr' takes Encoding::UTF_8, the one encoding a string has (ADR 0069), got {encoding:?}"
+        ));
+    }
+    let scalar = u32::try_from(code)
+        .ok()
+        .filter(|scalar| *scalar <= 0x10FFFF)
+        .unwrap_or_else(|| refuse_program(&format!("{code} out of char range")));
+    match char::from_u32(scalar) {
+        Some(character) => string_of(&character.to_string()),
+        None => refuse_program(&format!("invalid codepoint 0x{scalar:X} in UTF-8")),
+    }
+}
