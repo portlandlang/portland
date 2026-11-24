@@ -857,7 +857,13 @@ def native_nothing?(body, types)
   synthesize(last, types) == NOTHING
 end
 
-def native_reading?(types) = types.any? { it[0] == NATIVE_READING }
+# Whether these bindings are the native build's: its name is the last of
+# them, where pinning keeps it, so a checker's bindings answer no after
+# one look and are never walked for it.
+def native_reading?(types)
+  last = types.last
+  last.some? && last[0] == NATIVE_READING
+end
 
 def nil_arm?(branch) = (branch.pattern in NilNode) && branch.guard.nil?
 
@@ -1200,9 +1206,10 @@ def synthesize_bare_call(node, types)
   return ["rational"] if node.name == "Rational" && synthesize_name(node.name, types) == ["type", "Rational"]
   return ["complex"] if node.name == "Complex" && synthesize_name(node.name, types) == ["type", "Complex"]
   found = synthesize_name(node.name, types)
-  # A name nothing binds may be one of the program's defs under the
-  # native reading, where a def is kept by the types it is called with.
-  return found unless found == ["unknown"] && types.none? { it[0] == node.name } && native_reading?(types)
+  # A call that answers nothing known may be to one of the program's defs
+  # under the native reading, where a def is kept by the types it is
+  # called with and not by its name.
+  return found unless found == ["unknown"] && native_reading?(types)
   native_call_answer(node, types)
 end
 

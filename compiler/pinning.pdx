@@ -328,7 +328,8 @@ def pinned_answers(pinned)
   yielding = pinned.reject { it.block.nil? }
   yielded = yielding.map { |found| [yields_key(found.name, found.parameters.map { type_at(it, 1) }), found.block.parameters] }
   # Everything pinning reads, it reads the way the native build runs it
-  # (#503): the name that says so rides with the answers into every scope.
+  # (#503): the name that says so rides with the answers into every scope,
+  # and is kept last, which is where inference looks for it.
   answers + yielded + [[NATIVE_READING, ["boolean"]]]
 end
 
@@ -342,7 +343,7 @@ def pinned_block(definition, parameters, handed, answers, names, strict)
   mutable reason = nil
   reason = "it yields, and one call hands it no block" if handed.nil?
   answer = handed or ["unknown"]
-  walked = pin_statements(definition.body, PinWalk.new(bindings: parameters, calls: []), answers + [[YIELD, answer]], names)
+  walked = pin_statements(definition.body, PinWalk.new(bindings: parameters, calls: []), [[YIELD, answer]] + answers, names)
   yields = walked.calls.select { it[0] == YIELD }.map { type_at(it, 1) }
   counts = unique_types(yields.map { it.length })
   reason = (reason or "it yields #{counts[0]} at one place and #{counts[1]} at another") if counts.length > 1
@@ -480,7 +481,7 @@ end
 # block answers where it yields.
 def yielding_answers(answers, block)
   return answers if block.nil?
-  answers + [[YIELD, block.answer]]
+  [[YIELD, block.answer]] + answers
 end
 
 # Whether a body yields anywhere, the blocks written in it included: a
