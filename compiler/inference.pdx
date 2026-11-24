@@ -353,6 +353,8 @@ end
 # by a fixture whose `reduce(0) { |count, line| count + … }` read `count`
 # as the element and refused a working `+`.
 def block_parameter_type(receiver, index, name, argument_types, parameter_count: 1)
+  # `times` hands the turn it is on (#565).
+  return ["integer"] if name == "times" && receiver == ["integer"] && index == 0
   if name == "reduce" || name == "inject"
     return accumulator_type(argument_types) if index == 0
     return element_type(receiver) if index == 1

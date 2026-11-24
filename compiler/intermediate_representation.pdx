@@ -124,6 +124,14 @@ struct IntermediateConstant
   value
 end
 
+# `count.times { … }` (#565): the block run that many times, handed the
+# turn it is on where it takes a parameter. It answers the count.
+struct IntermediateCount
+  type
+  count
+  block
+end
+
 # `maybe || fallback`: the value where there is one, and otherwise the
 # fallback, which is computed only then.
 struct IntermediateDefault
@@ -1010,6 +1018,16 @@ def lower_value(node, bindings, context)
     refuse_leaving_inside(block, leaves, context.root, node)
     handed = PinnedBlock.new(parameters: [type_at(walked.type, 1)], answer: NOTHING, reason: nil, leaves: leaves)
     IntermediateWalk.new(type: walked.type, array: walked, block: lower_block(block, handed, bindings, inner))
+  # `times` on an Integer (#565): the block is handed the turn it is on,
+  # where it takes one, and answers nothing anyone reads.
+  in MethodCallNode(receiver:, name: "times", arguments: [], block:)
+    refuse_native("times without a block", node) if block.nil?
+    counted = lower_value(receiver, bindings, inner)
+    refuse_native("a call with a dot, .times, on #{with_article(counted.type)}", node) unless counted.type == ["integer"]
+    leaves = native_block_leaves?(block, bindings + yielding_answers(context.answers, context.yielding))
+    refuse_leaving_inside(block, leaves, context.root, node)
+    handed = PinnedBlock.new(parameters: (block.parameters.empty? ? [] : [["integer"]]), answer: NOTHING, reason: nil, leaves: leaves)
+    IntermediateCount.new(type: ["integer"], count: counted, block: lower_block(block, handed, bindings, inner))
   in MethodCallNode(receiver:, name:, arguments: [], block: nil)
     asked = lower_value(receiver, bindings, inner)
     refuse_native("a call with a dot, .#{name}, on nil", node) if asked.type == ["nil"]
@@ -1225,6 +1243,7 @@ def render_value(value)
   in IntermediateDefault(value: held, fallback:) then "(|| #{render_value(held)} #{render_value(fallback)})"
   in IntermediateSome(value: held) then "(some #{render_value(held)})"
   in IntermediateWalk(array:, block:) then "(each #{render_value(array)} #{render_handed_block(block)})"
+  in IntermediateCount(count:, block:) then "(times #{render_value(count)} #{render_handed_block(block)})"
   in IntermediateConcat(left:, right:) then "(concat #{render_value(left)} #{render_value(right)})"
   in IntermediateMethod(receiver:, name:) then "(. #{render_value(receiver)} #{name})"
   in IntermediateLibrary(symbol:, receiver:, arguments:) then "(#{symbol} #{([receiver] + arguments).map { render_value(it) }.join(" ")})"

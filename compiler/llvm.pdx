@@ -1158,6 +1158,27 @@ def llvm_value(emitter, value)
     stepped = llvm_line(following.emitter, "store i64 #{following.operand}, ptr #{turn}")
     finished = llvm_label(llvm_line(stepped, "br label %walk#{number}.test"), "walk#{number}.done")
     LLVMValue.new(emitter: finished, operand: walked.operand)
+  # `count.times { … }` (#565): a loop that calls the block's function
+  # with the turn it is on, where the block takes one. A `break` goes
+  # straight to the loop's end, and anything else that leaves, leaves
+  # this function.
+  in IntermediateCount(count:, block:)
+    counted = llvm_value(emitter, count)
+    handed = llvm_block(counted.emitter, block)
+    number = handed.emitter.counter
+    turn = "%\"count.#{number}\""
+    reserved = handed.emitter.with(frames: handed.emitter.frames + ["  #{turn} = alloca i64"])
+    started = llvm_label(llvm_line(llvm_line(reserved, "store i64 0, ptr #{turn}"), "br label %count#{number}.test"), "count#{number}.test")
+    index = llvm_named(started, "load i64, ptr #{turn}")
+    more = llvm_named(index.emitter, "icmp slt i64 #{index.operand}, #{counted.operand}")
+    inside = llvm_label(llvm_line(more.emitter, "br i1 #{more.operand}, label %count#{number}.body, label %count#{number}.done"), "count#{number}.body")
+    given = block.parameters.empty? ? "" : ", i64 #{index.operand}"
+    call = "call #{llvm_answer_type(NOTHING, block.leaves)} #{handed.function}(ptr #{handed.frame}#{given})"
+    called = block.leaves ? llvm_arrived(inside, NOTHING, call, handed.token, "count#{number}.done", [["integer"], counted.operand]).emitter : llvm_line(inside, call)
+    following = llvm_named(called, "add i64 #{index.operand}, 1")
+    stepped = llvm_line(following.emitter, "store i64 #{following.operand}, ptr #{turn}")
+    finished = llvm_label(llvm_line(stepped, "br label %count#{number}.test"), "count#{number}.done")
+    LLVMValue.new(emitter: finished, operand: counted.operand)
   # `System.arguments` is the runtime's to make. `System.read_file` hands
   # back the text or nothing, which is a maybe: there where it is not
   # nothing. The path asked with is let go of once it has answered.
