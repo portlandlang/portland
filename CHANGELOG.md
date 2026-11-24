@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **A native program reads its command line and a file** ([#534](https://github.com/portlandlang/portland/issues/534), [#511](https://github.com/portlandlang/portland/issues/511)) — `System.arguments` and `System.read_file` build natively, and so does `maybe or panic "…"`, whose right side stops the program and so leaves the whole the value's type. They were the third thing the linter's native build refused.
+  - `System.read_file` answers a failure where a file cannot be read, and a failure is unbuilt. So it builds only with an `or` beside it, where the right side takes the failure's place and nothing can tell one from nil; read any other way it refuses at build by name.
+  - The entry function takes the command line as the operating system hands it over, and gives it to the runtime before anything else runs.
 - **A native program holds a struct** ([#532](https://github.com/portlandlang/portland/issues/532), [#511](https://github.com/portlandlang/portland/issues/511)) — a struct builds natively: declared, made with `Name.new(field: value)`, its fields read, its methods called, bound, passed, answered, held in an array, and written out as the seed writes it. It was the second thing the linter's native build refused.
   - A struct is a counted block in the `runtime` crate, as a String and an array are: a count, the address of its shape, and its fields, one word each. A field that is a String, an array, or a struct is a counted pointer the struct holds once. The debug runtime refuses a leaked struct or one released too often.
   - Each field has one type, read off where the struct is made. One made with two refuses at build by name, as a mixed array does.

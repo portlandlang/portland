@@ -142,6 +142,9 @@ LLVM_PRELUDE = [
   "declare void @portland_refuse_nil_method(ptr)",
   "declare void @portland_refuse_nil_puts()",
   "declare void @portland_refuse_nil_operand(ptr, ptr, ptr)",
+  "declare void @portland_start(i32, ptr)",
+  "declare ptr @portland_system_arguments()",
+  "declare ptr @portland_system_read_file(ptr)",
   "declare ptr @portland_struct_new(ptr)",
   "declare void @portland_struct_release(ptr)",
   "declare ptr @portland_struct_to_string(ptr)",
@@ -480,7 +483,7 @@ def llvm_function(function, prefix)
   # to call it with. Handed one that can leave, it answers a pair.
   parameters = function.block.nil? ? named : named + ["ptr #{LLVM_BLOCK}", "ptr #{LLVM_BLOCK_FRAME}"]
   paired = function.block.some? && function.block.leaves
-  header = entry ? "define i32 @main() {" : "define #{llvm_answer_type(function.answer, paired)} #{llvm_function_name(function.key)}(#{parameters.join(", ")}) {"
+  header = entry ? "define i32 @main(i32 %\".count\", ptr %\".values\") {" : "define #{llvm_answer_type(function.answer, paired)} #{llvm_function_name(function.key)}(#{parameters.join(", ")}) {"
   llvm_routine(LLVMRoutine.new(header: header, prefix: prefix, entry: entry, parameters: function.parameters, locals: function.locals, body: function.body, answer: function.answer, captures: [], onward: false, returns: false, breaks: false, paired: paired, returned: function.returned))
 end
 
@@ -658,6 +661,9 @@ def llvm_routine(routine)
     type = llvm_type(type_at(parameter, 1))
     emitter = llvm_line(emitter, "store #{type} #{llvm_local(parameter[0])}, ptr #{llvm_slot(parameter[0])}")
   end
+  # The entry function's first act is to hand the runtime the command
+  # line, for `System.arguments` to answer (#534).
+  emitter = llvm_line(emitter, "call void @portland_start(i32 %\".count\", ptr %\".values\")") if routine.entry
   emitter = llvm_statements(emitter, routine.body)
   # Every path through a def or a block has returned by here; the entry
   # function falls off its end and answers success.
@@ -1080,6 +1086,23 @@ def llvm_value(emitter, value)
     stepped = llvm_line(following.emitter, "store i64 #{following.operand}, ptr #{turn}")
     finished = llvm_label(llvm_line(stepped, "br label %walk#{number}.test"), "walk#{number}.done")
     LLVMValue.new(emitter: finished, operand: walked.operand)
+  # `System.arguments` is the runtime's to make. `System.read_file` hands
+  # back the text or nothing, which is a maybe: there where it is not
+  # nothing. The path asked with is let go of once it has answered.
+  in IntermediateSystem(type:, name:, arguments:)
+    return llvm_named(emitter, "call ptr @portland_system_arguments()") if name == "arguments"
+    named = llvm_value(emitter, arguments[0])
+    read = llvm_named(named.emitter, "call ptr @portland_system_read_file(ptr #{named.operand})")
+    released = llvm_drop(read.emitter, ["string"], named.operand)
+    there = llvm_named(released, "icmp ne ptr #{read.operand}, null")
+    flagged = llvm_named(there.emitter, "insertvalue #{llvm_type(type)} zeroinitializer, i1 #{there.operand}, 0")
+    llvm_named(flagged.emitter, "insertvalue #{llvm_type(type)} #{flagged.operand}, ptr #{read.operand}, 1")
+  # `panic` where a value was to be: the runtime says the message and does
+  # not come back, and what follows names a value no one reaches.
+  in IntermediateStop(type:, message:)
+    written = llvm_value(emitter, message)
+    stopped = llvm_line(llvm_line(written.emitter, "call void @portland_panic(ptr #{written.operand})"), "unreachable")
+    LLVMValue.new(emitter: llvm_label(stopped, "after#{stopped.counter}"), operand: llvm_zero(type))
   # A struct made: a block of its shape from the runtime, and each field
   # stored as a word, in order. A counted field's hold passes to the
   # struct.

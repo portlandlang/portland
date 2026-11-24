@@ -1,0 +1,9 @@
+# The command line and a file (#534). A fixture is run with nothing on its
+# command line, so this sees no arguments and reads a file that is not
+# there, which takes the `or`. A test of its own runs a program with
+# arguments and a file to read.
+arguments = System.arguments
+puts arguments.length
+p(arguments)
+missing = System.read_file("/nonexistent/portland/file") || "nothing there"
+puts missing

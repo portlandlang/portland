@@ -1432,6 +1432,13 @@ end
 # already lives by, read back as types. Partial lookups answer maybes
 # (ADR 0040 §3). Unlisted names answer unknown, never an error.
 def synthesize_call(node, types)
+  # `System.read_file` answers the text or a failure. The checker leaves
+  # a fallible builtin unknown; the native build compiles it where an
+  # `or` takes the failure's place, and reads it there as text or
+  # nothing (#534).
+  if node.name == "read_file" && (node.receiver in IdentifierNode) && node.receiver.name == "System" && native_reading?(types)
+    return ["maybe", ["string"]]
+  end
   return type_function_answer(node) if builtin_type_function?(node, types)
   receiver = synthesize(node.receiver, types)
   # A method the core writes for the receiver's type is a def of its own
