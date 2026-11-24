@@ -510,7 +510,10 @@ def llvm_literal(emitter, text)
   LLVMValue.new(emitter: emitter.with(globals: emitter.globals + [constant], counter: emitter.counter + 1), operand: name)
 end
 
-def llvm_local(name) = "%\"#{name}\""
+# The value a parameter arrives as. LLVM keeps values and labels in one
+# set of names, so it goes by a name no label has (#554): a parameter
+# named `entry` would otherwise be the first block's own name.
+def llvm_local(name) = "%\"#{name}.handed\""
 
 # A method with no arguments. What can refuse, or needs a table, is the
 # runtime's; a question about an Integer's sign or parity is one
