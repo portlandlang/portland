@@ -108,7 +108,7 @@ end
 # it met one, inside a def or a block as much as at the top, so every
 # node is looked at, and each is named in the parser's own words.
 def lint_parse(path, nodes)
-  walked(nodes).select { it in ErrorNode }.map { LintFinding.new(path: path, line: (it.line or 1), message: "this does not parse — #{it.message}") }
+  every_node(nodes).select { it in ErrorNode }.map { LintFinding.new(path: path, line: (it.line or 1), message: "this does not parse — #{it.message}") }
 end
 
 # Every finding in one file's text.

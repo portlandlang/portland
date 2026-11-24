@@ -770,6 +770,11 @@ end
 
 def entry_name(entry) = entry.split("/").first
 
+# Every node in a file, each before what it holds.
+def every_node(nodes)
+  nodes.flat_map { [it] + every_node(held_by(it)) }
+end
+
 def exit?(node)
   case node
   in ReturnNode | BreakNode | NextNode then true
@@ -1902,11 +1907,6 @@ def universal_answer(name)
   return ["boolean"] if name == "nil?" || name == "some?" || name == "failure?" || name == "eql?"
   return ["string"] if name == "to_s"
   ["unknown"]
-end
-
-# Every node in a file, each before what it holds.
-def walked(nodes)
-  nodes.flat_map { [it] + walked(held_by(it)) }
 end
 
 def when_false(proof) = type_at(proof, 1)

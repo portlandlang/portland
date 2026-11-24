@@ -80,7 +80,7 @@ end
 # Every `panic` in these nodes, in the order written.
 def panic_sites(path, source, nodes)
   lines = source.split("\n", -1)
-  walked(nodes).select { (it in CallNode) && it.name == "panic" }.map do |call|
+  every_node(nodes).select { (it in CallNode) && it.name == "panic" }.map do |call|
     text = lines[(call.line or 1) - 1] or ""
     PanicSite.new(path: path, line: (call.line or 1), reason: panic_reason(text))
   end
@@ -120,11 +120,11 @@ end
 # a type's methods among them.
 def scopes_of(nodes)
   top = nodes.reject { (it in DefNode) || (it in StructDefNode) || (it in TraitDefNode) || (it in ModuleDefNode) }
-  defs = walked(nodes).select { it in DefNode }
+  defs = every_node(nodes).select { it in DefNode }
   [top] + defs.map { it.body }
 end
 
 # Every `together` block in these nodes, in the order written.
 def together_sites(path, nodes)
-  walked(nodes).select { it in TogetherNode }.map { TogetherSite.new(path: path, line: (it.line or 1)) }
+  every_node(nodes).select { it in TogetherNode }.map { TogetherSite.new(path: path, line: (it.line or 1)) }
 end
