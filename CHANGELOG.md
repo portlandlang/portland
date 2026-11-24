@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **The seed and the runtime share Ruby's rules for text and numbers** ([#581](https://github.com/portlandlang/portland/issues/581)) — `String#split` was written once in the seed and copied line for line into the runtime. It is one copy in a crate both call, `ruby_rules`, beside the rules for `to_i`, the padding of `rjust`, `ljust`, and `center`, `gcd`, and an Integer written in a base. A rule that refuses answers its sentence, and each caller refuses in its own way. From it the native build gains `text.to_i`, `text.rjust(width, padding)`, `number.gcd(other)`, and `number.to_s(base)`.
 - **Native: an array that starts empty and is joined onto holds what it is joined with** ([#572](https://github.com/portlandlang/portland/issues/572)) — `all += group` onto `[]` left the array with no element type, and the build refused it. Beneath that, the runtime read the joined array's kind off the empty literal, which every type shares, so Strings joined onto `[]` were written out as addresses; it reads the kind off an array that holds something.
 - **Native: `value&.name`** ([#572](https://github.com/portlandlang/portland/issues/572)) — a safe call builds where its receiver is a name, a field, or an element: nil where the value is not there, and the method asked of it where it is.
 - **Native: Strings order** ([#572](https://github.com/portlandlang/portland/issues/572)) — `<`, `<=`, `>`, and `>=` between two Strings build, where only `==` and `!=` did. They order by their canonical text, code point by code point (ADR 0054), as on the seed.

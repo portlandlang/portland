@@ -845,79 +845,11 @@ fn sliced_runs(
 
 fn split_value(text: &str, separator: Option<&str>, limit: i64) -> Value {
     Value::array(
-        ruby_split(text, separator, limit)
+        portland_ruby_rules::split(text, separator, limit)
             .into_iter()
             .map(Value::String)
             .collect(),
     )
-}
-
-/// `String#split` by Ruby's rules (#142), each checked against Ruby 4.0.9:
-/// no separator or a single space splits on runs of whitespace, leading
-/// whitespace ignored; an empty separator splits into characters; a
-/// positive limit caps the pieces, the last holding the rest; and trailing
-/// empty fields drop unless a limit is given — a negative one keeps them.
-/// An empty string has no fields at all.
-fn ruby_split(text: &str, separator: Option<&str>, limit: i64) -> Vec<String> {
-    if text.is_empty() {
-        return Vec::new();
-    }
-    let cap = usize::try_from(limit).ok().filter(|cap| *cap > 0);
-    let full = |pieces: &Vec<String>| cap.is_some_and(|cap| pieces.len() + 1 == cap);
-    let mut pieces: Vec<String> = Vec::new();
-    // Ruby's whitespace is ASCII's six — a U+2008 punctuation space is not
-    // a field break.
-    let ascii_space =
-        |character: char| matches!(character, ' ' | '\t' | '\n' | '\u{b}' | '\u{c}' | '\r');
-    match separator {
-        None | Some(" ") => {
-            let mut rest = text.trim_start_matches(ascii_space);
-            let mut took_the_rest = false;
-            while !rest.is_empty() {
-                if full(&pieces) {
-                    pieces.push(rest.to_string());
-                    took_the_rest = true;
-                    break;
-                }
-                let end = rest.find(ascii_space).unwrap_or(rest.len());
-                pieces.push(rest[..end].to_string());
-                rest = rest[end..].trim_start_matches(ascii_space);
-            }
-            // Trailing whitespace is one empty field, which a limit keeps:
-            // `" 1 2 ".split(" ", 3)` is `["1", "2", ""]`, and `" "` with a
-            // limit is `[""]`. Without one it drops below with the rest.
-            if limit != 0 && !took_the_rest && text.ends_with(ascii_space) {
-                pieces.push(String::new());
-            }
-        }
-        Some("") => {
-            let characters: Vec<&str> = text.graphemes(true).collect();
-            for (index, character) in characters.iter().enumerate() {
-                if full(&pieces) {
-                    pieces.push(characters[index..].concat());
-                    break;
-                }
-                pieces.push((*character).to_string());
-            }
-            // A limit past the last character — or a negative one — keeps
-            // the empty field after it, as Ruby's `"ab".split("", -1)` does.
-            if limit < 0 || cap.is_some_and(|cap| cap > characters.len()) {
-                pieces.push(String::new());
-            }
-        }
-        Some(separator) => {
-            pieces = match cap {
-                Some(cap) => text.splitn(cap, separator).map(str::to_string).collect(),
-                None => text.split(separator).map(str::to_string).collect(),
-            };
-        }
-    }
-    if limit == 0 {
-        while pieces.last().is_some_and(String::is_empty) {
-            pieces.pop();
-        }
-    }
-    pieces
 }
 
 /// `flatten`'s walk: arrays open, everything else lands (Ruby's one-call,
@@ -929,26 +861,6 @@ fn flatten_into(elements: &[Value], flat: &mut Vec<Value>) {
             other => flat.push(other.clone()),
         }
     }
-}
-
-/// A whole number written in another base, 2 through 36 — lowercase digits,
-/// the sign out front, Ruby's shapes (probed on 4.0.9).
-fn integer_in_base(number: i64, base: i64) -> String {
-    if number == 0 {
-        return "0".to_string();
-    }
-    let digits = b"0123456789abcdefghijklmnopqrstuvwxyz";
-    let mut magnitude = number.unsigned_abs();
-    let mut written = Vec::new();
-    while magnitude > 0 {
-        written.push(digits[(magnitude % base as u64) as usize]);
-        magnitude /= base as u64;
-    }
-    if number < 0 {
-        written.push(b'-');
-    }
-    written.reverse();
-    String::from_utf8(written).expect("base digits are ascii")
 }
 
 /// Integer division, floored — Ruby's rule, not Rust's truncation
@@ -1145,27 +1057,6 @@ fn round_integer(number: i64, digits: i64, method: &str) -> Value {
         Ok(answer) => Value::Integer(answer),
         Err(_) => panic!("{} overflows the 64-bit integers", written()),
     }
-}
-
-/// `center`, `ljust`, and `rjust` (#106): the text padded to `width`
-/// graphemes with `padding` repeated, `center` giving the extra to the
-/// right as Ruby's does. An empty padding refuses in Ruby's words.
-fn padded(text: &str, width: i64, padding: &str, method: &str) -> String {
-    if padding.is_empty() {
-        panic!("zero width padding");
-    }
-    let length = text.graphemes(true).count() as i64;
-    if width <= length {
-        return text.to_string();
-    }
-    let total = (width - length) as usize;
-    let (left, right) = match method {
-        "ljust" => (0, total),
-        "rjust" => (total, 0),
-        _ => (total / 2, total - total / 2),
-    };
-    let fill = |count: usize| -> String { padding.graphemes(true).cycle().take(count).collect() };
-    format!("{}{}{}", fill(left), text, fill(right))
 }
 
 /// `rindex` (#106): the last grapheme position where `needle` starts, at
@@ -1564,79 +1455,6 @@ fn matched_spans(text: &str, pattern: &str, all: bool) -> Vec<(usize, usize)> {
     } else {
         spans.into_iter().take(1).collect()
     }
-}
-
-/// `String#to_i` by Ruby's rule (ADR 0061), which never fails: leading
-/// whitespace, one sign, the prefix of the base asked for — any of them,
-/// or a bare `0` for octal, when the base is 0 — then digits of the base
-/// with single underscores between digits; the first thing that is none
-/// of these ends the number, and nothing parsed is 0. A base outside 2 to
-/// 36 refuses in Ruby's words; a number past 64 bits refuses (#156).
-fn ruby_to_i(text: &str, base: i64) -> i64 {
-    if base == 1 || !(0..=36).contains(&base) {
-        panic!("invalid radix {base}");
-    }
-    let trimmed = text.trim_start_matches([' ', '\t', '\n', '\u{b}', '\u{c}', '\r']);
-    let (negative, rest) = match trimmed.strip_prefix('-') {
-        Some(rest) => (true, rest),
-        None => (false, trimmed.strip_prefix('+').unwrap_or(trimmed)),
-    };
-    let lowered = rest.to_ascii_lowercase();
-    let (base, rest) = if base == 0 {
-        if let Some(after) = lowered.strip_prefix("0b") {
-            (2, after.to_string())
-        } else if let Some(after) = lowered.strip_prefix("0o") {
-            (8, after.to_string())
-        } else if let Some(after) = lowered.strip_prefix("0d") {
-            (10, after.to_string())
-        } else if let Some(after) = lowered.strip_prefix("0x") {
-            (16, after.to_string())
-        } else if lowered.starts_with('0') {
-            (8, lowered.clone())
-        } else {
-            (10, lowered.clone())
-        }
-    } else {
-        let prefix = match base {
-            2 => "0b",
-            8 => "0o",
-            10 => "0d",
-            16 => "0x",
-            _ => "",
-        };
-        let after = if prefix.is_empty() {
-            lowered.clone()
-        } else {
-            lowered
-                .strip_prefix(prefix)
-                .map_or_else(|| lowered.clone(), str::to_string)
-        };
-        (base as u32, after)
-    };
-    let mut value: i64 = 0;
-    let mut previous_underscore = true;
-    for character in rest.chars() {
-        if character == '_' {
-            if previous_underscore {
-                break;
-            }
-            previous_underscore = true;
-            continue;
-        }
-        let Some(digit) = character.to_digit(base) else {
-            break;
-        };
-        value = value
-            .checked_mul(i64::from(base))
-            .and_then(|scaled| scaled.checked_add(i64::from(digit)))
-            .unwrap_or_else(|| {
-                panic!(
-                    "to_i overflows a 64-bit integer on {text:?} — integers are 64-bit here (#156)"
-                )
-            });
-        previous_underscore = false;
-    }
-    if negative { -value } else { value }
 }
 
 /// `oct` (#106): octal unless a prefix says otherwise — `0x`, `0d`, `0b`,
@@ -2449,24 +2267,15 @@ fn integer_digits(number: i64, radix: i64) -> Value {
     Value::array(places)
 }
 
-/// Euclid on magnitudes, taken unsigned so the smallest integer has one.
-fn magnitude_gcd(left: i64, right: i64) -> u64 {
-    let (mut left, mut right) = (left.unsigned_abs(), right.unsigned_abs());
-    while right != 0 {
-        let remainder = left % right;
-        left = right;
-        right = remainder;
-    }
-    left
+/// What a rule the seed shares with the runtime answered (#581), or the
+/// refusal it answered with, made here as the seed makes every refusal.
+fn refused<Answer>(answered: Result<Answer, String>) -> Answer {
+    answered.unwrap_or_else(|sentence| panic!("{sentence}"))
 }
 
-/// `gcd`: never a sign, and a zero yields the other side's magnitude (Ruby
-/// 4.0.9, probed). The smallest integer's magnitude is past the edge.
+/// `gcd`, by the rule the runtime shares.
 fn integer_gcd(number: i64, other: i64) -> Value {
-    match i64::try_from(magnitude_gcd(number, other)) {
-        Ok(divisor) => Value::Integer(divisor),
-        Err(_) => panic!("{number}.gcd({other}) overflows the 64-bit integers"),
-    }
+    Value::Integer(refused(portland_ruby_rules::gcd(number, other)))
 }
 
 /// `lcm` (#107): a magnitude, zero beside a zero, refused past the edge.
@@ -2474,7 +2283,7 @@ fn integer_lcm(number: i64, other: i64) -> Value {
     if number == 0 || other == 0 {
         return Value::Integer(0);
     }
-    let divisor = magnitude_gcd(number, other) as u128;
+    let divisor = portland_ruby_rules::magnitude_gcd(number, other) as u128;
     let multiple = number.unsigned_abs() as u128 / divisor * other.unsigned_abs() as u128;
     match i64::try_from(multiple) {
         Ok(multiple) => Value::Integer(multiple),
@@ -8279,10 +8088,7 @@ impl<W: std::io::Write> Interpreter<W> {
             // `to_s` with a base, 2 through 36, lowercase digits, the sign
             // out front — Ruby's shapes, including the refusal's bounds.
             (Value::Integer(number), "to_s", [Value::Integer(base)]) => {
-                if !(2..=36).contains(base) {
-                    panic!("invalid radix {base}");
-                }
-                Value::String(integer_in_base(*number, *base))
+                Value::String(refused(portland_ruby_rules::in_base(*number, *base)))
             }
             // `pow` is `**`'s named twin (ADR 0033), one arity; the modular
             // second argument waits to be pulled for.
@@ -8373,7 +8179,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 };
                 Value::String(taken)
             }
-            // Ruby's rules, all of them (#142): see `ruby_split`.
+            // Ruby's rules, all of them (#142): see `portland_ruby_rules::split`.
             (Value::String(text), "split", []) => split_value(text, None, 0),
             (Value::String(text), "split", [Value::String(separator)]) => {
                 split_value(text, Some(separator), 0)
@@ -8392,9 +8198,11 @@ impl<W: std::io::Write> Interpreter<W> {
             }
             // `to_i` by Ruby's rule (ADR 0061): leading digits count, garbage
             // is 0, and a base may be named.
-            (Value::String(text), "to_i", []) => Value::Integer(ruby_to_i(text, 10)),
+            (Value::String(text), "to_i", []) => {
+                Value::Integer(refused(portland_ruby_rules::to_i(text, 10)))
+            }
             (Value::String(text), "to_i", [Value::Integer(base)]) => {
-                Value::Integer(ruby_to_i(text, *base))
+                Value::Integer(refused(portland_ruby_rules::to_i(text, *base)))
             }
             (Value::String(text), "to_f", []) => Value::Float(ruby_to_f(text)),
             // A symbol may be made from text (ADR 0071): a Symbol of no
@@ -8467,13 +8275,17 @@ impl<W: std::io::Write> Interpreter<W> {
             // number parses, and string-pattern substitution. Widths and
             // positions count graphemes (ADR 0038).
             (Value::String(text), "center" | "ljust" | "rjust", [Value::Integer(width)]) => {
-                Value::String(padded(text, *width, " ", name))
+                Value::String(refused(portland_ruby_rules::padded(
+                    text, *width, " ", name,
+                )))
             }
             (
                 Value::String(text),
                 "center" | "ljust" | "rjust",
                 [Value::Integer(width), Value::String(padding)],
-            ) => Value::String(padded(text, *width, padding, name)),
+            ) => Value::String(refused(portland_ruby_rules::padded(
+                text, *width, padding, name,
+            ))),
             (Value::String(text), "chop", []) => {
                 let mut graphemes: Vec<&str> = text.graphemes(true).collect();
                 graphemes.pop();

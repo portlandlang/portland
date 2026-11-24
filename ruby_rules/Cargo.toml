@@ -1,0 +1,19 @@
+[package]
+name = "portland-ruby-rules"
+version = "0.0.0"
+edition = "2024"
+description = "Ruby's rules for text and numbers that Portland keeps. One copy, used by the seed and by the runtime."
+license = "MIT"
+publish = false
+
+# The rules that are text and numbers in, text and numbers out (#581):
+# how a String splits, how one reads as an Integer, how one is padded,
+# what two Integers share, how an Integer is written in a base. The seed
+# answers with them, and so does the runtime every native program is
+# linked with, so the two cannot come to answer differently. A rule that
+# refuses answers the sentence, and each caller refuses in its own way.
+[lib]
+doctest = false
+
+[dependencies]
+unicode-segmentation = { workspace = true }

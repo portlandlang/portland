@@ -1,11 +1,15 @@
 [workspace]
 resolver = "3"
-members = ["crate", "runtime", "seed", "source_form"]
+members = ["crate", "ruby_rules", "runtime", "seed", "source_form"]
 
 # What the seed and the runtime both use is pinned here, once, so the two
 # cannot carry different versions of one crate (ADR 0095).
 [workspace.dependencies]
 libc = "0.2.191"
+# Ruby's rules for text and numbers that Portland keeps (#581): one copy,
+# so the seed and a native binary split, read, and pad a String the same
+# way.
+portland-ruby-rules = { path = "ruby_rules" }
 # How a String and a Symbol are written back out as source (#507): one
 # copy of Portland's own, so the seed and a native binary write a value
 # the same way.
