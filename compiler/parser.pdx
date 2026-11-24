@@ -1404,10 +1404,11 @@ end
 # `def` in either body has no definition to guard (#238): the refusal's
 # Step, or nil when no modifier follows.
 def guarded_definition_refusal(tokens, method, owner)
-  return nil unless method.node in DefNode
+  made = method.node
+  return nil unless made in DefNode
   return nil unless keyword_at?(tokens, method.position, %w[if unless while until])
   modifier = tokens[method.position].text
-  Step.new(node: error_node("def #{method.node.name} in a #{owner} body is always defined — '#{modifier}' cannot guard it; put the condition inside the method"), position: method.position)
+  Step.new(node: error_node("def #{made.name} in a #{owner} body is always defined — '#{modifier}' cannot guard it; put the condition inside the method"), position: method.position)
 end
 
 def hash_node(pairs, line: nil)
@@ -1476,6 +1477,15 @@ end
 
 def index_update_node(name, index, value, line: nil)
   IndexUpdateNode.new(kind: "index_update", name: name, index: index, value: value, line: line)
+end
+
+# The name an index is asked of, as in `name[index]`, or nil where the
+# node is no index, or is one asked of more than a name.
+def indexed_name(node)
+  return nil unless node in IndexNode
+  receiver = node.receiver
+  return nil unless receiver in IdentifierNode
+  receiver.name
 end
 
 # The name of the inner call the braces might belong to.
@@ -2564,8 +2574,9 @@ def parse_hash(tokens, mutable position)
     end
     # One spelling per symbol key (ADR 0023 §1), the seed's refusal: the
     # rocket stays only for keys the shorthand cannot say (#201).
-    if rocketed.symbol? && (key.node in SymbolNode) && shorthand_key_name?(key.node.value)
-      return Step.new(node: error_node("write #{key.node.value}: instead of #{rocketed.text} => — the shorthand is the only symbol-key spelling"), position: skip_line_at(tokens, position))
+    written = key.node
+    if rocketed.symbol? && (written in SymbolNode) && shorthand_key_name?(written.value)
+      return Step.new(node: error_node("write #{written.value}: instead of #{rocketed.text} => — the shorthand is the only symbol-key spelling"), position: skip_line_at(tokens, position))
     end
     value = parse_expression(tokens, key.position + 1)
     pairs << pair_node(key.node, value.node, line: rocketed.line)
@@ -3157,8 +3168,9 @@ def parse_program(tokens)
     # def nested in another def's body is not checked — a flat statement
     # walk cannot see it, the decline-to-check rule — and the seed refuses
     # it first. The wording is the seed's.
-    if (step.node in DefNode) && step.node.type_function
-      nodes << error_node("`def self.` belongs inside a struct body — write def #{step.node.name}", line: step.node.line)
+    made = step.node
+    if (made in DefNode) && made.type_function
+      nodes << error_node("`def self.` belongs inside a struct body — write def #{made.name}", line: made.line)
       position = step.position
       next
     end
@@ -3287,8 +3299,9 @@ def parse_statement(tokens, position)
   # The compound family on a slot (ADR 0043): `name[index] += v` and
   # `name[index] ||= v`. A dedicated node, not a desugar: the desugar
   # would mention the index twice and Ruby evaluates it once.
-  if (step.node in IndexNode) && (step.node.receiver in IdentifierNode) && operator_at?(tokens, step.position, %w[+= -= *= /= %= ||=])
-    name = step.node.receiver.name
+  indexed = indexed_name(step.node)
+  if indexed.some? && operator_at?(tokens, step.position, %w[+= -= *= /= %= ||=])
+    name = indexed or ""
     operator = if operator_at?(tokens, step.position, %w[||=])
       nil
     else
@@ -3298,8 +3311,8 @@ def parse_statement(tokens, position)
     return Step.new(node: assignment_node(name, slot_compound_node(name, step.node.index, operator, value.node, line: token.line), line: token.line), position: value.position)
   end
   # `name[index] = value` — a functional update rebound on the name.
-  if operator_at?(tokens, step.position, %w[=]) && (step.node in IndexNode) && (step.node.receiver in IdentifierNode)
-    name = step.node.receiver.name
+  if operator_at?(tokens, step.position, %w[=]) && indexed.some?
+    name = indexed or ""
     value = parse_expression(tokens, step.position + 1)
     return Step.new(node: assignment_node(name, index_update_node(name, step.node.index, value.node, line: token.line), line: token.line), position: value.position)
   end
@@ -3494,20 +3507,21 @@ def parse_struct(tokens, mutable position)
       # One namespace serves instances and the type (ADR 0031): the same
       # name on both sides is a collision, not overloading. The wordings
       # are the seed's.
-      if (method.node in DefNode) && method.node.type_function
-        checked = check_type_function(name, fields, methods, type_functions, method.node)
+      made = method.node
+      if (made in DefNode) && made.type_function
+        checked = check_type_function(name, fields, methods, type_functions, made)
         return Step.new(node: checked, position: method.position) if checked in ErrorNode
-        type_functions << method.node
+        type_functions << made
       else
         # Reserved names are the checker's job now (#86) — one list, one walk.
-        if (method.node in DefNode) && !type_functions.select { it.name == method.node.name }.empty?
-          return Step.new(node: error_node("#{method.node.name} is defined on #{name} instances and on the type — rename one"), position: method.position)
+        if (made in DefNode) && !type_functions.select { it.name == made.name }.empty?
+          return Step.new(node: error_node("#{made.name} is defined on #{name} instances and on the type — rename one"), position: method.position)
         end
         methods << method.node
         # The def's visibility (ADR 0076): a one-method marker's, else its
         # section's; type functions are public.
         marked = pending.nil? ? section : pending
-        visibilities << [method.node.name, marked] if (method.node in DefNode) && marked != "public"
+        visibilities << [made.name, marked] if (made in DefNode) && marked != "public"
       end
       pending = nil
       position = skip_newlines_at(tokens, method.position)
@@ -3705,12 +3719,13 @@ def parse_trait(tokens, mutable position)
     return guarded unless guarded.nil?
     # A trait is instance behavior with no state (ADR 0028); a type
     # function has no instance, so it cannot ride one (ADR 0031).
-    if (method.node in DefNode) && method.node.type_function
-      return Step.new(node: error_node("a trait cannot define def self.#{method.node.name} — a type function lives on the struct that includes it"), position: method.position)
+    made = method.node
+    if (made in DefNode) && made.type_function
+      return Step.new(node: error_node("a trait cannot define def self.#{made.name} — a type function lives on the struct that includes it"), position: method.position)
     end
     methods << method.node
     marked = pending.nil? ? section : pending
-    visibilities << [method.node.name, marked] if (method.node in DefNode) && marked != "public"
+    visibilities << [made.name, marked] if (made in DefNode) && marked != "public"
     pending = nil
     position = skip_newlines_at(tokens, method.position)
   end
@@ -3953,7 +3968,8 @@ def postfix_from(tokens, mutable step)
       # 0058, amended, #218): the type function `[]` with the members
       # between the brackets — not an index — when the bracket touches the
       # name.
-      if (step.node in IdentifierNode) && %w[Array Hash Set].include?(step.node.name) && !tokens[position].leading_space
+      asked = step.node
+      if (asked in IdentifierNode) && %w[Array Hash Set].include?(asked.name) && !tokens[position].leading_space
         members = parse_bracket_arguments(tokens, position + 1)
         step = Step.new(node: method_call_node(step.node, "[]", members.nodes, nil, line: line_at(tokens, position)), position: members.position)
         next
