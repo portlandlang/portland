@@ -638,6 +638,8 @@ end
 # for what is asked and handed. A maybe is opened, the value asked and
 # what it is handed alike, and nil refuses by the method's name.
 def lower_library(node, bindings, context)
+  # The library takes nothing by name.
+  return nil if node.arguments.any? { it in KeywordArgumentNode }
   asked = lower_value(node.receiver, bindings, context)
   handed = node.arguments.map { lower_value(it, bindings, context) }
   entry = native_library_entry(plain_of(asked.type), node.name, handed.map { plain_of(it.type) })
@@ -840,8 +842,8 @@ end
 # An expression, as a value with its type.
 def lower_value(node, bindings, context)
   # A `case` over literals is built as the `if`s it means (#558).
-  plain = case_as_if(node)
-  return lower_value(plain, bindings, context) if plain.some?
+  as_if = case_as_if(node)
+  return lower_value(as_if, bindings, context) if as_if.some?
   refuse_native(UNBUILT_CASE, node) if node in CaseNode
   # `%w[a b]` is the array of its words (#562).
   if node in WordArrayNode

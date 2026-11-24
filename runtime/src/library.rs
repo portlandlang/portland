@@ -36,9 +36,7 @@ fn strings_of<'piece>(pieces: impl Iterator<Item = &'piece str>) -> *mut ArrayBl
 /// end is a run of nothing, and a negative length refuses.
 fn run_of(count: usize, start: i64, length: i64) -> (usize, usize) {
     let length = usize::try_from(length).unwrap_or_else(|_| {
-        refuse_program(&format!(
-            "slice length must not be negative, got {length}"
-        ))
+        refuse_program(&format!("slice length must not be negative, got {length}"))
     });
     let start = if start < 0 {
         start + count as i64
@@ -56,7 +54,10 @@ fn run_of(count: usize, start: i64, length: i64) -> (usize, usize) {
 /// # Safety
 /// `array` is null or points at a live array.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn portland_array_drop(array: *mut ArrayBlock, count: i64) -> *mut ArrayBlock {
+pub unsafe extern "C" fn portland_array_drop(
+    array: *mut ArrayBlock,
+    count: i64,
+) -> *mut ArrayBlock {
     if count < 0 {
         refuse_program(&format!("attempt to drop negative size, got {count}"));
     }
@@ -419,7 +420,12 @@ fn bounds_of(length: usize, start: i64, end: i64, mode: i64) -> (usize, usize) {
         length
     } else {
         let bound = resolve(end);
-        (if mode & 1 != 0 { bound } else { bound.saturating_add(1) }).clamp(0, length)
+        (if mode & 1 != 0 {
+            bound
+        } else {
+            bound.saturating_add(1)
+        })
+        .clamp(0, length)
     };
     (from as usize, to.max(from) as usize)
 }
@@ -462,7 +468,10 @@ pub unsafe extern "C" fn portland_string_character(
         } else {
             index
         };
-        match usize::try_from(place).ok().and_then(|place| characters.get(place)) {
+        match usize::try_from(place)
+            .ok()
+            .and_then(|place| characters.get(place))
+        {
             Some(character) => string_of(character),
             None => std::ptr::null_mut(),
         }
