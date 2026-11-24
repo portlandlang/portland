@@ -35,3 +35,30 @@ puts described(["a", "b"], 1)
 puts described(["a", "b"], 7)
 puts kinds(true)
 puts kinds(false)
+
+# A local bound to what a def answers, and handed back to that def.
+struct Leaf
+  text
+end
+
+struct Pair
+  left
+  right
+end
+
+def paired(left, right)
+  Pair.new(left: left, right: right)
+end
+
+def chained(words)
+  mutable chain = Leaf.new(text: (words[0] or ""))
+  mutable index = 1
+  while index < words.length
+    chain = paired(chain, Leaf.new(text: (words[index] or "")))
+    index += 1
+  end
+  chain
+end
+
+p(chained(["a"]))
+p(chained(["a", "b", "c"]))

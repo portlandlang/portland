@@ -223,8 +223,7 @@ end
 def body_calls(found, names, answers)
   return [] if found.parameters.length != found.definition.parameters.length
   reading = yielding_answers(answers, found.block)
-  starting = settled_start(found.definition.body, found.parameters, reading, names)
-  pin_statements(found.definition.body, PinWalk.new(bindings: starting, calls: []), reading, names).calls
+  twice_read_calls(found.definition.body, found.parameters, reading, names)
 end
 
 # One line of what the build is doing (#543), on standard error, with
@@ -353,8 +352,8 @@ end
 # of them, makes the calls it made then. With `changed` nil every body is
 # walked.
 def gathered_round(statements, names, answers, pinned, changed, mentions, read_before)
-  walk = pin_statements(statements, PinWalk.new(bindings: settled_start(statements, [], answers, names), calls: []), answers, names)
-  mutable calls = walk.calls
+  walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
+  mutable calls = twice_read_calls(statements, [], answers, names)
   mutable read = []
   mutable again = 0
   pinned.each do |found|
@@ -962,6 +961,19 @@ def settle_pins(definitions, statements, names, fixed, starting, strict, progres
   Settled.new(pinned: pinned, fields: fields)
 end
 
+# A body's parameters, and each local a walk of the body bound, once, at
+# the type beneath any proof a guard bound ahead of it.
+def settled_bindings(parameters, bindings)
+  mutable start = parameters
+  mutable seen = parameters.map { it[0] }
+  bindings.reverse.each do |binding|
+    next if seen.include?(binding[0])
+    seen << binding[0]
+    start = [binding] + start if concrete?(type_at(binding, 1))
+  end
+  start
+end
+
 # Each struct's fields as bindings (#532): a field is bound to the type
 # its makings hand it, joined (#553). One handed types that do not join
 # keeps the first, and is named by `field_conflicts`. It is not dropped: a field left out is
@@ -986,14 +998,7 @@ end
 # at the type beneath the proof.
 def settled_start(body, parameters, answers, names)
   walked = pin_statements(body, PinWalk.new(bindings: parameters, calls: []), answers, names)
-  mutable start = parameters
-  mutable seen = parameters.map { it[0] }
-  walked.bindings.reverse.each do |binding|
-    next if seen.include?(binding[0])
-    seen << binding[0]
-    start = [binding] + start if concrete?(type_at(binding, 1))
-  end
-  start
+  settled_bindings(parameters, walked.bindings)
 end
 
 # A combination's answer with its parameters pinned. Read plainly first.
@@ -1014,6 +1019,19 @@ def solved_answer(definition, key, parameters, answers, names, strict)
   return found unless strict
   whole = body_answer(definition.body, parameters, [[key, found]] + others, names)
   whole == found ? found : ["unknown"]
+end
+
+# The calls a body makes, read twice (#572): once with each local as it
+# is bound going down the body, and once with each at the one type the
+# body leaves it. The second is what lowering asks for. The first is
+# kept beside it: a local bound to what a call answers, and handed back
+# to that call, is read from the call the first walk names, and dropped,
+# that call would be pinned in one round and gone in the next.
+def twice_read_calls(body, parameters, answers, names)
+  first = pin_statements(body, PinWalk.new(bindings: parameters, calls: []), answers, names)
+  starting = settled_bindings(parameters, first.bindings)
+  return first.calls if starting == parameters
+  first.calls + pin_statements(body, PinWalk.new(bindings: starting, calls: []), answers, names).calls
 end
 
 # The methods of the core's types and of a program's structs as defs
