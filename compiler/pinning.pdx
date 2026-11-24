@@ -784,6 +784,11 @@ def rebound(bindings, name, type)
   # maybe of that value (#505), whichever came first, and one that holds
   # one struct and then another holds one of several (#572).
   held = type_at(found, 1)
+  # A value whose type is not known is not another type: the name keeps
+  # the one it has, and a later round reads the value once it is known
+  # (#572). Unpinned here, the name would starve the call that makes it
+  # known.
+  return bindings if concrete?(held) && !concrete?(type)
   widened = joined_pair(held, type)
   return bindings if widened == held
   return bindings.map { it[0] == name ? [name, widened] : it } if widened.some?
