@@ -1023,6 +1023,8 @@ def lower_value(node, bindings, context)
     refuse_leaving_inside(block, leaves, context.root, node)
     handed = PinnedBlock.new(parameters: [type_at(walked.type, 1)], answer: NOTHING, reason: nil, leaves: leaves)
     IntermediateWalk.new(type: walked.type, array: walked, block: lower_block(block, handed, bindings, inner))
+  # `record.with(field: value)` (#576): a new struct of the same type.
+  in MethodCallNode(name: "with", block: nil) then lower_with(node, bindings, inner)
   # `times` on an Integer (#565): the block is handed the turn it is on,
   # where it takes one, and answers nothing anyone reads.
   in MethodCallNode(receiver:, name: "times", arguments: [], block:)
@@ -1070,6 +1072,37 @@ def lower_value(node, bindings, context)
   else
     refuse_native(native_name_of(node), node)
   end
+end
+
+# `record.with(field: value)` (#576): a new struct of the same type, each
+# field named taking the value handed and every other the one the struct
+# asked holds. The struct asked is read once for each field it keeps, so
+# it is one that reads the same each time.
+def lower_with(node, bindings, context)
+  asked = lower_value(node.receiver, bindings, context)
+  refuse_native("with asked of #{with_article(asked.type)}", node) unless asked.type in ["struct", *]
+  refuse_native("with asked of more than a name or a field of one", node) unless steady_subject?(node.receiver)
+  made = context.structs.find { it.name == type_at(asked.type, 1) } or refuse_native("with asked of #{with_article(asked.type)}", node)
+  labelled = node.arguments.select { it in KeywordArgumentNode }
+  refuse_native("#{made.name}.with handed a value without its field's name", node) unless labelled.length == node.arguments.length
+  fields = struct_fields(made, context)
+  labelled.each do |argument|
+    refuse_native("#{made.name}.with handed #{argument.label}, which is not one of its fields", node) unless fields.any? { it[0] == argument.label }
+  end
+  mutable values = []
+  mutable place = 0
+  fields.each do |field|
+    type = type_at(field, 1)
+    argument = labelled.find { it.label == field[0] }
+    if argument.nil?
+      values << IntermediateField.new(type: type, record: lower_value(node.receiver, bindings, context), index: field_offset(fields, place))
+    else
+      written = lower_value(argument.value, bindings, context)
+      values << (fitted(written, type) or refuse_native("#{made.name}.#{field[0]} handed #{with_article(written.type)} where it is #{with_article(type)}", node))
+    end
+    place += 1
+  end
+  IntermediateRecord.new(type: asked.type, fields: values)
 end
 
 # A `yield`: what it hands over, and the type the block answers.

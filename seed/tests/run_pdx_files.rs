@@ -1652,8 +1652,8 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             format!("{compiles} — '==' between structs on line 5 is unbuilt (#443)"),
         ),
         (
-            "struct Pair\n  left\nend\nfirst = Pair.new(left: 1)\nother = first.with(left: 2)\n",
-            format!("{compiles} — a call with a dot, .with on line 5 is unbuilt (#443)"),
+            "struct Pair\n  left\nend\nfirst = Pair.new(left: 1)\nother = first.with(right: 2)\n",
+            format!("{compiles} — Pair.with handed right, which is not one of its fields on line 5 is unbuilt (#443)"),
         ),
         // A maybe outside the first step (#503).
         (

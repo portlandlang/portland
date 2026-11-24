@@ -512,6 +512,16 @@ def pin_expression(node, walk, answers, names)
       current = current.with(calls: current.calls + [[MAKING, [type_at(made, 1), handed], nil, false]])
     end
   end
+  # `with` hands a field its value as `new` does (#576), so what it hands
+  # counts toward the field's one type.
+  if (node in MethodCallNode) && node.name == "with"
+    reading = current.bindings + answers
+    asked = synthesize(node.receiver, reading)
+    if asked in ["struct", *]
+      handed = node.arguments.select { it in KeywordArgumentNode }.map { [it.label, synthesize(it.value, reading)] }
+      current = current.with(calls: current.calls + [[MAKING, [type_at(asked, 1), handed], nil, false]])
+    end
+  end
   if (node in CallNode) && names.include?(node.name)
     scope = current.bindings + answers
     current = current.with(calls: current.calls + [[node.name, native_argument_types(node.arguments, scope), nil, false]])
