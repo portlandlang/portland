@@ -45,6 +45,11 @@ struct Task
   value
 end
 
+# A struct the program never makes, whose arm is never taken.
+struct Ghost
+  inside
+end
+
 struct Group
   lines
 end
@@ -68,6 +73,7 @@ def children_of(node)
   in Group(lines:) then lines.map { if it in Task then it.value else it end }
   in Call(arguments:, block:) then arguments + block_body(block)
   in Table(pairs:) then pairs.map { it.key } + pairs.map { it.value }
+  in Ghost(inside:) then [inside]
   else
     []
   end

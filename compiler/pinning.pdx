@@ -1001,6 +1001,11 @@ def settled_fields(calls)
     types = unique_types(type_at(made, 1).select { concrete?(it) })
     bindings << [made[0], (joined_field(types) or types[0])] unless types.empty?
   end
+  # And each struct the program makes, by a name of its own (#572): an
+  # `in` test for one it never makes is never true.
+  calls.select { it[0] == MAKING }.map { made_key(type_at(type_at(it, 1), 0)) }.uniq.each do |key|
+    bindings << [key, ["boolean"]]
+  end
   bindings
 end
 

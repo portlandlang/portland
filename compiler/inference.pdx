@@ -999,6 +999,10 @@ def library_type(written, receiver)
   written
 end
 
+# The name a struct the program makes is bound under (#572), which no
+# field, def, or local is spelled as.
+def made_key(name) = "#{name}.new&"
+
 # `Math` (ADR 0083): the total functions answer a Float; one that may answer
 # a domain failure is unknown, as every fallible builtin is; `frexp` and
 # `lgamma` answer a pair.
@@ -1488,8 +1492,10 @@ def settled_arm(node, types)
   test = node.condition
   return nil unless (test in MatchTestNode) && (test.subject in IdentifierNode) && (test.pattern in StructPatternNode) && test.pattern.fields.empty?
   held = synthesize_name(test.subject.name, types)
-  return nil unless (held in ["struct", *]) && held != ANY_STRUCT
   return nil unless synthesize_name(test.pattern.name, types) == ["type", test.pattern.name]
+  # A struct the program never makes is one no value is.
+  return (node.else_body or []) if types.assoc(made_key(test.pattern.name)).nil?
+  return nil unless (held in ["struct", *]) && held != ANY_STRUCT
   type_at(held, 1) == test.pattern.name ? (node.then_body or []) : (node.else_body or [])
 end
 
