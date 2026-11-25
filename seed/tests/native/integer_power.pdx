@@ -1,0 +1,10 @@
+# `**` between Integers (#572), by the rule the seed shares: a result
+# past the 64-bit integers refuses in the seed's words.
+places = [0, 3, 10]
+places.each do |place|
+  puts 10 ** place
+end
+puts 2 ** 62
+puts((0 - 1) ** 7)
+puts 0 ** 0
+puts 2 ** 64

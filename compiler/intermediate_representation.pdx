@@ -1090,6 +1090,10 @@ def lower_value(node, bindings, context)
       refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == ["integer"] && after == ["integer"]
       return IntermediateArithmetic.new(type: ["integer"], operator: operator, left: first, right: second)
     end
+    # `**` between Integers is the library's (#572), by the seed's rule.
+    if operator == "**" && before == ["integer"] && after == ["integer"]
+      return library_call("**", opened_for(first, "**"), [opened_for(second, "**")], node)
+    end
     refuse_native("the operator '#{operator}'", node) unless %w[< <= > >= == !=].include?(operator)
     refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == after
     refuse_native("'#{operator}' between Booleans", node) if before == ["boolean"] && !%w[== !=].include?(operator)
