@@ -462,18 +462,26 @@ end
 # Every field the gathered calls made, as [its key, the types it was
 # handed], one entry for each field.
 def made_fields(calls)
-  mutable fields = []
-  calls.select { it[0] == MAKING }.each do |call|
+  # Each way a struct is made is read once, and a field's types are kept
+  # at the field's place, found by one search of the keys (#537).
+  mutable keys = []
+  mutable types = []
+  calls_of(calls_by_name(calls), MAKING).each do |call|
     made = type_at(call, 1)
     type_at(made, 1).each do |handed|
       key = field_key(made[0], handed[0])
-      found = fields.assoc(key)
-      if found.nil?
-        fields << [key, [type_at(handed, 1)]]
+      place = keys.index(key)
+      if place.nil?
+        keys << key
+        types << [type_at(handed, 1)]
       else
-        fields = fields.map { it[0] == key ? [key, type_at(it, 1) + [type_at(handed, 1)]] : it }
+        types[place] = (types[place] or []) + [type_at(handed, 1)]
       end
     end
+  end
+  mutable fields = []
+  keys.each_with_index do |key, place|
+    fields << [key, (types[place] or [])]
   end
   fields
 end
@@ -1068,7 +1076,7 @@ def settled_fields(calls)
   end
   # And each struct the program makes, by a name of its own (#572): an
   # `in` test for one it never makes is never true.
-  calls.select { it[0] == MAKING }.map { made_key(type_at(type_at(it, 1), 0)) }.uniq.each do |key|
+  calls_of(calls_by_name(calls), MAKING).map { made_key(type_at(type_at(it, 1), 0)) }.uniq.each do |key|
     bindings << [key, ["boolean"]]
   end
   bindings
