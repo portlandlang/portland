@@ -1137,6 +1137,12 @@ def lower_value(node, bindings, context)
     first = lower_value(left, bindings, inner.with(root: operator == "||" ? "or" : nil))
     # `maybe || fallback` (#503): the value, or the fallback where there
     # is none. The fallback is a value of the same type, or another maybe.
+    # A name that is nil in this combination gives way to the right side
+    # (#572), as a maybe that is not there does.
+    return lower_value(right, bindings, inner) if operator == "||" && first.type == ["nil"]
+    # And one that holds a value in this combination is that value: the
+    # right side is never reached.
+    return first if operator == "||" && first.type != ["boolean"] && native_value?(first.type)
     if operator == "||" && (first.type in ["maybe", *])
       # `maybe or panic "…"`: the right side stops the program, so the
       # whole is the value (#534).

@@ -31,6 +31,14 @@ puts marked("plain", nil, 2)
 puts marked("starred", "*", 3)
 puts noted("by name", line: nil).line.nil?
 
+# A parameter that is nil gives way to what stands after `or`.
+def placed(text, line: nil)
+  "#{text} on #{line or 1}"
+end
+
+puts placed("first")
+puts placed("ninth", line: 9)
+
 # Nil itself in its source form, and written out, which refuses as the
 # seed does.
 nothing = nil
