@@ -354,7 +354,7 @@ def llvm_block(emitter, block)
   mutable position = 0
   carried.each do |kind|
     address = case kind
-              when "block" then LLVM_BLOCK
+              when "block handed" then LLVM_BLOCK
               when "block frame" then LLVM_BLOCK_FRAME
               when "return" then LLVM_RETURN
               when "break" then (token or "null")
@@ -466,6 +466,9 @@ end
 # kind, and sixteen more where the field is a maybe of it, which the
 # runtime's `MAYBE` is.
 def llvm_field_kind(type)
+  # A field that is only ever nil is a maybe that is not there (#572):
+  # two words the runtime reads as nothing, whatever it would have held.
+  return 16 if type == ["nil"]
   return 16 + llvm_array_kind(type_at(type, 1)) if type in ["maybe", *]
   llvm_array_kind(type)
 end
@@ -474,10 +477,10 @@ end
 # name, then, as each applies, the block its writer was handed and that
 # block's frame, the place its def keeps a returned answer, and the token
 # its own `break` leaves to. A local's name is never one of those words
-# with a space in it or bare `block`, `return`, or `break`, which are
-# keywords.
+# with a space in it, nor bare `return` or `break`, which are keywords.
+# `block` is no keyword, and a local may be named it.
 def llvm_frame_carried(captures, onward, returns, breaks)
-  captures.map { it[0] } + (onward ? ["block", "block frame"] : []) + (returns ? ["return"] : []) + (breaks ? ["break"] : [])
+  captures.map { it[0] } + (onward ? ["block handed", "block frame"] : []) + (returns ? ["return"] : []) + (breaks ? ["break"] : [])
 end
 
 # where the block yields.
@@ -671,7 +674,7 @@ def llvm_routine(routine)
   mutable position = 0
   carried.each do |kind|
     name = case kind
-           when "block" then LLVM_BLOCK
+           when "block handed" then LLVM_BLOCK
            when "block frame" then LLVM_BLOCK_FRAME
            when "return" then LLVM_RETURN
            when "break" then LLVM_BREAK
@@ -1223,6 +1226,12 @@ def llvm_value(emitter, value)
     record = made.operand
     mutable place = 0
     fields.each do |field|
+      # A field that is only ever nil is left as the runtime made it:
+      # two words of nothing (#572).
+      if field.type == ["nil"]
+        place += 2
+        next
+      end
       written = llvm_value(made.emitter, field)
       mutable storing = written.emitter
       mutable stored = written.operand
@@ -1248,6 +1257,8 @@ def llvm_value(emitter, value)
   # its two words (#553).
   in IntermediateField(type:, record:, index:)
     asked = llvm_value(emitter, record)
+    # A field that is only ever nil holds nothing to read (#572).
+    return LLVMValue.new(emitter: llvm_drop(asked.emitter, record.type, asked.operand), operand: "null") if type == ["nil"]
     slot = llvm_named(asked.emitter, "getelementptr i64, ptr #{asked.operand}, i64 #{index + 2}")
     mutable read = nil
     if type in ["maybe", *]

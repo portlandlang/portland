@@ -98,7 +98,7 @@ def lint_order(path, nodes)
       before = kind_place(previous)
       if place < before
         findings << LintFinding.new(path: path, line: node.line, message: "#{KIND_NAMES[place]} is written after #{KIND_NAMES[before]} — a file holds its requires, constants, traits, structs, and defs in that order, and then what it runs")
-      elsif place == before && place >= 1 && place <= 4 && node.name < previous.name && !(place == 1 && (node in AssignmentNode) && mentions?(node.value, previous.name))
+      elsif place == before && place >= 1 && place <= 4 && node.name < previous.name && !(place == 1 && (node in AssignmentNode) && one_if_there(node.value).any? { mentions?(it, previous.name) })
         findings << LintFinding.new(path: path, line: node.line, message: "#{node.name} is written after #{previous.name} — #{KIND_NAMES[place].slice(2, 20)}s are alphabetical")
       end
     end
@@ -132,7 +132,6 @@ end
 
 # Whether a name is read anywhere inside a node.
 def mentions?(node, name)
-  return false if node.nil?
   return true if (node in IdentifierNode) && node.name == name
   children_of(node).any? { mentions?(it, name) }
 end

@@ -667,3 +667,16 @@ pub extern "C" fn portland_integer_gcd(number: i64, other: i64) -> i64 {
 pub extern "C" fn portland_integer_to_s_base(number: i64, base: i64) -> *mut StringBlock {
     string_of(&refused(portland_ruby_rules::in_base(number, base)))
 }
+
+/// `base ** exponent` between Integers, by the rule the seed shares. A
+/// negative exponent answers a Rational on the seed, which a native
+/// program does not hold, so it refuses here.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_integer_power(base: i64, exponent: i64) -> i64 {
+    if exponent < 0 {
+        refuse_program(&format!(
+            "{base} ** {exponent} is a Rational, which a native program does not hold"
+        ));
+    }
+    refused(portland_ruby_rules::power(base, exponent))
+}

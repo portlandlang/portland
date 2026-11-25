@@ -878,23 +878,7 @@ fn integer_power(left: i64, right: i64) -> Value {
         )
         .expect("a negative power is the tower's");
     }
-    // A magnitude of one never grows, however tall the tower — Ruby's
-    // answers, reached before the width check could refuse them.
-    if left == 0 && right > 0 {
-        return Value::Integer(0);
-    }
-    if left == 1 {
-        return Value::Integer(1);
-    }
-    if left == -1 {
-        return Value::Integer(if right % 2 == 0 { 1 } else { -1 });
-    }
-    let exponent = u32::try_from(right)
-        .unwrap_or_else(|_| panic!("{left} ** {right} overflows the 64-bit integers"));
-    match left.checked_pow(exponent) {
-        Some(value) => Value::Integer(value),
-        None => panic!("{left} ** {right} overflows the 64-bit integers"),
-    }
+    Value::Integer(refused(portland_ruby_rules::power(left, right)))
 }
 
 /// A float's integer, already rounded by `method`'s rule. NaN and the

@@ -1606,8 +1606,8 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             format!("{compiles} — a hash on line 1 is unbuilt (#443)"),
         ),
         (
-            "puts 2 ** 3\n",
-            format!("{compiles} — the operator '**' on line 1 is unbuilt (#443)"),
+            "puts 2 <=> 3\n",
+            format!("{compiles} — the operator '<=>' on line 1 is unbuilt (#443)"),
         ),
         (
             "[1].each_slice(1) { puts 1 }\n",

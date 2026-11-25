@@ -53,6 +53,14 @@ NATIVE_CORE_SOURCE = <<~PORTLAND
       nil
     end
 
+    def flat_map
+      mutable gathered = []
+      self.each do |element|
+        gathered += yield(element)
+      end
+      gathered
+    end
+
     def none?
       self.each do |element|
         return false if yield(element)

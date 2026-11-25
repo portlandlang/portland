@@ -185,6 +185,25 @@ pub fn magnitude_gcd(left: i64, right: i64) -> u64 {
     left
 }
 
+/// Integer `**` (ADR 0033) for an exponent that is not negative. Past-i64
+/// results refuse the way past-i64 literals do.
+pub fn power(left: i64, right: i64) -> Result<i64, String> {
+    // A magnitude of one never grows, however tall the tower — Ruby's
+    // answers, reached before the width check could refuse them.
+    if left == 0 && right > 0 {
+        return Ok(0);
+    }
+    if left == 1 {
+        return Ok(1);
+    }
+    if left == -1 {
+        return Ok(if right % 2 == 0 { 1 } else { -1 });
+    }
+    let overflows = || format!("{left} ** {right} overflows the 64-bit integers");
+    let exponent = u32::try_from(right).map_err(|_| overflows())?;
+    left.checked_pow(exponent).ok_or_else(overflows)
+}
+
 /// `gcd`: never a sign, and a zero yields the other side's magnitude (Ruby
 /// 4.0.9, probed). The smallest integer's magnitude is past the edge.
 pub fn gcd(number: i64, other: i64) -> Result<i64, String> {
@@ -257,6 +276,17 @@ mod tests {
         assert_eq!(
             padded("a", 3, "", "rjust"),
             Err("zero width padding".to_string())
+        );
+    }
+
+    #[test]
+    fn power_refuses_past_the_edge() {
+        assert_eq!(power(2, 10), Ok(1024));
+        assert_eq!(power(0, 0), Ok(1));
+        assert_eq!(power(-1, 9_000_000_000), Ok(1));
+        assert_eq!(
+            power(2, 64),
+            Err("2 ** 64 overflows the 64-bit integers".to_string())
         );
     }
 

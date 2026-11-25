@@ -450,7 +450,8 @@ end
 def field_offset(fields, place)
   mutable offset = 0
   fields.slice(0, place).each do |field|
-    offset += (type_at(field, 1) in ["maybe", *]) ? 2 : 1
+    # A field that is only ever nil is kept as a maybe that is not there.
+    offset += (type_at(field, 1) in ["maybe", *]) || type_at(field, 1) == ["nil"] ? 2 : 1
   end
   offset
 end
@@ -591,7 +592,10 @@ def lower_block(block, handed, bindings, context)
   start = parameters.reverse + captures
   # A `yield` inside the block is its writer's, so what the writer was
   # handed stays what a `yield` reaches.
-  inside = context.with(procedure: handed.answer == NOTHING, looping: false, inside_block: true, answer: handed.answer)
+  # A local the block binds holds one type through the block (#572), as
+  # a def's do through the def.
+  settled = settled_start(block.body, start, yielding_answers(context.answers, context.yielding), context.arities.map { it[0] })
+  inside = context.with(procedure: handed.answer == NOTHING, looping: false, inside_block: true, answer: handed.answer, pinned: settled)
   lowered = lower_body(block.body, block, "a block", start, handed.answer, inside)
   locals = placed_locals(lowered.bindings.slice(0, lowered.bindings.length - start.length))
   IntermediateBlock.new(parameters: parameters, answer: handed.answer, locals: locals.reverse, body: lowered.nodes, captures: placed_locals(captures), onward: yields?(block.body), leaves: handed.leaves, returns: block_returns?(block.body), breaks: block_breaks?(block.body))
@@ -641,6 +645,12 @@ def lower_body(body, owner, what, bindings, answer, context)
   # inside the arm taken (#559): each arm is a body of its own, and one
   # that is missing or empty answers nil.
   ending = (case_as_if(last) or last)
+  # Only the arm that runs is built (#572).
+  settled = (ending in IfNode) ? settled_arm(ending, lowered.bindings + context.answers) : nil
+  if settled.some?
+    rest = lower_body((settled.empty? ? [nil_node(line: ending.line)] : settled), owner, what, lowered.bindings, answer, context)
+    return Lowered.new(nodes: lowered.nodes + rest.nodes, bindings: rest.bindings)
+  end
   if arms_are_bodies?(ending)
     test = lower_condition(ending.condition, lowered.bindings, context)
     nothing = [nil_node(line: ending.line)]
@@ -765,15 +775,20 @@ def lower_program(written, core: nil, progress: nil)
   # A field has one type (#532), as an array's elements have.
   conflict = pinned.conflicts.first
   panic("the native build gives each field of a struct one type — #{conflict} (#532)") if conflict.some?
-  mutable called = []
-  pinned.defs.each do |found|
-    if found.pinned?
-      called << found
-    elsif found.key.some?
-      panic("the native build needs one type for every value — def #{found.name} on line #{found.definition.line} has none: #{found.reason}")
-    end
+  # Only what the program can reach is built (#572). Pinning keeps a
+  # combination that only its first reading of a body names, so that the
+  # types settle; nothing calls it, and it may have no type or not build.
+  named = pinned.defs.select { it.key.some? }
+  reached = reached_combinations(named, statements, pinned.shapes + pinned_answers(named.select { it.pinned? }), definitions.map { it.name })
+  untyped = reached.find { !it.pinned? }
+  if untyped.some?
+    panic("the native build needs one type for every value — def #{untyped.name} on line #{untyped.definition.line} has none: #{untyped.reason}")
   end
-  context = LoweringContext.new(answers: pinned.shapes + pinned_answers(called), arities: unique_types(called.map { [it.name, it.parameters.length] }), procedure: false, looping: false, combinations: called, structs: pinned.structs, yielding: nil, inside_block: false, answer: nil, home: nil, root: nil, pinned: pinned.bindings)
+  called = reached
+  # Types are still read with every combination pinning settled: what a
+  # local holds was worked out with them all.
+  typed = named.select { it.pinned? }
+  context = LoweringContext.new(answers: pinned.shapes + pinned_answers(typed), arities: unique_types(typed.map { [it.name, it.parameters.length] }), procedure: false, looping: false, combinations: called, structs: pinned.structs, yielding: nil, inside_block: false, answer: nil, home: nil, root: nil, pinned: pinned.bindings)
   build_note(progress, "lowering: #{called.length} combinations of #{unique_types(called.map { it.name }).length} defs") if progress.some?
   mutable functions = []
   called.each do |found|
@@ -843,8 +858,8 @@ def lower_statement(statement, bindings, context)
     # A name bound to nil and to nothing else is nil wherever it is read,
     # and is given no place of its own (#572): a parameter left out whose
     # default is nil is one.
-    return Lowered.new(nodes: [], bindings: [[name, ["nil"]]] + bindings) if found.nil? && holding == ["nil"] && (value in NilNode)
-    return Lowered.new(nodes: [], bindings: bindings) if found.some? && holding == ["nil"] && (value in NilNode)
+    return Lowered.new(nodes: [], bindings: [[name, ["nil"]]] + bindings) if found.nil? && holding == ["nil"] && stored.type == ["nil"]
+    return Lowered.new(nodes: [], bindings: bindings) if found.some? && holding == ["nil"] && stored.type == ["nil"]
     refuse_native("a binding of #{with_article(stored.type)}", statement) unless native_type?(stored.type) || stored.type == EMPTY_ARRAY
     # The name holds what it was fitted to, which is more than the value
     # where it is one of several structs (#572).
@@ -877,6 +892,9 @@ def lower_statement(statement, bindings, context)
   # proved it to be, in the arm where that holds, and below the `if`
   # where the other arm always leaves (#572), as pinning read it.
   in IfNode(condition:, then_body:, else_body:)
+    # Only the arm that runs is built (#572).
+    settled = settled_arm(statement, bindings + context.answers)
+    return lower_statements(settled, bindings, context) if settled.some?
     test = lower_condition(condition, bindings, context)
     proof = shape_narrowings(condition, bindings + context.answers)
     taken = lower_statements((then_body or []), narrowed_bindings(bindings, when_true(proof)), context)
@@ -1090,6 +1108,10 @@ def lower_value(node, bindings, context)
       refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == ["integer"] && after == ["integer"]
       return IntermediateArithmetic.new(type: ["integer"], operator: operator, left: first, right: second)
     end
+    # `**` between Integers is the library's (#572), by the seed's rule.
+    if operator == "**" && before == ["integer"] && after == ["integer"]
+      return library_call("**", opened_for(first, "**"), [opened_for(second, "**")], node)
+    end
     refuse_native("the operator '#{operator}'", node) unless %w[< <= > >= == !=].include?(operator)
     refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == after
     refuse_native("'#{operator}' between Booleans", node) if before == ["boolean"] && !%w[== !=].include?(operator)
@@ -1133,6 +1155,12 @@ def lower_value(node, bindings, context)
     first = lower_value(left, bindings, inner.with(root: operator == "||" ? "or" : nil))
     # `maybe || fallback` (#503): the value, or the fallback where there
     # is none. The fallback is a value of the same type, or another maybe.
+    # A name that is nil in this combination gives way to the right side
+    # (#572), as a maybe that is not there does.
+    return lower_value(right, bindings, inner) if operator == "||" && first.type == ["nil"]
+    # And one that holds a value in this combination is that value: the
+    # right side is never reached.
+    return first if operator == "||" && first.type != ["boolean"] && native_value?(first.type)
     if operator == "||" && (first.type in ["maybe", *])
       # `maybe or panic "…"`: the right side stops the program, so the
       # whole is the value (#534).
@@ -1142,7 +1170,9 @@ def lower_value(node, bindings, context)
         plain = type_at(first.type, 1)
         return IntermediateDefault.new(type: plain, value: first, fallback: IntermediateStop.new(type: plain, message: message))
       end
-      fallback = lower_value(right, bindings, inner)
+      written = lower_value(right, bindings, inner)
+      # An empty array standing in for an array is that array.
+      fallback = written.type == EMPTY_ARRAY && (type_at(first.type, 1) in ["array", *]) ? written.with(type: type_at(first.type, 1)) : written
       fits = fallback.type == first.type || fallback.type == type_at(first.type, 1)
       refuse_native("'||' between #{with_article(first.type)} and #{with_article(fallback.type)}", node) unless fits
       return IntermediateDefault.new(type: fallback.type, value: first, fallback: fallback)
@@ -1215,6 +1245,12 @@ def lower_value(node, bindings, context)
   in MethodCallNode(block: nil)
     lower_library(node, bindings, inner) or refuse_native(native_name_of(node), node)
   in IfNode(condition:, then_body:, else_body:)
+    # Only the arm that runs is built (#572).
+    settled = settled_arm(node, bindings + inner.answers)
+    if settled.some?
+      refuse_native("an if read for its value whose arms are not one expression each", node) unless settled.length <= 1
+      return lower_value((settled.first or nil_node(line: node.line)), bindings, inner)
+    end
     taken = then_body or []
     other = else_body or []
     refuse_native("an if read for its value whose arms are not one expression each", node) unless taken.length == 1 && other.length <= 1

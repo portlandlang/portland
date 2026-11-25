@@ -1,0 +1,100 @@
+# A walk over a tree of several structs (#572), as the compiler walks its
+# own: a `case/in` that answers each node's children, an array joined
+# with what the walk itself answers, arms that are never taken in a def
+# compiled for one struct, and an arm whose only answer is `[]`.
+struct Leaf
+  name
+end
+
+struct Assign
+  name
+  value
+end
+
+struct Loop
+  condition
+  body
+end
+
+struct Choice
+  condition
+  then_body
+  else_body
+end
+
+struct Call
+  name
+  arguments
+  block
+end
+
+struct Block
+  body
+end
+
+struct Pair
+  key
+  value
+end
+
+struct Table
+  pairs
+end
+
+struct Task
+  value
+end
+
+# A struct the program never makes, whose arm is never taken.
+struct Ghost
+  inside
+end
+
+struct Group
+  lines
+end
+
+def block_body(block)
+  return [] if block.nil?
+  block.body
+end
+
+def one_if_there(node)
+  mutable found = []
+  found << node unless node.nil?
+  found
+end
+
+def children_of(node)
+  case node
+  in Assign(value:) then one_if_there(value)
+  in Loop(condition:, body:) then [condition] + body
+  in Choice(condition:, then_body:, else_body:) then [condition] + (then_body or []) + (else_body or [])
+  in Group(lines:) then lines.map { if it in Task then it.value else it end }
+  in Call(arguments:, block:) then arguments + block_body(block)
+  in Table(pairs:) then pairs.map { it.key } + pairs.map { it.value }
+  in Ghost(inside:) then [inside]
+  else
+    []
+  end
+end
+
+def every_node(nodes)
+  nodes.flat_map { [it] + every_node(children_of(it)) }
+end
+
+leaf = Leaf.new(name: "x")
+call = Call.new(name: "f", arguments: [leaf, Leaf.new(name: "y")], block: Block.new(body: [Leaf.new(name: "z")]))
+bare = Call.new(name: "g", arguments: [], block: nil)
+tree = [
+  Assign.new(name: "a", value: call),
+  Assign.new(name: "b", value: nil),
+  Loop.new(condition: leaf, body: [bare]),
+  Choice.new(condition: leaf, then_body: [leaf], else_body: nil),
+  Choice.new(condition: leaf, then_body: nil, else_body: [bare]),
+  Group.new(lines: [Task.new(value: leaf), leaf]),
+  Table.new(pairs: [Pair.new(key: leaf, value: bare)])
+]
+every_node(tree).each do |node|
+  puts node
+end

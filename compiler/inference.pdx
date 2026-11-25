@@ -84,6 +84,7 @@ NATIVE_LIBRARY = [
   [["integer"], "chr", [], ["string"], "portland_integer_chr"],
   [["integer"], "chr", [["string"]], ["string"], "portland_integer_chr_encoded"],
   [["integer"], "gcd", [["integer"]], ["integer"], "portland_integer_gcd"],
+  [["integer"], "**", [["integer"]], ["integer"], "portland_integer_power"],
   [["integer"], "to_s", [["integer"]], ["string"], "portland_integer_to_s_base"],
   [["string"], "bytesize", [], ["integer"], "portland_string_bytesize"],
   [["string"], "chars", [], ["array", ["string"]], "portland_string_chars"],
@@ -998,6 +999,10 @@ def library_type(written, receiver)
   written
 end
 
+# The name a struct the program makes is bound under (#572), which no
+# field, def, or local is spelled as.
+def made_key(name) = "#{name}.new&"
+
 # `Math` (ADR 0083): the total functions answer a Float; one that may answer
 # a domain failure is unknown, as every fallible builtin is; `frexp` and
 # `lgamma` answer a pair.
@@ -1401,6 +1406,8 @@ def return_types_in(node, types)
   case node
   in ReturnNode then [return_answer(node, types)]
   in IfNode
+    settled = native_reading?(types) ? settled_arm(node, types) : nil
+    return returns_in_body(settled, types) if settled.some?
     proof = narrowings(node.condition, types)
     mutable found = []
     found += returns_in_body(node.then_body, when_true(proof) + types)
@@ -1473,6 +1480,26 @@ def scan_program(nodes)
     end
   end
   types
+end
+
+# The arm of an `if` that runs whichever way the program goes, as the
+# native build reads it (#572), or nil where either may: an `in` test of
+# a name that holds one struct and no other is settled as written. A def
+# compiled for one struct keeps the `case/in` arms written for the
+# others, which read fields that struct has none of, and they are passed
+# over.
+def settled_arm(node, types)
+  test = node.condition
+  return nil unless (test in MatchTestNode) && (test.subject in IdentifierNode) && (test.pattern in StructPatternNode) && test.pattern.fields.empty?
+  held = synthesize_name(test.subject.name, types)
+  # Only of a struct the program declares: a builtin type's name is bound
+  # nowhere, and its tests are the build's to settle elsewhere.
+  declared = types.assoc(test.pattern.name)
+  return nil unless declared.some? && type_at(declared, 1) == ["type", test.pattern.name]
+  # A struct the program never makes is one no value is.
+  return (node.else_body or []) if types.assoc(made_key(test.pattern.name)).nil?
+  return nil unless (held in ["struct", *]) && held != ANY_STRUCT
+  type_at(held, 1) == test.pattern.name ? (node.then_body or []) : (node.else_body or [])
 end
 
 # Whether a method answers a call (ADR 0093, #536), by its shape: [the
@@ -1710,6 +1737,13 @@ def synthesize_binary(node, types)
     if native_reading?(types) && node.operator == "+" && (left in ["array", *]) && (right in ["array", *])
       return (joined_plain(left, right) or left)
     end
+    # And an array joined with what is not known is read as that array,
+    # so a def that joins an array with what it answers itself has a way
+    # out to be read from. The other side is held to it once it is known.
+    if native_reading?(types) && node.operator == "+"
+      return left if (left in ["array", *]) && left != ["array", ["unknown"]] && right == ["unknown"]
+      return right if (right in ["array", *]) && right != ["array", ["unknown"]] && left == ["unknown"]
+    end
     return left if (left in ["array", *]) && (right in ["array", *])
     # A set's union and difference answer a set (ADR 0082).
     return ["set"] if left == ["set"] && (node.operator == "+" || node.operator == "-")
@@ -1928,6 +1962,8 @@ end
 # maybe of the other. Each branch is read under what the condition proved
 # on its side (narrowings).
 def synthesize_if(node, types)
+  settled = native_reading?(types) ? settled_arm(node, types) : nil
+  return branch_answer(settled, types) if settled.some?
   proof = narrowings(node.condition, types)
   yes = branch_answer(node.then_body, when_true(proof) + types)
   no = branch_answer(node.else_body, when_false(proof) + types)
@@ -1971,6 +2007,12 @@ def synthesize_logical(node, types)
   right_types = if node.operator == "&&" then when_true(proof) + types else when_false(proof) + types end
   right = synthesize(node.right, right_types)
   return left if left == right
+  # Read as the native build runs it, nil gives way to the right of an
+  # `or`, and a value that is always there is itself (#572).
+  if native_reading?(types) && node.operator == "||"
+    return right if left == ["nil"]
+    return left if left != ["boolean"] && left != ["unknown"] && !(left in ["maybe", *])
+  end
   return ["unknown"] unless left in ["maybe", *]
   # `maybe or default` answers the plain type when the default is one of
   # it, and `maybe or return` the plain type outright — below the guard
