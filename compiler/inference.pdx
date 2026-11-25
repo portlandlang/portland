@@ -78,6 +78,8 @@ NATIVE_LIBRARY = [
   [["array", ["element"]], "+", [["self"]], ["self"], "portland_array_concat"],
   [["array", ["element"]], "drop", [["integer"]], ["self"], "portland_array_drop"],
   [["array", ["element"]], "include?", [["element"]], ["boolean"], "portland_array_include"],
+  [["array", ["integer"]], "join", [], ["string"], "portland_array_join"],
+  [["array", ["integer"]], "join", [["string"]], ["string"], "portland_array_join_with"],
   [["array", ["string"]], "join", [], ["string"], "portland_array_join"],
   [["array", ["string"]], "join", [["string"]], ["string"], "portland_array_join_with"],
   [["array", ["element"]], "slice", [["integer"], ["integer"]], ["self"], "portland_array_slice"],

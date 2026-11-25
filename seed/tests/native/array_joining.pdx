@@ -22,3 +22,7 @@ def gathered(groups)
 end
 
 p(gathered([["a", "b"], ["c"]]))
+
+# An array of Integers joins as each is written out.
+p([3, 14, 15].join(", "))
+p([3, 14, 15].join)

@@ -91,7 +91,7 @@ step "docs checks — script/docs/check"
 script/docs/check
 
 if [ "$scope" = all ]; then
-  step "whole suites — seed/tests/whole_suites.rs: the language spec on both implementations, the checker over the compiler's own source, the linter and the parser built natively (minutes, started with the unit tests)"
+  step "whole suites — seed/tests/whole_suites.rs: the language spec on both implementations, the checker over the compiler's own source, the linter, the parser, and the report built natively (minutes, started with the unit tests)"
   whole_suites_status=0
   wait "$whole_suites_pid" || whole_suites_status=$?
   cat "$whole_suites_output"
