@@ -1,6 +1,6 @@
 //! The whole-suite runs: the language spec on both implementations, the
-//! checker over the compiler's own source, and the linter built natively
-//! and held to the seed. Each takes over a minute,
+//! checker over the compiler's own source, and the linter and the parser
+//! built natively and held to the seed. Each takes over a minute,
 //! which is most of the gate, so they live in their own test binary — cargo
 //! reports them in a block of their own, apart from the hundred quick ones in
 //! `run_pdx_files.rs`.
@@ -297,6 +297,60 @@ fn the_linter_built_natively_lints_as_the_seed_does() {
             native.status.code(),
             seed.status.code(),
             "the native linter leaves differently over {files:?}"
+        );
+    }
+}
+
+/// The parser builds natively and writes the trees the seed does (#572):
+/// `parse.pdx`, which parses a file and writes each statement's tree out
+/// by its `sexp`, compiled and run over the compiler's own source and the
+/// core, writes what the seed writes running the same file. The whole
+/// tree is compared, and writing it calls a method on a value that is
+/// one of several structs at every node.
+#[test]
+fn the_parser_built_natively_writes_the_trees_the_seed_does() {
+    let root = format!("{}/..", env!("CARGO_MANIFEST_DIR"));
+    let program = format!("{root}/compiler/parse.pdx");
+    let built = Command::new(format!("{root}/script/build"))
+        .arg(&program)
+        .env("PDX", env!("CARGO_BIN_EXE_pdx"))
+        .output()
+        .expect("failed to run script/build");
+    assert!(
+        built.status.success(),
+        "parse.pdx should build: {}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let binary = String::from_utf8(built.stdout).unwrap().trim().to_string();
+
+    let mut files: Vec<_> = [format!("{root}/compiler"), format!("{root}/core")]
+        .iter()
+        .flat_map(|directory| std::fs::read_dir(directory).unwrap())
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "pdx"))
+        .collect();
+    files.sort();
+    assert!(files.len() > 5, "the compiler directory should hold files");
+
+    for file in files {
+        let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&program)
+            .arg(&file)
+            .output()
+            .expect("failed to run pdx");
+        let native = Command::new(&binary)
+            .arg(&file)
+            .output()
+            .expect("failed to run the native parser");
+        assert!(
+            native.status.success(),
+            "the native parser should read {}",
+            file.display()
+        );
+        assert!(
+            native.stdout == seed.stdout,
+            "the native parser's tree differs from the seed's for {}",
+            file.display()
         );
     }
 }
