@@ -76,3 +76,12 @@ empty = numbers[9] || numbers[10]
 p(empty)
 puts inspect(names[0])
 puts inspect(names[7])
+
+# `each` asked of an array that may not be there walks it where it is.
+groups = [["a", "b"], ["c"]]
+groups[1].each do |word|
+  puts word
+end
+groups[0].each do |word|
+  puts word + "!"
+end
