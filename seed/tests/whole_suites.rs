@@ -1,5 +1,6 @@
-//! The two whole-suite runs: the language spec on both implementations, and
-//! the checker over the compiler's own source. Each takes over a minute,
+//! The whole-suite runs: the language spec on both implementations, the
+//! checker over the compiler's own source, and the linter built natively
+//! and held to the seed. Each takes over a minute,
 //! which is most of the gate, so they live in their own test binary — cargo
 //! reports them in a block of their own, apart from the hundred quick ones in
 //! `run_pdx_files.rs`.
@@ -219,6 +220,83 @@ fn the_language_spec_passes_on_both_oracles() {
             hosted,
             "{} diverged between the seed and the compiler",
             spec.display()
+        );
+    }
+}
+
+/// The linter builds natively (#572, #511): `lint.pdx`, which is the
+/// compiler's lexer, its parser, the tree walk, and the rules, compiled
+/// and run, says what the seed says running the same file. Over the
+/// compiler's own source and the core, which lint clean, and over files
+/// that break each kind of rule, where the two must find the same things
+/// in the same words and leave with the same status.
+///
+/// It lives here because the build is the slow part: pinning the whole
+/// front end's types takes the seed minutes.
+#[test]
+fn the_linter_built_natively_lints_as_the_seed_does() {
+    let root = format!("{}/..", env!("CARGO_MANIFEST_DIR"));
+    let program = format!("{root}/compiler/lint.pdx");
+    let built = Command::new(format!("{root}/script/build"))
+        .arg(&program)
+        .env("PDX", env!("CARGO_BIN_EXE_pdx"))
+        .output()
+        .expect("failed to run script/build");
+    assert!(
+        built.status.success(),
+        "lint.pdx should build: {}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let binary = String::from_utf8(built.stdout).unwrap().trim().to_string();
+
+    let mut clean: Vec<_> = [format!("{root}/compiler"), format!("{root}/core")]
+        .iter()
+        .flat_map(|directory| std::fs::read_dir(directory).unwrap())
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "pdx"))
+        .collect();
+    clean.sort();
+
+    let directory = std::env::temp_dir().join("native_lint_probe");
+    std::fs::create_dir_all(&directory).unwrap();
+    let broken = [
+        (
+            "order.pdx",
+            "def zebra = 1\n\nALPHA = 2\n\nstruct Point\n  x\n\n  def wide = x\n  def area = x * x\nend\n\ndef apple = ALPHA\nrequire_relative \"nothing\"\n",
+        ),
+        (
+            "margin.pdx",
+            "def total(numbers)\n  mutable sum = 0\nnumbers.each do |number|\n    sum += number\n  end\n  sum\nend\n",
+        ),
+        ("parse.pdx", "def broken(\n  x = \nend\nputs [1, 2\n"),
+        ("constants.pdx", "B = 1\nA = B + 1\nC = 3\n"),
+    ];
+    let mut runs: Vec<Vec<std::path::PathBuf>> = vec![clean];
+    for (name, source) in broken {
+        let path = directory.join(name);
+        std::fs::write(&path, source).unwrap();
+        runs.push(vec![path]);
+    }
+
+    for files in runs {
+        let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&program)
+            .args(&files)
+            .output()
+            .expect("failed to run pdx");
+        let native = Command::new(&binary)
+            .args(&files)
+            .output()
+            .expect("failed to run the native linter");
+        assert_eq!(
+            String::from_utf8_lossy(&native.stdout),
+            String::from_utf8_lossy(&seed.stdout),
+            "the native linter finds differently over {files:?}"
+        );
+        assert_eq!(
+            native.status.code(),
+            seed.status.code(),
+            "the native linter leaves differently over {files:?}"
         );
     }
 }
