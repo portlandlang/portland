@@ -653,7 +653,7 @@ def own_bindings(bindings)
   mutable own = []
   mutable seen = []
   bindings.reverse.each do |binding|
-    next if seen.include?(binding[0])
+    next if seen.include?(binding[0]) || proved_key?(binding[0])
     seen << binding[0]
     own = [binding] + own
   end
@@ -1046,6 +1046,11 @@ end
 def rebound(bindings, name, type)
   found = bindings.assoc(name)
   return [[name, type]] + bindings if found.nil?
+  # What was proved of the name was proved of what it held (#572), and
+  # goes when the name is bound again.
+  if (type_at(found, 1) in ["maybe", ["struct", *]]) && bindings.assoc(proved_key(name)).some?
+    return rebound(bindings.reject { it[0] == proved_key(name) }, name, type)
+  end
   return bindings if type_at(found, 1) == type
   return bindings if type == EMPTY_ARRAY && (type_at(found, 1) in ["array", *])
   return bindings.map { it[0] == name ? [name, type] : it } if type_at(found, 1) == EMPTY_ARRAY && (type in ["array", *])
@@ -1204,7 +1209,9 @@ def settled_bindings(parameters, bindings)
   mutable start = parameters
   mutable seen = parameters.map { it[0] }
   bindings.reverse.each do |binding|
-    next if seen.include?(binding[0])
+    # A proof bound beside a name is no local, and holds only where it
+    # was proved.
+    next if seen.include?(binding[0]) || proved_key?(binding[0])
     seen << binding[0]
     start = [binding] + start if concrete?(type_at(binding, 1))
   end

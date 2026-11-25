@@ -896,7 +896,9 @@ def lower_statement(statement, bindings, context)
     refuse_native("a binding of #{with_article(stored.type)}", statement) unless native_type?(stored.type) || stored.type == EMPTY_ARRAY
     # The name holds what it was fitted to, which is more than the value
     # where it is one of several structs (#572).
-    after = found.nil? ? [[name, holding]] + bindings : bindings
+    # What was proved of the name goes when the name is bound again.
+    held = bindings.assoc(proved_key(name)).nil? ? bindings : bindings.reject { it[0] == proved_key(name) }
+    after = found.nil? ? [[name, holding]] + held : held
     Lowered.new(nodes: [IntermediateStore.new(name: name, value: stored)], bindings: after)
   # A struct or a trait written out declares, and runs nothing.
   in StructDefNode then Lowered.new(nodes: [], bindings: bindings)
@@ -1094,6 +1096,12 @@ def lower_value(node, bindings, context)
     found = bindings.assoc(name)
     refuse_native("an array that is never given an element, #{name}", node) if found.some? && type_at(found, 1) == EMPTY_ARRAY
     return IntermediateConstant.new(type: ["nil"], value: nil) if found.some? && type_at(found, 1) == ["nil"]
+    # A name that may not be there, proved to be a struct, is opened and
+    # read as that struct (#572): an `in` test found it there.
+    if found.some? && (type_at(found, 1) in ["maybe", ["struct", *]])
+      proved = bindings.assoc(proved_key(name))
+      return IntermediateOpen.new(type: type_at(proved, 1), value: IntermediateLocal.new(type: type_at(found, 1), name: name), name: name) if proved.some?
+    end
     return IntermediateLocal.new(type: type_at(found, 1), name: name) if found.some?
     lower_call(node, name, [], bindings, inner, nil)
   in ArrayNode(elements:)
@@ -1437,8 +1445,9 @@ def opened_for(value, name)
 end
 
 # The locals that are given a place: every one but a name bound only to
-# nil, which is nil wherever it is read (#572).
-def placed_locals(bindings) = bindings.reject { type_at(it, 1) == ["nil"] }
+# nil, which is nil wherever it is read (#572), and a proof bound beside
+# a name, which is no local.
+def placed_locals(bindings) = bindings.reject { type_at(it, 1) == ["nil"] || proved_key?(it[0]) }
 
 # A type with a maybe opened: what an operation that needs the value
 # works on.

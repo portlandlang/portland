@@ -91,3 +91,27 @@ puts checked(label)
 puts checked(wide)
 puts called(label)
 puts called(small)
+
+# A name that may not be there is the struct `in` proved it to be: it is
+# there, and it is that struct.
+def first_wide(tiles)
+  shape = tiles[0]&.shape
+  return "no circle" unless shape in Circle
+  "circle of #{shape.size + 1}"
+end
+
+def label_text(tiles, place)
+  found = tiles[place]
+  if found in Tile
+    inner = found.shape
+    return inner.text if inner in Label
+  end
+  "none"
+end
+
+puts first_wide([wide, label])
+puts first_wide([label])
+puts first_wide([])
+puts label_text([wide, label], 1)
+puts label_text([wide, label], 0)
+puts label_text([wide, label], 9)

@@ -1095,7 +1095,11 @@ def names?(node, name) = (node in IdentifierNode) && node.name == name
 # it stood (#572).
 def narrowed_bindings(bindings, proved)
   return bindings if proved.empty?
-  bindings.map { |binding| (proved.assoc(binding[0]) or binding) }
+  # What was proved of a name that may not be there is bound beside the
+  # name, under a key of its own, and is new here unless a proof around
+  # this one bound it.
+  fresh = proved.reject { |entry| bindings.assoc(entry[0]).some? }
+  fresh + bindings.map { |binding| (proved.assoc(binding[0]) or binding) }
 end
 
 def narrowings(condition, types)
@@ -1389,6 +1393,13 @@ def proof_of(condition, types)
   end
 end
 
+# The key what was proved of a name that may not be there is bound under
+# (#572), beside the name. No local is spelled with a space.
+def proved_key(name) = "#{name} is"
+
+# Whether a binding's key is a proof bound beside a name.
+def proved_key?(key) = key.end_with?(" is")
+
 # The three that order: a complex has no `<`.
 def real_numeric?(type) = numeric?(type) && type != ["complex"]
 
@@ -1569,18 +1580,26 @@ end
 def shape_narrowings(condition, types)
   proof = proof_of(condition, types)
   [when_true(proof), when_false(proof)].map do |proved|
-    proved.select { |entry| synthesize_name(entry[0], types) == ANY_STRUCT }
+    proved.select { |entry| proved_key?(entry[0]) || synthesize_name(entry[0], types) == ANY_STRUCT }
   end
 end
 
 # `name in Struct`, asked of a name that holds one of several structs
 # (#572): where it holds, the name is that struct. Where it does not, the
 # name is still any of the others.
+#
+# A name that may not be there, and is a struct where it is, is proved
+# the same way under the native reading: where the test holds the value
+# is there and is that struct. It is held as a maybe all the same, so the
+# proof is bound beside the name and not in its place, and a read of the
+# name opens it.
 def shape_proof(node, types)
   return no_proof unless (node.subject in IdentifierNode) && (node.pattern in StructPatternNode) && node.pattern.fields.empty?
-  return no_proof unless synthesize_name(node.subject.name, types) == ANY_STRUCT
+  held = synthesize_name(node.subject.name, types)
   return no_proof unless synthesize_name(node.pattern.name, types) == ["type", node.pattern.name]
-  [[[node.subject.name, ["struct", node.pattern.name]]], []]
+  return [[[node.subject.name, ["struct", node.pattern.name]]], []] if held == ANY_STRUCT
+  return no_proof unless native_reading?(types) && (held in ["maybe", *]) && (type_at(held, 1) in ["struct", *])
+  [[[proved_key(node.subject.name), ["struct", node.pattern.name]]], []]
 end
 
 # The type a field of this name has, read off a value that is one of
@@ -1994,6 +2013,12 @@ end
 
 def synthesize_identifier(node, types)
   found = types.assoc(node.name)
+  # A name that may not be there, proved to be a struct, is that struct
+  # (#572): the proof is bound beside it.
+  if found.some? && (type_at(found, 1) in ["maybe", ["struct", *]])
+    proved = types.assoc(proved_key(node.name))
+    return type_at(proved, 1) if proved.some?
+  end
   return type_at(found, 1) if found.some?
   plain = synthesize_name(node.name, types)
   # A def with no parameters is called by its bare name; under the
@@ -2255,9 +2280,11 @@ end
 # one of several structs holding that again (#572): what a body proved
 # of a name is proved no further than the body.
 def unnarrowed(before, after)
+  # A proof bound beside a name inside the body goes with the body.
+  kept = after.any? { proved_key?(it[0]) } ? after.reject { proved_key?(it[0]) && before.assoc(it[0]).nil? } : after
   wide = before.select { type_at(it, 1) == ANY_STRUCT }
-  return after if wide.empty?
-  after.map { |binding| wide.assoc(binding[0]).nil? ? binding : [binding[0], ANY_STRUCT] }
+  return kept if wide.empty?
+  kept.map { |binding| wide.assoc(binding[0]).nil? ? binding : [binding[0], ANY_STRUCT] }
 end
 
 def when_false(proof) = type_at(proof, 1)
