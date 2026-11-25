@@ -168,6 +168,14 @@ def answer_candidates(body, parameters, answers, names)
   found + returns_gathered(walk) + last
 end
 
+# The array a def's pinned combinations answer, as what they make
+# together, or nil where none answers an array (#572).
+def answered_array(name, answers)
+  opening = "#{name}("
+  arrays = answers.select { it[0].start_with?(opening) && (type_at(it, 1) in ["array", *]) && concrete?(type_at(it, 1)) }.map { type_at(it, 1) }
+  arrays.empty? ? nil : joined_types(arrays)
+end
+
 # Whether a body ends in what produces no value, read with the bindings
 # its statements above the last one leave.
 def answers_nothing?(body, parameters, answers, names)
@@ -534,7 +542,11 @@ def pin_combination(definition, arguments, handed, leaves, answers, names, stric
   starting = settled_start(called.body, parameters, yielding_answers(answers, block), names)
   solved = solved_answer(called, key, starting, yielding_answers(answers, block), names, strict)
   # A def whose every way out answers nil answers nothing (#561).
-  answer = solved == ["nil"] ? NOTHING : solved
+  # One whose every way out is an empty array answers the array its
+  # other combinations do (#572): an empty literal says nothing of what
+  # it holds, and the def's other answers do.
+  borrowed = solved == EMPTY_ARRAY ? answered_array(definition.name, answers) : nil
+  answer = solved == ["nil"] ? NOTHING : (borrowed or solved)
   reason = concrete?(answer) ? nil : "its answer is #{render_type(answer)}"
   PinnedDef.new(name: definition.name, key: key, arguments: arguments, definition: called, parameters: parameters, answer: answer, reason: reason, block: block)
 end
@@ -710,6 +722,9 @@ def pin_statement(statement, walk, answers, names)
   in IfNode(condition:, then_body:, else_body:)
     after_condition = pin_expression(condition, walk, answers, names)
     entering = after_condition.bindings
+    # Only the arm that runs is walked (#572).
+    settled = settled_arm(statement, entering + answers)
+    return pin_statements(settled, after_condition, answers, names) if settled.some?
     proof = shape_narrowings(condition, entering + answers)
     taken = pin_statements((then_body or []), after_condition.with(bindings: narrowed_bindings(entering, when_true(proof))), answers, names)
     after_then = taken.with(bindings: unnarrowed(entering, taken.bindings))
@@ -1013,6 +1028,9 @@ def solved_answer(definition, key, parameters, answers, names, strict)
   others = answers.reject { it[0] == key }
   plain = body_answer(definition.body, parameters, others, names)
   return plain if concrete?(plain)
+  # Every way out an empty array: said as it is, for the combination to
+  # take the array the def's others answer (#572).
+  return plain if plain == EMPTY_ARRAY
   known = unique_types(answer_candidates(definition.body, parameters, answers, names).select { concrete?(it) })
   # The ways out that are known answer one type, or types that join.
   found = joined_types(known) or return ["unknown"]
@@ -1087,6 +1105,12 @@ def value_candidates(node, scope)
   # A `panic` is no way out with an answer (#572).
   return [] if (node in CallNode) && node.name == "panic"
   return [statement_answer(node, scope)] unless node in IfNode
+  # Only the arm that runs answers (#572).
+  settled = settled_arm(node, scope)
+  if settled.some?
+    ending = settled.last
+    return ending.nil? ? [["nil"]] : value_candidates(ending, scope)
+  end
   taken = node.then_body or []
   other = node.else_body or []
   first = taken.last

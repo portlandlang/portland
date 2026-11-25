@@ -1,0 +1,18 @@
+# A struct field that is only ever nil (#572): the struct is written
+# out, compared, and copied with it there, and reading it reads nil.
+struct Note
+  text
+  mark
+  count
+end
+
+first = Note.new(text: "one", mark: nil, count: 1)
+second = Note.new(text: "two", mark: nil, count: 2)
+p(first)
+puts second
+puts first == second
+puts first == Note.new(text: "one", mark: nil, count: 1)
+p(first.with(count: 5))
+puts first.mark.nil?
+puts second.count
+p([first, second])

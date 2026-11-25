@@ -450,7 +450,8 @@ end
 def field_offset(fields, place)
   mutable offset = 0
   fields.slice(0, place).each do |field|
-    offset += (type_at(field, 1) in ["maybe", *]) ? 2 : 1
+    # A field that is only ever nil is kept as a maybe that is not there.
+    offset += (type_at(field, 1) in ["maybe", *]) || type_at(field, 1) == ["nil"] ? 2 : 1
   end
   offset
 end
@@ -641,6 +642,12 @@ def lower_body(body, owner, what, bindings, answer, context)
   # inside the arm taken (#559): each arm is a body of its own, and one
   # that is missing or empty answers nil.
   ending = (case_as_if(last) or last)
+  # Only the arm that runs is built (#572).
+  settled = (ending in IfNode) ? settled_arm(ending, lowered.bindings + context.answers) : nil
+  if settled.some?
+    rest = lower_body((settled.empty? ? [nil_node(line: ending.line)] : settled), owner, what, lowered.bindings, answer, context)
+    return Lowered.new(nodes: lowered.nodes + rest.nodes, bindings: rest.bindings)
+  end
   if arms_are_bodies?(ending)
     test = lower_condition(ending.condition, lowered.bindings, context)
     nothing = [nil_node(line: ending.line)]
@@ -843,8 +850,8 @@ def lower_statement(statement, bindings, context)
     # A name bound to nil and to nothing else is nil wherever it is read,
     # and is given no place of its own (#572): a parameter left out whose
     # default is nil is one.
-    return Lowered.new(nodes: [], bindings: [[name, ["nil"]]] + bindings) if found.nil? && holding == ["nil"] && (value in NilNode)
-    return Lowered.new(nodes: [], bindings: bindings) if found.some? && holding == ["nil"] && (value in NilNode)
+    return Lowered.new(nodes: [], bindings: [[name, ["nil"]]] + bindings) if found.nil? && holding == ["nil"] && stored.type == ["nil"]
+    return Lowered.new(nodes: [], bindings: bindings) if found.some? && holding == ["nil"] && stored.type == ["nil"]
     refuse_native("a binding of #{with_article(stored.type)}", statement) unless native_type?(stored.type) || stored.type == EMPTY_ARRAY
     # The name holds what it was fitted to, which is more than the value
     # where it is one of several structs (#572).
@@ -877,6 +884,9 @@ def lower_statement(statement, bindings, context)
   # proved it to be, in the arm where that holds, and below the `if`
   # where the other arm always leaves (#572), as pinning read it.
   in IfNode(condition:, then_body:, else_body:)
+    # Only the arm that runs is built (#572).
+    settled = settled_arm(statement, bindings + context.answers)
+    return lower_statements(settled, bindings, context) if settled.some?
     test = lower_condition(condition, bindings, context)
     proof = shape_narrowings(condition, bindings + context.answers)
     taken = lower_statements((then_body or []), narrowed_bindings(bindings, when_true(proof)), context)
@@ -1225,6 +1235,12 @@ def lower_value(node, bindings, context)
   in MethodCallNode(block: nil)
     lower_library(node, bindings, inner) or refuse_native(native_name_of(node), node)
   in IfNode(condition:, then_body:, else_body:)
+    # Only the arm that runs is built (#572).
+    settled = settled_arm(node, bindings + inner.answers)
+    if settled.some?
+      refuse_native("an if read for its value whose arms are not one expression each", node) unless settled.length <= 1
+      return lower_value((settled.first or nil_node(line: node.line)), bindings, inner)
+    end
     taken = then_body or []
     other = else_body or []
     refuse_native("an if read for its value whose arms are not one expression each", node) unless taken.length == 1 && other.length <= 1
