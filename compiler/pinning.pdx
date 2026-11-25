@@ -382,6 +382,12 @@ def definition_mentions(definitions)
   definitions.map { [it.name, (mentioned_names(it.body) + %w[inspect to_s]).uniq] }
 end
 
+# A body that may not be there, each statement read by `on_self`.
+def each_on_self(body, own)
+  return nil if body.nil?
+  body.map { on_self(it, own) }
+end
+
 # For each field of a struct made with types that do not join, a sentence
 # saying so (#532). The native build gives a field one type, as it gives
 # an array's elements one; a value in one place and nil or a maybe of it
@@ -564,13 +570,90 @@ def merge_answers(candidates)
   (joined_types(candidates) or merge_candidates(candidates))
 end
 
+# For each method name, the program's structs that write a method of
+# that name (#572), as bindings: what a method asked of one of several
+# structs is looked up in. `shapes` is every method's shape of call,
+# keyed by its struct and its name.
+def method_owners(shapes, structs)
+  mutable names = []
+  mutable owners = []
+  shapes.each do |shape|
+    parts = shape[0].slice(0, shape[0].length - 1).split("#")
+    owner = parts.first or ""
+    name = parts.last or ""
+    next unless parts.length == 2 && structs.include?(owner)
+    place = names.index(name)
+    if place.nil?
+      names << name
+      owners << [owner]
+    else
+      owners[place] = (owners[place] or []) + [owner]
+    end
+  end
+  mutable bound = []
+  names.each_with_index do |name, place|
+    bound << [any_method_key(name), (owners[place] or [])]
+  end
+  bound
+end
+
+# A statement of a struct's method with each of the struct's own methods
+# that it calls by a bare name asked of `self` (#572): `headed(items)`
+# written in a method is `self.headed(items)`, as the interpreters read
+# it. As a def handed `self`, the method has no other way to say whose
+# method it means. `own` is the names of the struct's methods; a name
+# cannot be both a method and a local, so a bare one is the method.
+def on_self(node, own)
+  return nil if node.nil?
+  case node
+  in CallNode(name:, arguments:, block:)
+    handed = arguments.map { on_self(it, own) }
+    given = on_self(block, own)
+    return node.with(arguments: handed, block: given) unless own.include?(name)
+    MethodCallNode.new(kind: "method_call", receiver: SelfNode.new(kind: "self", line: node.line), name: name, arguments: handed, block: given, line: node.line)
+  in IdentifierNode(name:)
+    return node unless own.include?(name)
+    MethodCallNode.new(kind: "method_call", receiver: SelfNode.new(kind: "self", line: node.line), name: name, arguments: [], block: nil, line: node.line)
+  in BlockNode(body:) then node.with(body: body.map { on_self(it, own) })
+  in AssignmentNode(value:) then node.with(value: on_self(value, own))
+  in AppendNode(value:) then node.with(value: on_self(value, own))
+  in WhileNode(condition:, body:) then node.with(condition: on_self(condition, own), body: body.map { on_self(it, own) })
+  in IfNode(condition:, then_body:, else_body:)
+    node.with(condition: on_self(condition, own), then_body: each_on_self(then_body, own), else_body: each_on_self(else_body, own))
+  in CaseNode(subject:, branches:, else_body:)
+    arms = branches.map { |branch| branch.with(values: branch.values.map { on_self(it, own) }, body: branch.body.map { on_self(it, own) }) }
+    node.with(subject: on_self(subject, own), branches: arms, else_body: each_on_self(else_body, own))
+  in CaseInNode(subject:, branches:, else_body:)
+    arms = branches.map { |branch| branch.with(guard: on_self(branch.guard, own), body: branch.body.map { on_self(it, own) }) }
+    node.with(subject: on_self(subject, own), branches: arms, else_body: each_on_self(else_body, own))
+  in ReturnNode(value:) then node.with(value: on_self(value, own))
+  in MethodCallNode(receiver:, arguments:, block:)
+    node.with(receiver: on_self(receiver, own), arguments: arguments.map { on_self(it, own) }, block: on_self(block, own))
+  in SafeMethodCallNode(receiver:, arguments:, block:)
+    node.with(receiver: on_self(receiver, own), arguments: arguments.map { on_self(it, own) }, block: on_self(block, own))
+  in ArrayNode(elements:) then node.with(elements: elements.map { on_self(it, own) })
+  in HashNode(pairs:) then node.with(pairs: pairs.map { |pair| pair.with(key: on_self(pair.key, own), value: on_self(pair.value, own)) })
+  in BinaryNode(left:, right:) then node.with(left: on_self(left, own), right: on_self(right, own))
+  in LogicalNode(left:, right:) then node.with(left: on_self(left, own), right: on_self(right, own))
+  in UnaryNode(operand:) then node.with(operand: on_self(operand, own))
+  in IndexNode(receiver:, index:) then node.with(receiver: on_self(receiver, own), index: on_self(index, own))
+  in RangeNode(start:, finish:) then node.with(start: on_self(start, own), finish: on_self(finish, own))
+  in MatchAssertNode(subject:) then node.with(subject: on_self(subject, own))
+  in MatchTestNode(subject: tested) then node.with(subject: on_self(tested, own))
+  in KeywordArgumentNode(value:) then node.with(value: on_self(value, own))
+  in YieldNode(values:) then node.with(values: values.map { on_self(it, own) })
+  else
+    node
+  end
+end
+
 # Each name once, at the type it holds: where a guard's proof is bound
 # ahead of a name's own binding, the binding beneath it.
 def own_bindings(bindings)
   mutable own = []
   mutable seen = []
   bindings.reverse.each do |binding|
-    next if seen.include?(binding[0])
+    next if seen.include?(binding[0]) || proved_key?(binding[0])
     seen << binding[0]
     own = [binding] + own
   end
@@ -709,6 +792,16 @@ def pin_expression(node, walk, answers, names)
     scope = walk.bindings + answers
     called = native_method_call(node, synthesize(node.receiver, scope), scope)
     return pin_expression(called, walk, answers, names) if called.some?
+    # Asked of one of several structs, it is a call of each struct's own
+    # method (#572), and each is gathered.
+    several = dispatched_calls(node, synthesize(node.receiver, scope), scope)
+    unless several.empty?
+      mutable gathering = walk
+      several.each do |one|
+        gathering = pin_expression(one, gathering, answers, names)
+      end
+      return gathering
+    end
   end
   return pin_walk(node, walk, answers, names) if (node in MethodCallNode) && node.block.some?
   mutable current = walk
@@ -763,7 +856,7 @@ def pin_program(written, core: nil, progress: nil)
   names = definitions.map { it.name }
   # What every scope reads beside the answers: the shapes of call the
   # methods answer, and each struct's name as the type it is.
-  fixed = methods.shapes + structs.map { [it.name, ["type", it.name]] }
+  fixed = methods.shapes + method_owners(methods.shapes, structs.map { it.name }) + structs.map { [it.name, ["type", it.name]] }
   # Two passes. The first pins from the arguments whose types are known,
   # since `double(double(3))` cannot say its outer argument until `double`
   # itself is pinned, and takes a def that calls itself at the answer its
@@ -953,6 +1046,11 @@ end
 def rebound(bindings, name, type)
   found = bindings.assoc(name)
   return [[name, type]] + bindings if found.nil?
+  # What was proved of the name was proved of what it held (#572), and
+  # goes when the name is bound again.
+  if (type_at(found, 1) in ["maybe", ["struct", *]]) && bindings.assoc(proved_key(name)).some?
+    return rebound(bindings.reject { it[0] == proved_key(name) }, name, type)
+  end
   return bindings if type_at(found, 1) == type
   return bindings if type == EMPTY_ARRAY && (type_at(found, 1) in ["array", *])
   return bindings.map { it[0] == name ? [name, type] : it } if type_at(found, 1) == EMPTY_ARRAY && (type in ["array", *])
@@ -1111,7 +1209,9 @@ def settled_bindings(parameters, bindings)
   mutable start = parameters
   mutable seen = parameters.map { it[0] }
   bindings.reverse.each do |binding|
-    next if seen.include?(binding[0])
+    # A proof bound beside a name is no local, and holds only where it
+    # was proved.
+    next if seen.include?(binding[0]) || proved_key?(binding[0])
     seen << binding[0]
     start = [binding] + start if concrete?(type_at(binding, 1))
   end
@@ -1216,7 +1316,11 @@ def type_methods(nodes, core)
     end
     methods.each do |method|
       receiver = IdentifierNode.new(kind: "identifier", name: "self", line: method.line)
-      definitions << method.with(name: method_def_name(node.name, method.name), parameters: [receiver] + method.parameters, body: field_prelude(node.fields, method) + method.body)
+      # A method of the struct called by its bare name, inside another, is
+      # asked of `self` (#572).
+      own = methods.map { it.name }
+      body = method.body.map { on_self(it, own) }
+      definitions << method.with(name: method_def_name(node.name, method.name), parameters: [receiver] + method.parameters, body: field_prelude(node.fields, method) + body)
       shapes << [method_shape_key(node.name, method.name), parameters_shape(method.parameters, yields?(method.body))]
     end
   end

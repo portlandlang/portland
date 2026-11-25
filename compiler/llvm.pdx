@@ -153,6 +153,7 @@ LLVM_PRELUDE = [
   "declare ptr @portland_struct_to_string(ptr)",
   "declare ptr @portland_struct_slot(ptr, ptr)",
   "declare zeroext i1 @portland_struct_is(ptr, ptr)",
+  "declare void @portland_struct_refuse_method(ptr, ptr)",
   "declare void @portland_retain(ptr)",
   "declare void @portland_release(ptr)",
   "declare void @portland_exit_check()",
@@ -1213,6 +1214,13 @@ def llvm_value(emitter, value)
     llvm_named(flagged.emitter, "insertvalue #{llvm_type(type)} #{flagged.operand}, ptr #{read.operand}, 1")
   # `panic` where a value was to be: the runtime says the message and does
   # not come back, and what follows names a value no one reaches.
+  # A struct with no method of the name asked (#572): the runtime says so
+  # in the seed's words and the program stops.
+  in IntermediateMissing(type:, record:, name:)
+    asked = llvm_value(emitter, record)
+    label = llvm_literal(asked.emitter, name)
+    stopped = llvm_line(llvm_line(label.emitter, "call void @portland_struct_refuse_method(ptr #{asked.operand}, ptr #{label.operand})"), "unreachable")
+    LLVMValue.new(emitter: llvm_label(stopped, "after#{stopped.counter}"), operand: llvm_zero(type))
   in IntermediateStop(type:, message:)
     written = llvm_value(emitter, message)
     stopped = llvm_line(llvm_line(written.emitter, "call void @portland_panic(ptr #{written.operand})"), "unreachable")

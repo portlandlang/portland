@@ -1,0 +1,12 @@
+# A block that answers a value or nil is read for what it answers (#572):
+# handed to `map`, each answer that is there is kept.
+def marked(visibilities)
+  mutable parts = []
+  %w[private protected].each do |kind|
+    names = visibilities.select { it[1] == kind }.map { it[0] }
+    parts << "(#{kind} #{names.join(" ")})" unless names.empty?
+  end
+  parts.join(" ")
+end
+
+puts marked([["a", "private"], ["b", "public"], ["c", "protected"], ["d", "private"]])

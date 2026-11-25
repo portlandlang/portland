@@ -134,6 +134,17 @@ YIELD = "yield"
 # a block written in that def which yields can then leave too.
 YIELD_LEAVES = "yield leaves"
 
+# A value that is one of several structs, taken as the one named (#572):
+# no source spells it. It stands where the receiver did, as the first
+# argument of that struct's method, in the arm of a call that runs only
+# where the value is that struct.
+struct NarrowedNode
+  kind
+  value
+  name
+  line
+end
+
 # A maybe opened for a method the native build compiles as a def (#525):
 # no source spells it. It stands where the receiver did, as the def's
 # first argument, and says which method nil is to be refused for.
@@ -198,6 +209,10 @@ def annotation_for(source, name)
   tail = found.slice(marker + 5, found.length - marker - 5)
   tail.strip
 end
+
+# The name the structs that write a method of one name are bound under
+# (#572), which no def, field, or local is spelled as.
+def any_method_key(name) = "//#{name}"
 
 # What an arm of a `case/in` binds, as pairs to put before the types: a
 # bare capture takes the subject's type — the plain type once an unguarded
@@ -703,6 +718,7 @@ def children_of(node)
   in KeywordArgumentNode(value:) then [value]
   in YieldNode(values:) then values
   in OpenedNode(value:) then [value]
+  in NarrowedNode(value:) then [value]
   in CaseEqualNode(pattern:, subject:) then [pattern, subject]
   in EnumCaseNode(payload:) then payload.map { it.value }
   else
@@ -799,6 +815,26 @@ def demands_in(nodes, name)
     found = add_demands(node, name, found)
   end
   found
+end
+
+# A method asked of a value that is one of several structs, as a call of
+# each struct's own method (#572), the value taken as that struct: one
+# call for each struct that writes a method of that name which answers
+# this shape of call. None where the value is not one of several
+# structs, or no struct writes such a method.
+def dispatched_calls(node, receiver, types)
+  return [] unless opened_natively(receiver, types) == ANY_STRUCT
+  listed = types.assoc(any_method_key(node.name))
+  return [] if listed.nil?
+  handed = (receiver in ["maybe", *]) ? OpenedNode.new(kind: "opened", value: node.receiver, name: node.name, line: node.line) : node.receiver
+  answering = type_at(listed, 1).select do |owner|
+    shape = types.assoc(method_shape_key(owner, node.name))
+    shape.some? && shape_answers?(type_at(shape, 1), node)
+  end
+  answering.map do |owner|
+    narrowed = NarrowedNode.new(kind: "narrowed", value: handed, name: owner, line: node.line)
+    CallNode.new(kind: "call", name: method_def_name(owner, node.name), arguments: [narrowed] + node.arguments, block: node.block, line: node.line)
+  end
 end
 
 def element_type(receiver)
@@ -1059,7 +1095,11 @@ def names?(node, name) = (node in IdentifierNode) && node.name == name
 # it stood (#572).
 def narrowed_bindings(bindings, proved)
   return bindings if proved.empty?
-  bindings.map { |binding| (proved.assoc(binding[0]) or binding) }
+  # What was proved of a name that may not be there is bound beside the
+  # name, under a key of its own, and is new here unless a proof around
+  # this one bound it.
+  fresh = proved.reject { |entry| bindings.assoc(entry[0]).some? }
+  fresh + bindings.map { |binding| (proved.assoc(binding[0]) or binding) }
 end
 
 def narrowings(condition, types)
@@ -1084,8 +1124,9 @@ end
 # native reading: its parameters bound to what that combination of the
 # def yields, and its body read as any body is. A block that ends in
 # what produces no value answers nothing; so does one whose answer is
-# nil, or a value or nil, or not known, since nothing can read it then
-# and the block is run for what it does.
+# nil or not known, since nothing can read it then and the block is run
+# for what it does. One that answers a value or nil answers that maybe
+# (#572): `names.map { it[0] }` is read for what it answers.
 def native_block_answer(node, arguments, types)
   yielded = types.assoc(yields_key(node.name, arguments))
   mutable inner = types
@@ -1097,7 +1138,7 @@ def native_block_answer(node, arguments, types)
   end
   return NOTHING if native_nothing?(node.block.body, inner)
   found = synthesize_body(node.block.body, inner)
-  return NOTHING if found == ["nil"] || (found in ["maybe", *]) || render_type(found).include?("Unknown")
+  return NOTHING if found == ["nil"] || render_type(found).include?("Unknown")
   found
 end
 
@@ -1352,6 +1393,13 @@ def proof_of(condition, types)
   end
 end
 
+# The key what was proved of a name that may not be there is bound under
+# (#572), beside the name. No local is spelled with a space.
+def proved_key(name) = "#{name} is"
+
+# Whether a binding's key is a proof bound beside a name.
+def proved_key?(key) = key.end_with?(" is")
+
 # The three that order: a complex has no `<`.
 def real_numeric?(type) = numeric?(type) && type != ["complex"]
 
@@ -1532,18 +1580,26 @@ end
 def shape_narrowings(condition, types)
   proof = proof_of(condition, types)
   [when_true(proof), when_false(proof)].map do |proved|
-    proved.select { |entry| synthesize_name(entry[0], types) == ANY_STRUCT }
+    proved.select { |entry| proved_key?(entry[0]) || synthesize_name(entry[0], types) == ANY_STRUCT }
   end
 end
 
 # `name in Struct`, asked of a name that holds one of several structs
 # (#572): where it holds, the name is that struct. Where it does not, the
 # name is still any of the others.
+#
+# A name that may not be there, and is a struct where it is, is proved
+# the same way under the native reading: where the test holds the value
+# is there and is that struct. It is held as a maybe all the same, so the
+# proof is bound beside the name and not in its place, and a read of the
+# name opens it.
 def shape_proof(node, types)
   return no_proof unless (node.subject in IdentifierNode) && (node.pattern in StructPatternNode) && node.pattern.fields.empty?
-  return no_proof unless synthesize_name(node.subject.name, types) == ANY_STRUCT
+  held = synthesize_name(node.subject.name, types)
   return no_proof unless synthesize_name(node.pattern.name, types) == ["type", node.pattern.name]
-  [[[node.subject.name, ["struct", node.pattern.name]]], []]
+  return [[[node.subject.name, ["struct", node.pattern.name]]], []] if held == ANY_STRUCT
+  return no_proof unless native_reading?(types) && (held in ["maybe", *]) && (type_at(held, 1) in ["struct", *])
+  [[[proved_key(node.subject.name), ["struct", node.pattern.name]]], []]
 end
 
 # The type a field of this name has, read off a value that is one of
@@ -1643,6 +1699,7 @@ def synthesize(node, types)
   # as the first parameter of a method (#525).
   in SelfNode then synthesize_name("self", types)
   in OpenedNode(value:) then opened_natively(synthesize(value, types), types)
+  in NarrowedNode(name:) then ["struct", name]
   # Whether a value matches is a Boolean, which the native build reads
   # (#572). The checker reads no type off a test.
   in MatchTestNode then native_reading?(types) ? ["boolean"] : ["unknown"]
@@ -1870,6 +1927,14 @@ def synthesize_call(node, types)
   if native_reading?(types)
     called = native_method_call(node, receiver, types)
     return native_call_answer(called, types) if called.some?
+    # Asked of one of several structs, a method is each struct's own
+    # (#572), and answers what those make together. One whose answer is
+    # not known is read past, as a def that calls itself is.
+    several = dispatched_calls(node, receiver, types)
+    unless several.empty?
+      known = several.map { native_call_answer(it, types) }.select { it != ["unknown"] }
+      return (joined_types(known) or ["unknown"])
+    end
     # A struct's field is read by its name, at the one type pinning
     # settled for it (#532).
     holder = opened_natively(receiver, types)
@@ -1948,6 +2013,12 @@ end
 
 def synthesize_identifier(node, types)
   found = types.assoc(node.name)
+  # A name that may not be there, proved to be a struct, is that struct
+  # (#572): the proof is bound beside it.
+  if found.some? && (type_at(found, 1) in ["maybe", ["struct", *]])
+    proved = types.assoc(proved_key(node.name))
+    return type_at(proved, 1) if proved.some?
+  end
   return type_at(found, 1) if found.some?
   plain = synthesize_name(node.name, types)
   # A def with no parameters is called by its bare name; under the
@@ -2021,6 +2092,12 @@ def synthesize_logical(node, types)
   inner = type_at(left, 1)
   return inner if exit?(node.right)
   return inner if right == inner
+  # Read as the native build runs it, one struct standing in for one of
+  # several is one of them (#572).
+  if native_reading?(types) && node.operator == "||"
+    widest = joined_plain(inner, right)
+    return widest if widest.some?
+  end
   ["unknown"]
 end
 
@@ -2203,9 +2280,11 @@ end
 # one of several structs holding that again (#572): what a body proved
 # of a name is proved no further than the body.
 def unnarrowed(before, after)
+  # A proof bound beside a name inside the body goes with the body.
+  kept = after.any? { proved_key?(it[0]) } ? after.reject { proved_key?(it[0]) && before.assoc(it[0]).nil? } : after
   wide = before.select { type_at(it, 1) == ANY_STRUCT }
-  return after if wide.empty?
-  after.map { |binding| wide.assoc(binding[0]).nil? ? binding : [binding[0], ANY_STRUCT] }
+  return kept if wide.empty?
+  kept.map { |binding| wide.assoc(binding[0]).nil? ? binding : [binding[0], ANY_STRUCT] }
 end
 
 def when_false(proof) = type_at(proof, 1)

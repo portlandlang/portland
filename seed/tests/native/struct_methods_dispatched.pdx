@@ -1,0 +1,44 @@
+# A method asked of a value that is one of several structs (#572) is the
+# method of whichever struct the value is, found by the struct itself. A
+# struct with no such method refuses as the seed does.
+struct Circle
+  radius
+
+  def area = radius * radius * 3
+
+  def named(prefix) = "#{prefix} circle of #{radius}"
+end
+
+struct Square
+  side
+
+  def area = side * side
+
+  def named(prefix) = "#{prefix} square of #{side}"
+end
+
+struct Pair
+  first
+  second
+
+  def area = first.area + second.area
+
+  def named(prefix) = "#{prefix} pair of #{first.named("a")} and #{second.named("a")}"
+end
+
+struct Dot
+  size
+end
+
+shapes = [Circle.new(radius: 2), Square.new(side: 3), Pair.new(first: Circle.new(radius: 1), second: Square.new(side: 1))]
+shapes.each do |shape|
+  puts shape.area
+  puts shape.named("the")
+end
+nested = Pair.new(first: shapes[2] or Circle.new(radius: 0), second: Square.new(side: 4))
+puts nested.area
+puts nested.named("one")
+mixed = shapes + [Dot.new(size: 1)]
+mixed.each do |shape|
+  puts shape.area
+end
