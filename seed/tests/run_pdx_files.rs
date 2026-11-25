@@ -1423,12 +1423,15 @@ fn pdx_runs_lint_and_report_by_name() {
 
 /// `pdx lint` runs the native linter where one is built (#588): the
 /// binary at `target/portland/lint` in the checkout that holds the
-/// compiler, handed the files, where it is newer than what it was built
-/// from. One older than its source is passed over for the seed, since it
-/// would lint by rules the source no longer writes. A stand-in for each
-/// side says which one ran.
+/// compiler, handed the files, where the source it was built from reads
+/// as it did then. The build writes down which files those were and a
+/// fingerprint of what they held, and a file touched and left as it was
+/// changes nothing: a checkout rewrites files it does not change. One
+/// whose source has changed is passed over for the seed, since it would
+/// lint by rules the source no longer writes. A stand-in for each side
+/// says which one ran.
 #[test]
-fn pdx_lint_runs_the_native_linter_where_one_is_built_and_fresh() {
+fn pdx_lint_runs_the_native_linter_where_its_source_is_as_built() {
     use std::os::unix::fs::PermissionsExt;
     let checkout = std::env::temp_dir().join("native_lint_checkout");
     let compiler = checkout.join("compiler");
@@ -1436,60 +1439,51 @@ fn pdx_lint_runs_the_native_linter_where_one_is_built_and_fresh() {
     std::fs::create_dir_all(&compiler).unwrap();
     std::fs::create_dir_all(&built).unwrap();
     let script = compiler.join("lint.pdx");
-    std::fs::write(
-        &script,
-        "puts \"the seed read #{System.arguments.first}\"\n",
-    )
-    .unwrap();
+    let source = "puts \"the seed read #{System.arguments.first}\"\n";
+    std::fs::write(&script, source).unwrap();
     let binary = built.join("lint");
     std::fs::write(&binary, "#!/bin/sh\necho \"the binary read $1\"\nexit 3\n").unwrap();
     std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).unwrap();
-    let stamp = |path: &std::path::Path, seconds: u64| {
-        let time = std::time::UNIX_EPOCH + std::time::Duration::from_secs(seconds);
-        std::fs::File::options()
-            .write(true)
-            .open(path)
-            .unwrap()
-            .set_modified(time)
-            .unwrap();
-    };
-    let run = || {
-        Command::new(env!("CARGO_BIN_EXE_pdx"))
+    let sources = built.join("lint.sources");
+    std::fs::write(&sources, format!("{}\n", script.display())).unwrap();
+    let fingerprint = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg("--fingerprint")
+        .arg(&sources)
+        .output()
+        .expect("failed to run pdx");
+    assert!(fingerprint.status.success(), "the sources should be read");
+    std::fs::write(built.join("lint.fingerprint"), &fingerprint.stdout).unwrap();
+    let ran = || {
+        let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
             .args(["lint", "sample.pdx"])
             .env("PORTLAND_COMPILER", &compiler)
             .output()
-            .expect("failed to run pdx")
+            .expect("failed to run pdx");
+        (
+            String::from_utf8(output.stdout).unwrap(),
+            output.status.code(),
+        )
     };
+    let by_binary = ("the binary read sample.pdx\n".to_string(), Some(3));
+    let by_seed = ("the seed read sample.pdx\n".to_string(), Some(0));
 
-    stamp(&script, 1_000_000);
-    stamp(&binary, 2_000_000);
-    let fresh = run();
-    assert_eq!(
-        String::from_utf8(fresh.stdout).unwrap(),
-        "the binary read sample.pdx\n",
-        "a binary newer than its source should run"
-    );
-    assert_eq!(
-        fresh.status.code(),
-        Some(3),
-        "and leave with its own status"
-    );
+    assert_eq!(ran(), by_binary, "source as it was built from");
 
-    stamp(&script, 3_000_000);
-    let stale = run();
-    assert_eq!(
-        String::from_utf8(stale.stdout).unwrap(),
-        "the seed read sample.pdx\n",
-        "a binary older than its source should be passed over"
-    );
+    // Written again with what it already held, as a checkout does.
+    std::fs::write(&script, source).unwrap();
+    assert_eq!(ran(), by_binary, "source touched and left as it was");
+
+    std::fs::write(&script, format!("{source}# a rule changed\n")).unwrap();
+    assert_eq!(ran(), by_seed, "source changed since the build");
+
+    std::fs::write(&script, source).unwrap();
+    assert_eq!(ran(), by_binary, "source put back");
+
+    std::fs::remove_file(built.join("lint.fingerprint")).unwrap();
+    assert_eq!(ran(), by_seed, "a binary with no fingerprint");
 
     std::fs::remove_file(&binary).unwrap();
-    let absent = run();
-    assert_eq!(
-        String::from_utf8(absent.stdout).unwrap(),
-        "the seed read sample.pdx\n",
-        "with no binary the seed runs the linter"
-    );
+    assert_eq!(ran(), by_seed, "no binary at all");
 }
 
 /// The linter refuses a file that does not parse, wherever in it the

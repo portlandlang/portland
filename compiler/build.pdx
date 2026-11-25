@@ -6,6 +6,9 @@
 # The compiler cannot run a process (#179), so `script/build` runs this and
 # then `clang`.
 #
+# Beside the IR it writes `some_file.sources`: the files the program was
+# gathered from, which `script/build` fingerprints (#588).
+#
 # Usage: pdx compiler/build.pdx some_file.pdx some_file.ll [verbose]
 
 require_relative "checker"
@@ -22,9 +25,16 @@ progress = System.arguments[2] == "verbose" ? System.monotonic_time : nil
 build_note(progress, "checking: the program and everything it requires") if progress.some?
 check_program_closure(path, [], default_load_path(path, []), core: core_nodes)
 build_note(progress, "gathering: the program's files into one") if progress.some?
-nodes = program_nodes(path)
+gathered = gathered_program(path)
+nodes = gathered.nodes
 build_note(progress, "gathered: #{nodes.length} top-level statements") if progress.some?
 lowered = lower_program(nodes, core: core_nodes + native_core_nodes, progress: progress)
 build_note(progress, "writing: #{lowered.functions.length} functions as LLVM text") if progress.some?
 System.write_file(destination, llvm_text(lowered))
 build_note(progress, "written: #{destination}") if progress.some?
+# Beside it, the files the program was gathered from, one to a line
+# (#588): what the binary was built from, for whoever asks later whether
+# it still stands.
+if destination.end_with?(".ll")
+  System.write_file(destination.slice(0, destination.length - 3) + ".sources", gathered.files.join("\n") + "\n")
+end

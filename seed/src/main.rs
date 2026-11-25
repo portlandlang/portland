@@ -55,10 +55,25 @@ fn run() {
                 _ => parse_files(&paths),
             }
         }
+        // `pdx --fingerprint list` (#588): what `script/build` records
+        // beside a binary, of the source it was built from.
+        Some("--fingerprint") => {
+            let Some(list) = arguments.next() else {
+                eprintln!("pdx --fingerprint: needs a list of files");
+                process::exit(64);
+            };
+            match fingerprint_of(std::path::Path::new(&list)) {
+                Some(fingerprint) => println!("{fingerprint}"),
+                None => {
+                    eprintln!("pdx --fingerprint: cannot read {list}, or a file it names");
+                    process::exit(66);
+                }
+            }
+        }
         // `pdx lint file.pdx` and `pdx report file.pdx` (#550): the tools
         // written in Portland beside the compiler, run by name. Where one
-        // has been built natively and is newer than its source, that is
-        // what runs (#588), and otherwise the seed runs the script.
+        // has been built natively from source that reads as it did then,
+        // that is what runs (#588), and otherwise the seed runs the script.
         Some(tool @ ("lint" | "report")) => {
             let files: Vec<String> = arguments.collect();
             if files.is_empty() {
@@ -104,29 +119,46 @@ fn tool_path(tool: &str) -> String {
 
 /// The tool built natively (#588), where it is there to run and can be
 /// trusted: `target/portland/<tool>` in the checkout that holds the
-/// tool's script, newer than everything it was built from. That is the
-/// compiler and the core, which are its source, and the runtime with the
-/// crates it shares with the seed, which it is linked with. A binary
-/// older than any of them would do what the source no longer says, and
-/// is passed over for the seed.
+/// tool's script, with the source it was built from reading as it did
+/// then. The build writes beside the binary which files those were
+/// (`<tool>.sources`) and a fingerprint of what they held
+/// (`<tool>.fingerprint`). A binary whose source has changed would do
+/// what the source no longer says, and is passed over for the seed, as is
+/// one the build left no fingerprint for.
+///
+/// What the files hold is compared, and not when they were written: a
+/// checkout rewrites a file it does not change.
 fn fresh_native_tool(tool: &str, script: &str) -> Option<std::path::PathBuf> {
     let checkout = std::path::Path::new(script).parent()?.parent()?;
-    let binary = checkout.join("target/portland").join(tool);
-    let built = std::fs::metadata(&binary).ok()?.modified().ok()?;
-    let sources = [
-        "compiler",
-        "core",
-        "runtime/src",
-        "ruby_rules/src",
-        "source_form/src",
-    ];
-    let newest = sources
-        .iter()
-        .filter_map(|directory| std::fs::read_dir(checkout.join(directory)).ok())
-        .flatten()
-        .filter_map(|entry| entry.ok()?.metadata().ok()?.modified().ok())
-        .max()?;
-    (built > newest).then_some(binary)
+    let built = checkout.join("target/portland");
+    let binary = built.join(tool);
+    if !binary.is_file() {
+        return None;
+    }
+    let recorded = std::fs::read_to_string(built.join(format!("{tool}.fingerprint"))).ok()?;
+    let held = fingerprint_of(&built.join(format!("{tool}.sources")))?;
+    (recorded.trim() == held).then_some(binary)
+}
+
+/// A fingerprint of the files a list names, one path to a line: each
+/// file's length and bytes, in the order listed, folded by FNV-1a. None
+/// where the list or any file it names cannot be read. It tells a
+/// changed source from an unchanged one, and is no defense against
+/// anyone.
+fn fingerprint_of(list: &std::path::Path) -> Option<String> {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut fold = |bytes: &[u8]| {
+        for byte in bytes {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    };
+    for path in std::fs::read_to_string(list).ok()?.lines() {
+        let held = std::fs::read(path).ok()?;
+        fold(&(held.len() as u64).to_le_bytes());
+        fold(&held);
+    }
+    Some(format!("{hash:016x}"))
 }
 
 /// Become the native tool: it takes this process's place, so what it
