@@ -240,6 +240,9 @@ def build_note(started, message)
   System.write_standard_error("[#{seconds_between(started, System.monotonic_time).rjust(8)}] #{message}\n")
 end
 
+# The name of the combination a gathered call asks for.
+def call_key(call) = combination_key(call[0], type_at(call, 1), type_at(call, 2), type_at(call, 3) == true)
+
 # A def as one way of calling it has it (#536): `placed` handed by place
 # and `named` by name. Its parameters are the ones handed over, by place
 # and then by name in the order written, and each parameter left out is
@@ -811,6 +814,26 @@ def pinned_block(definition, parameters, handed, leaves, answers, names, strict)
   PinnedBlock.new(parameters: types, answer: answer, reason: reason, leaves: leaves)
 end
 
+# The combinations a program can reach (#572): the ones its top level
+# calls, read with each local at the one type it holds, and the ones
+# those call in turn. The rest were named only by a first reading of
+# some body, and are left unbuilt.
+def reached_combinations(pinned, statements, answers, names)
+  mutable waiting = settled_calls(statements, [], answers, names).map { call_key(it) }.uniq
+  mutable reached = []
+  while !waiting.empty?
+    key = waiting.first or ""
+    waiting = waiting.slice(1, waiting.length - 1)
+    next if reached.include?(key)
+    found = pinned.find { it.key == key }
+    next if found.nil?
+    reached << key
+    inside = settled_calls(found.definition.body, found.parameters, yielding_answers(answers, found.block), names)
+    waiting += inside.map { call_key(it) }.reject { reached.include?(it) }
+  end
+  pinned.select { reached.include?(it.key) }
+end
+
 # Whether a combination's body would be read as it was (#537): the same
 # parameters and the same block, which are all of a combination that a
 # walk of its body binds. Its def is the same by its key.
@@ -987,6 +1010,12 @@ def settled_bindings(parameters, bindings)
     start = [binding] + start if concrete?(type_at(binding, 1))
   end
   start
+end
+
+# The calls a body makes, read with each local at the one type it holds.
+def settled_calls(body, parameters, answers, names)
+  starting = settled_start(body, parameters, answers, names)
+  pin_statements(body, PinWalk.new(bindings: starting, calls: []), answers, names).calls.select { names.include?(it[0]) }
 end
 
 # Each struct's fields as bindings (#532): a field is bound to the type

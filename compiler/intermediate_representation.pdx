@@ -772,15 +772,20 @@ def lower_program(written, core: nil, progress: nil)
   # A field has one type (#532), as an array's elements have.
   conflict = pinned.conflicts.first
   panic("the native build gives each field of a struct one type — #{conflict} (#532)") if conflict.some?
-  mutable called = []
-  pinned.defs.each do |found|
-    if found.pinned?
-      called << found
-    elsif found.key.some?
-      panic("the native build needs one type for every value — def #{found.name} on line #{found.definition.line} has none: #{found.reason}")
-    end
+  # Only what the program can reach is built (#572). Pinning keeps a
+  # combination that only its first reading of a body names, so that the
+  # types settle; nothing calls it, and it may have no type or not build.
+  named = pinned.defs.select { it.key.some? }
+  reached = reached_combinations(named, statements, pinned.shapes + pinned_answers(named.select { it.pinned? }), definitions.map { it.name })
+  untyped = reached.find { !it.pinned? }
+  if untyped.some?
+    panic("the native build needs one type for every value — def #{untyped.name} on line #{untyped.definition.line} has none: #{untyped.reason}")
   end
-  context = LoweringContext.new(answers: pinned.shapes + pinned_answers(called), arities: unique_types(called.map { [it.name, it.parameters.length] }), procedure: false, looping: false, combinations: called, structs: pinned.structs, yielding: nil, inside_block: false, answer: nil, home: nil, root: nil, pinned: pinned.bindings)
+  called = reached
+  # Types are still read with every combination pinning settled: what a
+  # local holds was worked out with them all.
+  typed = named.select { it.pinned? }
+  context = LoweringContext.new(answers: pinned.shapes + pinned_answers(typed), arities: unique_types(typed.map { [it.name, it.parameters.length] }), procedure: false, looping: false, combinations: called, structs: pinned.structs, yielding: nil, inside_block: false, answer: nil, home: nil, root: nil, pinned: pinned.bindings)
   build_note(progress, "lowering: #{called.length} combinations of #{unique_types(called.map { it.name }).length} defs") if progress.some?
   mutable functions = []
   called.each do |found|

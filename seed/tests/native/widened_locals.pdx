@@ -62,3 +62,20 @@ end
 
 p(chained(["a"]))
 p(chained(["a", "b", "c"]))
+
+# A def called with a local before the binding that fills it is built
+# only for what the local holds: nothing reaches it with nil.
+def length_of(word)
+  word.length
+end
+
+def longest(words)
+  mutable best = nil
+  words.each do |word|
+    best = word if best.nil? || length_of(word) > length_of(best)
+  end
+  best
+end
+
+p(longest(["to", "three", "four"]))
+p(longest([]))
