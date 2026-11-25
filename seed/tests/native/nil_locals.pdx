@@ -39,6 +39,18 @@ end
 puts placed("first")
 puts placed("ninth", line: 9)
 
+# What stands after `or` is handed on as what it is.
+def doubled(number)
+  number * 2
+end
+
+def twice_placed(text, line: nil)
+  "#{text} #{doubled(line or 1)}"
+end
+
+puts twice_placed("once")
+puts twice_placed("nine", line: 9)
+
 # Nil itself in its source form, and written out, which refuses as the
 # seed does.
 nothing = nil

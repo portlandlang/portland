@@ -1972,6 +1972,12 @@ def synthesize_logical(node, types)
   right_types = if node.operator == "&&" then when_true(proof) + types else when_false(proof) + types end
   right = synthesize(node.right, right_types)
   return left if left == right
+  # Read as the native build runs it, nil gives way to the right of an
+  # `or`, and a value that is always there is itself (#572).
+  if native_reading?(types) && node.operator == "||"
+    return right if left == ["nil"]
+    return left if left != ["boolean"] && left != ["unknown"] && !(left in ["maybe", *])
+  end
   return ["unknown"] unless left in ["maybe", *]
   # `maybe or default` answers the plain type when the default is one of
   # it, and `maybe or return` the plain type outright — below the guard
