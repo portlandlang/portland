@@ -1,7 +1,10 @@
 #!/bin/sh
 # Lint the implementation's Portland source (#510): compiler/ and core/, by
-# the rules in compiler/linting.pdx. The linter is written in Portland and
-# runs on the seed.
+# the rules in compiler/linting.pdx. The linter is written in Portland. It
+# is run as `pdx lint` runs it (#588): by the linter built natively,
+# `target/portland/lint`, where that is built and its source reads as it
+# did then, and on the seed otherwise. `script/build compiler/lint.pdx`
+# builds it.
 #
 #   script/lint                 the implementation's files
 #   script/lint FILE.pdx ...    the files named
@@ -20,8 +23,12 @@ if [ -z "$PDX" ]; then
   PDX=target/debug/pdx
 fi
 
+# The linter beside this script, whichever seed runs it.
+PORTLAND_COMPILER=$(pwd)/compiler
+export PORTLAND_COMPILER
+
 if [ $# -eq 0 ]; then
-  exec "$PDX" compiler/lint.pdx compiler/*.pdx core/*.pdx
+  exec "$PDX" lint compiler/*.pdx core/*.pdx
 fi
 
 # The files named are relative to where the script was called from.
@@ -32,4 +39,4 @@ for path in "$@"; do
   esac
   shift
 done
-exec "$PDX" compiler/lint.pdx "$@"
+exec "$PDX" lint "$@"
