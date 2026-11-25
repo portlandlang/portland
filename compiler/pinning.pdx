@@ -87,6 +87,14 @@ struct GatheredRound
   again
 end
 
+# The calls a round gathered, sorted by the name each calls (#537): the
+# names in the order first met, and beside each, its calls in the order
+# first met, each way of calling it once.
+struct NamedCalls
+  names
+  calls
+end
+
 struct PinWalk
   bindings
   calls
@@ -280,6 +288,31 @@ def called_definition(definition, placed, named)
   parameters = ordered.map { IdentifierNode.new(kind: "identifier", name: it.name, line: definition.line) }
   prelude = defaulted.map { AssignmentNode.new(kind: "assignment", name: it[0].name, value: type_at(it, 1), rebindable: true, line: definition.line) }
   definition.with(parameters: parameters, body: prelude + definition.body)
+end
+
+# Gathered calls sorted by the name each calls (#537), each way of
+# calling a name kept once. A lookup by name is then one search of the
+# names, where it was a walk of every call.
+def calls_by_name(calls)
+  mutable names = []
+  mutable sorted = []
+  calls.each do |call|
+    place = names.index(call[0])
+    if place.nil?
+      names << call[0]
+      sorted << [call]
+    else
+      held = sorted[place] or []
+      sorted[place] = held + [call] unless held.include?(call)
+    end
+  end
+  NamedCalls.new(names: names, calls: sorted)
+end
+
+# The calls of one name among calls sorted by name.
+def calls_of(sorted, name)
+  place = sorted.names.index(name)
+  place.nil? ? [] : (sorted.calls[place] or [])
 end
 
 # The names whose entries differ between one round's answers and the
@@ -563,8 +596,11 @@ end
 # afresh.
 def pin_combinations(definitions, calls, answers, names, strict, changed, mentions, before)
   mutable pinned = []
+  # The calls are sorted by the name called once, and not searched whole
+  # for each def (#537): that search was most of a round.
+  sorted = calls_by_name(calls)
   definitions.each do |definition|
-    sites = calls.select { it[0] == definition.name }
+    sites = calls_of(sorted, definition.name)
     steady = changed.some? && unaffected?(definition.name, changed, mentions)
     met = unique_types(sites.map { [type_at(it, 1), type_at(it, 2), type_at(it, 3) == true] })
     met.each do |combination|
