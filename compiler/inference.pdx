@@ -1492,7 +1492,10 @@ def settled_arm(node, types)
   test = node.condition
   return nil unless (test in MatchTestNode) && (test.subject in IdentifierNode) && (test.pattern in StructPatternNode) && test.pattern.fields.empty?
   held = synthesize_name(test.subject.name, types)
-  return nil unless synthesize_name(test.pattern.name, types) == ["type", test.pattern.name]
+  # Only of a struct the program declares: a builtin type's name is bound
+  # nowhere, and its tests are the build's to settle elsewhere.
+  declared = types.assoc(test.pattern.name)
+  return nil unless declared.some? && type_at(declared, 1) == ["type", test.pattern.name]
   # A struct the program never makes is one no value is.
   return (node.else_body or []) if types.assoc(made_key(test.pattern.name)).nil?
   return nil unless (held in ["struct", *]) && held != ANY_STRUCT
