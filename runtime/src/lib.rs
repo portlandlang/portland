@@ -880,6 +880,23 @@ pub unsafe extern "C" fn portland_struct_slot(
             }
             slot = slot.add(words_of(kind));
         }
+        portland_struct_refuse_method(record, name)
+    }
+}
+
+/// A struct asked for a method, or a field, it has none of (#572): the
+/// seed's sentence, and the program stops.
+///
+/// # Safety
+/// `record` points at a live struct whose fields are what its shape says,
+/// and `name` at a String.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_struct_refuse_method(
+    record: *mut StructBlock,
+    name: *const StringBlock,
+) -> ! {
+    unsafe {
+        let shape = (*record).shape;
         let struct_name = std::str::from_utf8_unchecked(bytes_of((*shape).name));
         let article = if struct_name.starts_with(['A', 'E', 'I', 'O', 'U']) {
             "an"
@@ -889,7 +906,7 @@ pub unsafe extern "C" fn portland_struct_slot(
         refuse_program(&format!(
             "{} is {article} {struct_name}, which has no method '{}'",
             struct_source(record),
-            std::str::from_utf8_unchecked(wanted)
+            std::str::from_utf8_unchecked(bytes_of(name))
         ))
     }
 }

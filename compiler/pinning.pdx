@@ -564,6 +564,33 @@ def merge_answers(candidates)
   (joined_types(candidates) or merge_candidates(candidates))
 end
 
+# For each method name, the program's structs that write a method of
+# that name (#572), as bindings: what a method asked of one of several
+# structs is looked up in. `shapes` is every method's shape of call,
+# keyed by its struct and its name.
+def method_owners(shapes, structs)
+  mutable names = []
+  mutable owners = []
+  shapes.each do |shape|
+    parts = shape[0].slice(0, shape[0].length - 1).split("#")
+    owner = parts.first or ""
+    name = parts.last or ""
+    next unless parts.length == 2 && structs.include?(owner)
+    place = names.index(name)
+    if place.nil?
+      names << name
+      owners << [owner]
+    else
+      owners[place] = (owners[place] or []) + [owner]
+    end
+  end
+  mutable bound = []
+  names.each_with_index do |name, place|
+    bound << [any_method_key(name), (owners[place] or [])]
+  end
+  bound
+end
+
 # Each name once, at the type it holds: where a guard's proof is bound
 # ahead of a name's own binding, the binding beneath it.
 def own_bindings(bindings)
@@ -709,6 +736,16 @@ def pin_expression(node, walk, answers, names)
     scope = walk.bindings + answers
     called = native_method_call(node, synthesize(node.receiver, scope), scope)
     return pin_expression(called, walk, answers, names) if called.some?
+    # Asked of one of several structs, it is a call of each struct's own
+    # method (#572), and each is gathered.
+    several = dispatched_calls(node, synthesize(node.receiver, scope), scope)
+    unless several.empty?
+      mutable gathering = walk
+      several.each do |one|
+        gathering = pin_expression(one, gathering, answers, names)
+      end
+      return gathering
+    end
   end
   return pin_walk(node, walk, answers, names) if (node in MethodCallNode) && node.block.some?
   mutable current = walk
@@ -763,7 +800,7 @@ def pin_program(written, core: nil, progress: nil)
   names = definitions.map { it.name }
   # What every scope reads beside the answers: the shapes of call the
   # methods answer, and each struct's name as the type it is.
-  fixed = methods.shapes + structs.map { [it.name, ["type", it.name]] }
+  fixed = methods.shapes + method_owners(methods.shapes, structs.map { it.name }) + structs.map { [it.name, ["type", it.name]] }
   # Two passes. The first pins from the arguments whose types are known,
   # since `double(double(3))` cannot say its outer argument until `double`
   # itself is pinned, and takes a def that calls itself at the answer its

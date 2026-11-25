@@ -134,6 +134,17 @@ YIELD = "yield"
 # a block written in that def which yields can then leave too.
 YIELD_LEAVES = "yield leaves"
 
+# A value that is one of several structs, taken as the one named (#572):
+# no source spells it. It stands where the receiver did, as the first
+# argument of that struct's method, in the arm of a call that runs only
+# where the value is that struct.
+struct NarrowedNode
+  kind
+  value
+  name
+  line
+end
+
 # A maybe opened for a method the native build compiles as a def (#525):
 # no source spells it. It stands where the receiver did, as the def's
 # first argument, and says which method nil is to be refused for.
@@ -198,6 +209,10 @@ def annotation_for(source, name)
   tail = found.slice(marker + 5, found.length - marker - 5)
   tail.strip
 end
+
+# The name the structs that write a method of one name are bound under
+# (#572), which no def, field, or local is spelled as.
+def any_method_key(name) = "//#{name}"
 
 # What an arm of a `case/in` binds, as pairs to put before the types: a
 # bare capture takes the subject's type — the plain type once an unguarded
@@ -703,6 +718,7 @@ def children_of(node)
   in KeywordArgumentNode(value:) then [value]
   in YieldNode(values:) then values
   in OpenedNode(value:) then [value]
+  in NarrowedNode(value:) then [value]
   in CaseEqualNode(pattern:, subject:) then [pattern, subject]
   in EnumCaseNode(payload:) then payload.map { it.value }
   else
@@ -799,6 +815,26 @@ def demands_in(nodes, name)
     found = add_demands(node, name, found)
   end
   found
+end
+
+# A method asked of a value that is one of several structs, as a call of
+# each struct's own method (#572), the value taken as that struct: one
+# call for each struct that writes a method of that name which answers
+# this shape of call. None where the value is not one of several
+# structs, or no struct writes such a method.
+def dispatched_calls(node, receiver, types)
+  return [] unless opened_natively(receiver, types) == ANY_STRUCT
+  listed = types.assoc(any_method_key(node.name))
+  return [] if listed.nil?
+  handed = (receiver in ["maybe", *]) ? OpenedNode.new(kind: "opened", value: node.receiver, name: node.name, line: node.line) : node.receiver
+  answering = type_at(listed, 1).select do |owner|
+    shape = types.assoc(method_shape_key(owner, node.name))
+    shape.some? && shape_answers?(type_at(shape, 1), node)
+  end
+  answering.map do |owner|
+    narrowed = NarrowedNode.new(kind: "narrowed", value: handed, name: owner, line: node.line)
+    CallNode.new(kind: "call", name: method_def_name(owner, node.name), arguments: [narrowed] + node.arguments, block: node.block, line: node.line)
+  end
 end
 
 def element_type(receiver)
@@ -1643,6 +1679,7 @@ def synthesize(node, types)
   # as the first parameter of a method (#525).
   in SelfNode then synthesize_name("self", types)
   in OpenedNode(value:) then opened_natively(synthesize(value, types), types)
+  in NarrowedNode(name:) then ["struct", name]
   # Whether a value matches is a Boolean, which the native build reads
   # (#572). The checker reads no type off a test.
   in MatchTestNode then native_reading?(types) ? ["boolean"] : ["unknown"]
@@ -1870,6 +1907,14 @@ def synthesize_call(node, types)
   if native_reading?(types)
     called = native_method_call(node, receiver, types)
     return native_call_answer(called, types) if called.some?
+    # Asked of one of several structs, a method is each struct's own
+    # (#572), and answers what those make together. One whose answer is
+    # not known is read past, as a def that calls itself is.
+    several = dispatched_calls(node, receiver, types)
+    unless several.empty?
+      known = several.map { native_call_answer(it, types) }.select { it != ["unknown"] }
+      return (joined_types(known) or ["unknown"])
+    end
     # A struct's field is read by its name, at the one type pinning
     # settled for it (#532).
     holder = opened_natively(receiver, types)
@@ -2021,6 +2066,12 @@ def synthesize_logical(node, types)
   inner = type_at(left, 1)
   return inner if exit?(node.right)
   return inner if right == inner
+  # Read as the native build runs it, one struct standing in for one of
+  # several is one of them (#572).
+  if native_reading?(types) && node.operator == "||"
+    widest = joined_plain(inner, right)
+    return widest if widest.some?
+  end
   ["unknown"]
 end
 

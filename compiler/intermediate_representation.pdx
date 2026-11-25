@@ -243,6 +243,16 @@ struct IntermediateMethod
   name
 end
 
+# A method asked of one of several structs that the struct the value
+# turned out to be has none of (#572): the program stops, in the seed's
+# words, so it answers nothing, and is given the type of the arms it
+# stands after.
+struct IntermediateMissing
+  type
+  record
+  name
+end
+
 # `-value`, refusing on the one Integer that has no negation.
 struct IntermediateNegation
   type
@@ -729,6 +739,29 @@ def lower_condition(node, bindings, context)
   value
 end
 
+# A method asked of a value that is one of several structs (#572): each
+# struct's own method, tried in turn by asking the value which struct it
+# is, and past the last, the seed's refusal for a struct with no such
+# method. The value is read once for each question and once for the
+# call, so it is one that reads the same each time.
+def lower_dispatch(node, several, bindings, context)
+  refuse_native("a method, .#{node.name}, asked of one of several structs that is more than a name or a field", node) unless steady_subject?(node.receiver)
+  calls = several.map { lower_call(it, it.name, it.arguments, bindings, context, nil) }
+  type = joined_types(calls.map { it.type }) or refuse_native("a method, .#{node.name}, that answers differently from one struct to another", node)
+  refuse_native("a method, .#{node.name}, asked of one of several structs, that answers nothing", node) if type == NOTHING
+  asked = type_at(several, 0).arguments.first.value
+  mutable chain = IntermediateMissing.new(type: type, record: lower_value(asked, bindings, context), name: node.name)
+  mutable place = several.length - 1
+  while place >= 0
+    owner = type_at(several, place).arguments.first.name
+    call = type_at(calls, place)
+    test = IntermediateShaped.new(type: ["boolean"], value: lower_value(asked, bindings, context), name: owner)
+    chain = IntermediateChoice.new(type: type, condition: test, then_value: (fitted(call, type) or call), else_value: chain)
+    place -= 1
+  end
+  chain
+end
+
 # A def: its statements, the last one read for its value, since a def
 # answers its last expression.
 def lower_function(definition, found, context)
@@ -986,6 +1019,16 @@ def lower_value(node, bindings, context)
   # `value&.name` is built as the `if` it means (#572).
   guarded = safe_as_if(node)
   return lower_value(guarded, bindings, context) if guarded.some?
+  # A method asked of one of several structs is the method of whichever
+  # the value is (#572).
+  if node in MethodCallNode
+    reading = bindings + yielding_answers(context.answers, context.yielding)
+    several = dispatched_calls(node, synthesize(node.receiver, reading), reading)
+    return lower_dispatch(node, several, bindings, context) unless several.empty?
+  end
+  # A value taken as the struct it was asked to be: held the same way,
+  # and read as that struct.
+  return lower_value(node.value, bindings, context).with(type: ["struct", node.name]) if node in NarrowedNode
   # `%w[a b]` is the array of its words (#562).
   if node in WordArrayNode
     words = word_array_elements(node.text).map { string_node(it, line: node.line) }
@@ -1174,6 +1217,8 @@ def lower_value(node, bindings, context)
       # An empty array standing in for an array is that array.
       fallback = written.type == EMPTY_ARRAY && (type_at(first.type, 1) in ["array", *]) ? written.with(type: type_at(first.type, 1)) : written
       fits = fallback.type == first.type || fallback.type == type_at(first.type, 1)
+      # One struct standing in for one of several is one of them (#572).
+      return IntermediateDefault.new(type: type_at(first.type, 1), value: first, fallback: fallback) if !fits && held_as?(fallback.type, type_at(first.type, 1))
       refuse_native("'||' between #{with_article(first.type)} and #{with_article(fallback.type)}", node) unless fits
       return IntermediateDefault.new(type: fallback.type, value: first, fallback: fallback)
     end
@@ -1488,6 +1533,7 @@ def render_value(value)
   in IntermediateRecord(type:, fields:) then "(new #{type_at(type, 1)}#{fields.map { " #{render_value(it)}" }.join("")})"
   in IntermediateField(record:, index:) then "(field #{render_value(record)} #{index})"
   in IntermediateSought(record:, name:) then "(field #{render_value(record)} #{name})"
+  in IntermediateMissing(record:, name:) then "(missing #{render_value(record)} #{name})"
   in IntermediateShaped(value: asked, name:) then "(in #{render_value(asked)} #{name})"
   in IntermediateIndex(array:, index:) then "([] #{render_value(array)} #{render_value(index)})"
   in IntermediateOpen(value: held, name:) then "(open #{render_value(held)} #{name})"
