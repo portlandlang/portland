@@ -382,6 +382,12 @@ def definition_mentions(definitions)
   definitions.map { [it.name, (mentioned_names(it.body) + %w[inspect to_s]).uniq] }
 end
 
+# A body that may not be there, each statement read by `on_self`.
+def each_on_self(body, own)
+  return nil if body.nil?
+  body.map { on_self(it, own) }
+end
+
 # For each field of a struct made with types that do not join, a sentence
 # saying so (#532). The native build gives a field one type, as it gives
 # an array's elements one; a value in one place and nil or a maybe of it
@@ -589,6 +595,56 @@ def method_owners(shapes, structs)
     bound << [any_method_key(name), (owners[place] or [])]
   end
   bound
+end
+
+# A statement of a struct's method with each of the struct's own methods
+# that it calls by a bare name asked of `self` (#572): `headed(items)`
+# written in a method is `self.headed(items)`, as the interpreters read
+# it. As a def handed `self`, the method has no other way to say whose
+# method it means. `own` is the names of the struct's methods; a name
+# cannot be both a method and a local, so a bare one is the method.
+def on_self(node, own)
+  return nil if node.nil?
+  case node
+  in CallNode(name:, arguments:, block:)
+    handed = arguments.map { on_self(it, own) }
+    given = on_self(block, own)
+    return node.with(arguments: handed, block: given) unless own.include?(name)
+    MethodCallNode.new(kind: "method_call", receiver: SelfNode.new(kind: "self", line: node.line), name: name, arguments: handed, block: given, line: node.line)
+  in IdentifierNode(name:)
+    return node unless own.include?(name)
+    MethodCallNode.new(kind: "method_call", receiver: SelfNode.new(kind: "self", line: node.line), name: name, arguments: [], block: nil, line: node.line)
+  in BlockNode(body:) then node.with(body: body.map { on_self(it, own) })
+  in AssignmentNode(value:) then node.with(value: on_self(value, own))
+  in AppendNode(value:) then node.with(value: on_self(value, own))
+  in WhileNode(condition:, body:) then node.with(condition: on_self(condition, own), body: body.map { on_self(it, own) })
+  in IfNode(condition:, then_body:, else_body:)
+    node.with(condition: on_self(condition, own), then_body: each_on_self(then_body, own), else_body: each_on_self(else_body, own))
+  in CaseNode(subject:, branches:, else_body:)
+    arms = branches.map { |branch| branch.with(values: branch.values.map { on_self(it, own) }, body: branch.body.map { on_self(it, own) }) }
+    node.with(subject: on_self(subject, own), branches: arms, else_body: each_on_self(else_body, own))
+  in CaseInNode(subject:, branches:, else_body:)
+    arms = branches.map { |branch| branch.with(guard: on_self(branch.guard, own), body: branch.body.map { on_self(it, own) }) }
+    node.with(subject: on_self(subject, own), branches: arms, else_body: each_on_self(else_body, own))
+  in ReturnNode(value:) then node.with(value: on_self(value, own))
+  in MethodCallNode(receiver:, arguments:, block:)
+    node.with(receiver: on_self(receiver, own), arguments: arguments.map { on_self(it, own) }, block: on_self(block, own))
+  in SafeMethodCallNode(receiver:, arguments:, block:)
+    node.with(receiver: on_self(receiver, own), arguments: arguments.map { on_self(it, own) }, block: on_self(block, own))
+  in ArrayNode(elements:) then node.with(elements: elements.map { on_self(it, own) })
+  in HashNode(pairs:) then node.with(pairs: pairs.map { |pair| pair.with(key: on_self(pair.key, own), value: on_self(pair.value, own)) })
+  in BinaryNode(left:, right:) then node.with(left: on_self(left, own), right: on_self(right, own))
+  in LogicalNode(left:, right:) then node.with(left: on_self(left, own), right: on_self(right, own))
+  in UnaryNode(operand:) then node.with(operand: on_self(operand, own))
+  in IndexNode(receiver:, index:) then node.with(receiver: on_self(receiver, own), index: on_self(index, own))
+  in RangeNode(start:, finish:) then node.with(start: on_self(start, own), finish: on_self(finish, own))
+  in MatchAssertNode(subject:) then node.with(subject: on_self(subject, own))
+  in MatchTestNode(subject: tested) then node.with(subject: on_self(tested, own))
+  in KeywordArgumentNode(value:) then node.with(value: on_self(value, own))
+  in YieldNode(values:) then node.with(values: values.map { on_self(it, own) })
+  else
+    node
+  end
 end
 
 # Each name once, at the type it holds: where a guard's proof is bound
@@ -1253,7 +1309,11 @@ def type_methods(nodes, core)
     end
     methods.each do |method|
       receiver = IdentifierNode.new(kind: "identifier", name: "self", line: method.line)
-      definitions << method.with(name: method_def_name(node.name, method.name), parameters: [receiver] + method.parameters, body: field_prelude(node.fields, method) + method.body)
+      # A method of the struct called by its bare name, inside another, is
+      # asked of `self` (#572).
+      own = methods.map { it.name }
+      body = method.body.map { on_self(it, own) }
+      definitions << method.with(name: method_def_name(node.name, method.name), parameters: [receiver] + method.parameters, body: field_prelude(node.fields, method) + body)
       shapes << [method_shape_key(node.name, method.name), parameters_shape(method.parameters, yields?(method.body))]
     end
   end

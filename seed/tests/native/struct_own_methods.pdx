@@ -1,0 +1,38 @@
+# A struct's method called by its bare name inside another of its
+# methods (#572) is asked of the struct itself, with arguments and
+# without, and so is one a trait gives it.
+trait Shown
+  def bracketed(text) = "[#{text}]"
+
+  def shown = bracketed(label)
+end
+
+struct Circle
+  radius
+
+  include Shown
+
+  def doubled = radius * 2
+
+  def label
+    wide = doubled > 5
+    wide ? "wide circle" : "circle #{scaled(3)}"
+  end
+
+  def scaled(factor) = doubled * factor
+end
+
+struct Square
+  side
+
+  include Shown
+
+  def label = "square #{side}"
+end
+
+puts Circle.new(radius: 1).shown
+puts Circle.new(radius: 4).shown
+puts Square.new(side: 2).shown
+[Circle.new(radius: 2), Square.new(side: 5)].each do |shape|
+  puts shape.shown
+end
