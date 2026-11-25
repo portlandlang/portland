@@ -59,10 +59,10 @@ Prose goes stale when it says something the code later stops doing and nothing n
 
 |                        |                                                                                 |
 | ---------------------- | ------------------------------------------------------------------------------- |
-| `script/test`          | `cargo fmt --check`, clippy `-D warnings`, the whole suite, `script/lint`, then the doc checks; `--fast` skips the two whole-suite tests (about 15s instead of a minute) |
+| `script/test`          | `cargo fmt --check`, clippy `-D warnings`, the whole suite, `script/lint`, then the doc checks; `--fast` skips the whole-suite tests, which take minutes: the language spec on both implementations, the checker over the compiler's own source, and the linter built natively |
 | `script/lint [file…]`  | Portland's own linter, written in Portland, over `compiler/` and `core/` — or only the files named; `script/test` runs it |
 | `script/report [concern] [file…]` | A program's own loud choices read back to it (#30): each `panic` with its reason, each `mutable` name with the lines that rebind it, each `together`; it judges nothing and never fails |
-| `pdx lint file…`, `pdx report [concern] file…` | The same two tools run by name from the built binary (#550), on the files named |
+| `pdx lint file…`, `pdx report [concern] file…` | The same two tools run by name from the built binary (#550), on the files named. `pdx lint` runs the linter built natively, `target/portland/lint`, where it is there and newer than its source (#588); `script/build compiler/lint.pdx` builds it |
 | `script/console`       | the REPL; `script/console file.pdx` runs a file                                 |
 | `script/docs/check`    | the doc checks in `script/docs/checks/`; name one to run it alone               |
 | `script/docs/generate` | rewrite generated index sections; name one generator to run it alone            |

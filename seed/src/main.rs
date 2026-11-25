@@ -56,14 +56,20 @@ fn run() {
             }
         }
         // `pdx lint file.pdx` and `pdx report file.pdx` (#550): the tools
-        // written in Portland beside the compiler, run by name.
+        // written in Portland beside the compiler, run by name. Where one
+        // has been built natively and is newer than its source, that is
+        // what runs (#588), and otherwise the seed runs the script.
         Some(tool @ ("lint" | "report")) => {
             let files: Vec<String> = arguments.collect();
             if files.is_empty() {
                 eprintln!("pdx {tool}: needs a file to read");
                 process::exit(64);
             }
-            run_file(&tool_path(tool), load_path, files);
+            let script = tool_path(tool);
+            if let Some(binary) = fresh_native_tool(tool, &script) {
+                run_native_tool(&binary, &files);
+            }
+            run_file(&script, load_path, files);
         }
         Some(path) => run_file(path, load_path, arguments.collect()),
         None => repl(),
@@ -94,6 +100,42 @@ fn tool_path(tool: &str) -> String {
             process::exit(69);
         }
     }
+}
+
+/// The tool built natively (#588), where it is there to run and can be
+/// trusted: `target/portland/<tool>` in the checkout that holds the
+/// tool's script, newer than everything it was built from. That is the
+/// compiler and the core, which are its source, and the runtime with the
+/// crates it shares with the seed, which it is linked with. A binary
+/// older than any of them would do what the source no longer says, and
+/// is passed over for the seed.
+fn fresh_native_tool(tool: &str, script: &str) -> Option<std::path::PathBuf> {
+    let checkout = std::path::Path::new(script).parent()?.parent()?;
+    let binary = checkout.join("target/portland").join(tool);
+    let built = std::fs::metadata(&binary).ok()?.modified().ok()?;
+    let sources = [
+        "compiler",
+        "core",
+        "runtime/src",
+        "ruby_rules/src",
+        "source_form/src",
+    ];
+    let newest = sources
+        .iter()
+        .filter_map(|directory| std::fs::read_dir(checkout.join(directory)).ok())
+        .flatten()
+        .filter_map(|entry| entry.ok()?.metadata().ok()?.modified().ok())
+        .max()?;
+    (built > newest).then_some(binary)
+}
+
+/// Become the native tool: it takes this process's place, so what it
+/// prints and the status it leaves with are its own.
+fn run_native_tool(binary: &std::path::Path, files: &[String]) -> ! {
+    use std::os::unix::process::CommandExt;
+    let failed = process::Command::new(binary).args(files).exec();
+    eprintln!("pdx: cannot run {}: {failed}", binary.display());
+    process::exit(69);
 }
 
 /// Parse and stop, without evaluating (#35), one file or many.

@@ -1421,6 +1421,77 @@ fn pdx_runs_lint_and_report_by_name() {
     }
 }
 
+/// `pdx lint` runs the native linter where one is built (#588): the
+/// binary at `target/portland/lint` in the checkout that holds the
+/// compiler, handed the files, where it is newer than what it was built
+/// from. One older than its source is passed over for the seed, since it
+/// would lint by rules the source no longer writes. A stand-in for each
+/// side says which one ran.
+#[test]
+fn pdx_lint_runs_the_native_linter_where_one_is_built_and_fresh() {
+    use std::os::unix::fs::PermissionsExt;
+    let checkout = std::env::temp_dir().join("native_lint_checkout");
+    let compiler = checkout.join("compiler");
+    let built = checkout.join("target/portland");
+    std::fs::create_dir_all(&compiler).unwrap();
+    std::fs::create_dir_all(&built).unwrap();
+    let script = compiler.join("lint.pdx");
+    std::fs::write(
+        &script,
+        "puts \"the seed read #{System.arguments.first}\"\n",
+    )
+    .unwrap();
+    let binary = built.join("lint");
+    std::fs::write(&binary, "#!/bin/sh\necho \"the binary read $1\"\nexit 3\n").unwrap();
+    std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let stamp = |path: &std::path::Path, seconds: u64| {
+        let time = std::time::UNIX_EPOCH + std::time::Duration::from_secs(seconds);
+        std::fs::File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_modified(time)
+            .unwrap();
+    };
+    let run = || {
+        Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .args(["lint", "sample.pdx"])
+            .env("PORTLAND_COMPILER", &compiler)
+            .output()
+            .expect("failed to run pdx")
+    };
+
+    stamp(&script, 1_000_000);
+    stamp(&binary, 2_000_000);
+    let fresh = run();
+    assert_eq!(
+        String::from_utf8(fresh.stdout).unwrap(),
+        "the binary read sample.pdx\n",
+        "a binary newer than its source should run"
+    );
+    assert_eq!(
+        fresh.status.code(),
+        Some(3),
+        "and leave with its own status"
+    );
+
+    stamp(&script, 3_000_000);
+    let stale = run();
+    assert_eq!(
+        String::from_utf8(stale.stdout).unwrap(),
+        "the seed read sample.pdx\n",
+        "a binary older than its source should be passed over"
+    );
+
+    std::fs::remove_file(&binary).unwrap();
+    let absent = run();
+    assert_eq!(
+        String::from_utf8(absent.stdout).unwrap(),
+        "the seed read sample.pdx\n",
+        "with no binary the seed runs the linter"
+    );
+}
+
 /// The linter refuses a file that does not parse, wherever in it the
 /// trouble is (#551): inside a def or a block as much as at the top, and
 /// in the parser's own words. Nothing else is said of such a file.
