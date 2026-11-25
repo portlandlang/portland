@@ -2577,7 +2577,10 @@ impl<'source> Parser<'source> {
         };
         self.close_it_frame(&mut parameters);
         self.command_arguments = enclosing_command;
-        Block { body, parameters }
+        Block {
+            body: body.into(),
+            parameters: parameters.into(),
+        }
     }
 
     /// Settle this block's `it` (ADR 0017). Naming `it` declares the

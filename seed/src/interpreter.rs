@@ -4882,8 +4882,8 @@ impl<W: std::io::Write> Interpreter<W> {
             });
         let gatherer = std::rc::Rc::new(std::cell::RefCell::new(HandedBlock {
             block: Block {
-                body: Vec::new(),
-                parameters: Vec::new(),
+                body: Vec::new().into(),
+                parameters: Vec::new().into(),
             },
             collects: true,
             home: self.home_depth,
