@@ -1318,7 +1318,11 @@ def type_methods(nodes, core)
       receiver = IdentifierNode.new(kind: "identifier", name: "self", line: method.line)
       # A method of the struct called by its bare name, inside another, is
       # asked of `self` (#572).
-      own = methods.map { it.name }
+      # A name the method binds itself, or takes, is that local: the
+      # core's `find_index` counts with an `index` of its own beside the
+      # method `index`.
+      bound = assigned_names_in_body(method.body) + method.parameters.map { it.name }
+      own = methods.map { it.name }.reject { bound.include?(it) }
       body = method.body.map { on_self(it, own) }
       definitions << method.with(name: method_def_name(node.name, method.name), parameters: [receiver] + method.parameters, body: field_prelude(node.fields, method) + body)
       shapes << [method_shape_key(node.name, method.name), parameters_shape(method.parameters, yields?(method.body))]
