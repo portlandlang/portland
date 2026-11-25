@@ -3252,7 +3252,7 @@ impl<W: std::io::Write> Interpreter<W> {
     /// The names bound as a nested scope opens (#537), written end to end
     /// in one piece with where each stops. A block runs for every element
     /// of every walk, and remembering the names as a set of copies, each
-    /// allocated and hashed, was a tenth of the compiler's run.
+    /// allocated and hashed, was a large share of the compiler's run.
     fn open_scope(&self) -> OpenedScope {
         let mut names = String::new();
         let mut ends = Vec::with_capacity(self.variables.len());
