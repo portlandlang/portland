@@ -1162,7 +1162,9 @@ def lower_value(node, bindings, context)
         plain = type_at(first.type, 1)
         return IntermediateDefault.new(type: plain, value: first, fallback: IntermediateStop.new(type: plain, message: message))
       end
-      fallback = lower_value(right, bindings, inner)
+      written = lower_value(right, bindings, inner)
+      # An empty array standing in for an array is that array.
+      fallback = written.type == EMPTY_ARRAY && (type_at(first.type, 1) in ["array", *]) ? written.with(type: type_at(first.type, 1)) : written
       fits = fallback.type == first.type || fallback.type == type_at(first.type, 1)
       refuse_native("'||' between #{with_article(first.type)} and #{with_article(fallback.type)}", node) unless fits
       return IntermediateDefault.new(type: fallback.type, value: first, fallback: fallback)

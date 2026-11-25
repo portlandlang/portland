@@ -85,6 +85,7 @@ tree = [
   Assign.new(name: "b", value: nil),
   Loop.new(condition: leaf, body: [bare]),
   Choice.new(condition: leaf, then_body: [leaf], else_body: nil),
+  Choice.new(condition: leaf, then_body: nil, else_body: [bare]),
   Group.new(lines: [Task.new(value: leaf), leaf]),
   Table.new(pairs: [Pair.new(key: leaf, value: bare)])
 ]
