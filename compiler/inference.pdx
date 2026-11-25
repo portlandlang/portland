@@ -1120,8 +1120,9 @@ end
 # native reading: its parameters bound to what that combination of the
 # def yields, and its body read as any body is. A block that ends in
 # what produces no value answers nothing; so does one whose answer is
-# nil, or a value or nil, or not known, since nothing can read it then
-# and the block is run for what it does.
+# nil or not known, since nothing can read it then and the block is run
+# for what it does. One that answers a value or nil answers that maybe
+# (#572): `names.map { it[0] }` is read for what it answers.
 def native_block_answer(node, arguments, types)
   yielded = types.assoc(yields_key(node.name, arguments))
   mutable inner = types
@@ -1133,7 +1134,7 @@ def native_block_answer(node, arguments, types)
   end
   return NOTHING if native_nothing?(node.block.body, inner)
   found = synthesize_body(node.block.body, inner)
-  return NOTHING if found == ["nil"] || (found in ["maybe", *]) || render_type(found).include?("Unknown")
+  return NOTHING if found == ["nil"] || render_type(found).include?("Unknown")
   found
 end
 

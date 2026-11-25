@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Native: a block that answers a value or nil is read for it** ([#572](https://github.com/portlandlang/portland/issues/572)) — `pairs.map { it[0] }` was compiled as a block run for what it does, answering nothing, and the array made of its answers could not be bound. Such a block answers that maybe, and `map` keeps each answer that is there.
 - **Native: a struct's method called by its bare name** ([#572](https://github.com/portlandlang/portland/issues/572)) — inside one of a struct's methods, `headed(items)` and a bare `label` name another of its methods, one it writes or one a trait gives it. The native build compiles a method as a def handed `self`, and such a call had nothing to say whose method it meant. It is asked of `self`.
 - **Native: a method asked of a value that is one of several structs** ([#572](https://github.com/portlandlang/portland/issues/572)) — `shape.area`, where `shape` may be a `Circle` or a `Square`, is the method of whichever struct the value is: the struct itself says which, and each struct's own method is compiled and called for it. It answers what those methods make together. A struct with no method of that name refuses when the line runs, in the seed's words. One struct standing in for one of several after `or` is one of them.
 - **Native: `each` asked of an array that may not be there** ([#591](https://github.com/portlandlang/portland/issues/591)) — the maybe is opened for the walk, as for any method, and the block is handed what the array holds. Where it is not there, it refuses by the method's name.
