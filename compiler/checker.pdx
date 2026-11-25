@@ -352,6 +352,12 @@ def calls_in_node(node, locals, globals, mutable found)
     end
     found << [name, positional, keywords]
     calls_in_block(node, ["unknown"], locals, globals, found)
+  # A def with no arguments handed is called by its bare name, which
+  # parses as a name and not as a call (#585). A local of that name is
+  # the local, and only a name the file can see declared is counted.
+  in IdentifierNode(name:)
+    return found if locals.assoc(name).some? || globals.assoc(name).nil?
+    found + [[name, [], []]]
   in MethodCallNode | SafeMethodCallNode
     found = calls_in_node(node.receiver, locals, globals, found)
     node.arguments.each do |argument|

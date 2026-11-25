@@ -6526,6 +6526,27 @@ fn run_mode_sharpens_the_entrys_parameters() {
         String::from_utf8_lossy(&hosted.stderr)
     );
     assert_eq!(String::from_utf8(hosted.stdout).unwrap(), "some\n");
+
+    // A def called by its bare name is a caller too (#585): it parses as a
+    // name, and passed over, the one call that hands `line` an Integer
+    // would be every caller, and `line or 1` would refuse as never absent.
+    let bare = std::env::temp_dir().join("sharpen_bare_name.pdx");
+    std::fs::write(
+        &bare,
+        "def doubled(number)\n  number * 2\nend\n\ndef twice_placed(line: nil)\n  doubled(line or 1)\nend\n\nputs twice_placed\nputs twice_placed(line: 9)\n",
+    )
+    .unwrap();
+    let hosted = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(portland_run())
+        .arg(&bare)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        hosted.status.success(),
+        "a call by a bare name leaves the default in play, got: {}",
+        String::from_utf8_lossy(&hosted.stderr)
+    );
+    assert_eq!(String::from_utf8(hosted.stdout).unwrap(), "2\n18\n");
 }
 
 /// Every refusal at once (the ruling of 2026-09-24): the checker collects
