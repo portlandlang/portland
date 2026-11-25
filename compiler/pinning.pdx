@@ -515,7 +515,7 @@ def pin_block_call(node, walk, answers, names)
     inner = [[parameter, (type or ["unknown"])]] + inner
     index += 1
   end
-  walked = pin_statements(node.block.body, current.with(bindings: inner), answers, names)
+  walked = walked_block(node.block.body, current.with(bindings: inner), answers, names)
   outer = current.bindings.length
   kept = unnarrowed(current.bindings, walked.bindings.slice(walked.bindings.length - outer, outer))
   PinWalk.new(bindings: kept, calls: block_returns(walked.calls, current.calls.length) + [[node.name, arguments, answer, leaves]])
@@ -767,7 +767,7 @@ def pin_walk(node, walk, answers, names)
     inner = [[parameter, block_parameter_type(receiver, index, node.name, arguments, parameter_count: node.block.parameters.length)]] + inner
     index += 1
   end
-  walked = pin_statements(node.block.body, current.with(bindings: inner), answers, names)
+  walked = walked_block(node.block.body, current.with(bindings: inner), answers, names)
   outer = current.bindings.length
   walked.with(bindings: unnarrowed(current.bindings, walked.bindings.slice(walked.bindings.length - outer, outer)), calls: block_returns(walked.calls, current.calls.length))
 end
@@ -1150,6 +1150,18 @@ def value_candidates(node, scope)
   first = taken.last
   second = other.last
   (first.nil? ? [["nil"]] : value_candidates(first, scope)) + (second.nil? ? [["nil"]] : value_candidates(second, scope))
+end
+
+# A block's body walked (#572), with each local the block binds at the
+# one type the body leaves it: read once going down the body, and where
+# that widened a local, again with what it left. The calls of both
+# readings are kept, as a def's are.
+def walked_block(body, start, answers, names)
+  first = pin_statements(body, start, answers, names)
+  settled = settled_bindings(start.bindings, first.bindings)
+  return first if settled == start.bindings
+  second = pin_statements(body, start.with(bindings: settled), answers, names)
+  second.with(calls: first.calls + second.calls.slice(start.calls.length, second.calls.length - start.calls.length))
 end
 
 def with_article(type)

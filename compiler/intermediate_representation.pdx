@@ -592,7 +592,10 @@ def lower_block(block, handed, bindings, context)
   start = parameters.reverse + captures
   # A `yield` inside the block is its writer's, so what the writer was
   # handed stays what a `yield` reaches.
-  inside = context.with(procedure: handed.answer == NOTHING, looping: false, inside_block: true, answer: handed.answer)
+  # A local the block binds holds one type through the block (#572), as
+  # a def's do through the def.
+  settled = settled_start(block.body, start, yielding_answers(context.answers, context.yielding), context.arities.map { it[0] })
+  inside = context.with(procedure: handed.answer == NOTHING, looping: false, inside_block: true, answer: handed.answer, pinned: settled)
   lowered = lower_body(block.body, block, "a block", start, handed.answer, inside)
   locals = placed_locals(lowered.bindings.slice(0, lowered.bindings.length - start.length))
   IntermediateBlock.new(parameters: parameters, answer: handed.answer, locals: locals.reverse, body: lowered.nodes, captures: placed_locals(captures), onward: yields?(block.body), leaves: handed.leaves, returns: block_returns?(block.body), breaks: block_breaks?(block.body))

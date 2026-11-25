@@ -79,3 +79,19 @@ end
 
 p(longest(["to", "three", "four"]))
 p(longest([]))
+
+# A local a block binds to nil and then to a value holds one type
+# through the block.
+def out_of_order(groups)
+  mutable found = []
+  groups.each do |group|
+    mutable previous = nil
+    group.each do |word|
+      found << "#{word} after #{previous}" if previous.some? && word < previous
+      previous = word
+    end
+  end
+  found
+end
+
+p(out_of_order([["b", "a", "c"], ["x", "y"], ["m", "k"]]))
