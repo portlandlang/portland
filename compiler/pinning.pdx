@@ -67,6 +67,20 @@ ROUND_LIMIT = 200
 struct BodyRead
   found
   calls
+  # The combinations those calls ask for, each once: what the body's
+  # reading rests on.
+  keys
+end
+
+# What differs between one round's answers and the next's (#537), as what
+# a body may have read. A combination's answer is read only by a body
+# that calls that combination, so those are kept by their keys, with the
+# defs they are of. Every other entry, a field's type or what a def
+# yields or is handed, is read by name, and gives the names in its key.
+struct Changed
+  names
+  keys
+  owners
 end
 
 struct CoreMethods
@@ -85,6 +99,14 @@ struct GatheredRound
   walk
   read
   again
+end
+
+# The calls a round gathered, sorted by the name each calls (#537): the
+# names in the order first met, and beside each, its calls in the order
+# first met, each way of calling it once.
+struct NamedCalls
+  names
+  calls
 end
 
 struct PinWalk
@@ -168,6 +190,12 @@ def answer_candidates(body, parameters, answers, names)
   found + returns_gathered(walk) + last
 end
 
+# Whether an entry's key is one a call reads (#537): a combination's
+# answer, keyed by the def's name and what it is called with, in
+# parentheses, or what that combination yields, keyed the same with `&`
+# after. A body reads either only by making that call.
+def answer_key?(key) = key.include?("(")
+
 # The array a def's pinned combinations answer, as what they make
 # together, or nil where none answers an array (#572).
 def answered_array(name, answers)
@@ -182,6 +210,11 @@ def answers_nothing?(body, parameters, answers, names)
   return false if body.empty?
   # A `return` with a value is an answer, whatever the body ends in.
   return false if returns_value?(body)
+  # Only a call, a loop, an `if`, or a `yield` can end a body in nothing,
+  # and nothing else is worth walking the body to ask (#537).
+  ending = body.last
+  closing = (case_as_if(ending) or ending)
+  return false unless (closing in CallNode) || (closing in WhileNode) || (closing in IfNode) || (closing in YieldNode)
   above = pin_statements(body.slice(0, body.length - 1), PinWalk.new(bindings: parameters, calls: []), answers, names)
   native_nothing?(body, above.bindings + answers)
 end
@@ -282,12 +315,49 @@ def called_definition(definition, placed, named)
   definition.with(parameters: parameters, body: prelude + definition.body)
 end
 
-# The names whose entries differ between one round's answers and the
-# next's (#537): each entry added, dropped, or changed gives the names in
-# its key.
-def changed_names(before, after)
-  differing = after.reject { before.include?(it) } + before.reject { after.include?(it) }
-  differing.flat_map { key_names(it[0]) }.uniq
+# Gathered calls sorted by the name each calls (#537), each way of
+# calling a name kept once. A lookup by name is then one search of the
+# names, where it was a walk of every call.
+def calls_by_name(calls)
+  mutable names = []
+  mutable sorted = []
+  calls.each do |call|
+    place = names.index(call[0])
+    if place.nil?
+      names << call[0]
+      sorted << [call]
+    else
+      held = sorted[place] or []
+      sorted[place] = held + [call] unless held.include?(call)
+    end
+  end
+  NamedCalls.new(names: names, calls: sorted)
+end
+
+# The calls of one name among calls sorted by name.
+def calls_of(sorted, name)
+  place = sorted.names.index(name)
+  place.nil? ? [] : (sorted.calls[place] or [])
+end
+
+# What differs between one round's answers and the next's (#537): each
+# entry added, dropped, or changed, sorted by how a body would have read
+# it.
+def changed_between(before, after)
+  differing = (after.reject { before.include?(it) } + before.reject { after.include?(it) }).map { it[0] }.uniq
+  answers = differing.select { answer_key?(it) }
+  fields = differing.select { field_entry?(it) }
+  others = differing.reject { answer_key?(it) || field_entry?(it) }
+  # A field's entry is read two ways. By a body that names its struct,
+  # which is given the struct's name. And through a value that is one of
+  # several structs, as the one type every struct with a field of that
+  # name holds there: the field's name counts only where that type is no
+  # longer what it was, which a struct made for the first time, with a
+  # `kind` and a `line` like every other, does not make it.
+  owners = fields.map { (it.split(".").first or it) }
+  shifted = fields.map { (it.split(".").last or it) }.uniq.select { shared_field(it, before) != shared_field(it, after) }
+  names = (others.flat_map { key_names(it) } + owners + shifted).uniq
+  Changed.new(names: names, keys: answers, owners: answers.map { (it.split("(").first or it) }.uniq)
 end
 
 # Whether a type says everything a code generator needs: no unknown in it.
@@ -326,6 +396,11 @@ def field_conflicts(calls)
   end
   sentences
 end
+
+# Whether an entry's key is a struct's field (#537): the struct's name,
+# a dot, and the field's. A struct the program makes is keyed with a dot
+# too and ends in `&`, and is read by the struct's name.
+def field_entry?(key) = key.include?(".") && !key.include?("(") && !key.include?("#") && !key.include?("[") && !key.end_with?("&")
 
 # A struct's fields that a method reads by their bare names, each bound
 # ahead of the method's body from `self` (#532). In a method a field is
@@ -369,10 +444,10 @@ def gathered_round(statements, names, answers, pinned, changed, mentions, read_b
   mutable again = 0
   pinned.each do |found|
     before = changed.nil? ? nil : read_before.find { it.found.key == found.key }
-    kept = before.some? && read_alike?(before.found, found) && unaffected?(found.definition.name, changed, mentions)
+    kept = before.some? && read_alike?(before.found, found) && unaffected?(found.definition.name, before.keys, changed, mentions)
     again += 1 unless kept
     made = kept ? before.calls : body_calls(found, names, answers)
-    read << BodyRead.new(found: found, calls: made)
+    read << BodyRead.new(found: found, calls: made, keys: (kept ? before.keys : keys_read(made, names)))
     calls += made
   end
   GatheredRound.new(walk: walk.with(calls: calls), read: read, again: again)
@@ -417,6 +492,18 @@ def key_names(key)
   head.split("#").flat_map { it.split(".") }
 end
 
+# The entries a body's calls read (#537), each once: the combination each
+# call asks for, and for a call that hands a block, what that def yields,
+# which the block's parameters are read from.
+def keys_read(calls, names)
+  mutable keys = []
+  calls.select { names.include?(it[0]) }.each do |call|
+    keys << call_key(call)
+    keys << yields_key(call[0], type_at(call, 1)) if type_at(call, 2).some?
+  end
+  keys.uniq
+end
+
 # The bindings a statement is read with: the ones above it, and for a
 # loop, each of those as the loop leaves it (#572). A local has one type,
 # so an array that goes into a loop empty is, inside it, the array the
@@ -429,18 +516,26 @@ end
 # Every field the gathered calls made, as [its key, the types it was
 # handed], one entry for each field.
 def made_fields(calls)
-  mutable fields = []
-  calls.select { it[0] == MAKING }.each do |call|
+  # Each way a struct is made is read once, and a field's types are kept
+  # at the field's place, found by one search of the keys (#537).
+  mutable keys = []
+  mutable types = []
+  calls_of(calls_by_name(calls), MAKING).each do |call|
     made = type_at(call, 1)
     type_at(made, 1).each do |handed|
       key = field_key(made[0], handed[0])
-      found = fields.assoc(key)
-      if found.nil?
-        fields << [key, [type_at(handed, 1)]]
+      place = keys.index(key)
+      if place.nil?
+        keys << key
+        types << [type_at(handed, 1)]
       else
-        fields = fields.map { it[0] == key ? [key, type_at(it, 1) + [type_at(handed, 1)]] : it }
+        types[place] = (types[place] or []) + [type_at(handed, 1)]
       end
     end
+  end
+  mutable fields = []
+  keys.each_with_index do |key, place|
+    fields << [key, (types[place] or [])]
   end
   fields
 end
@@ -561,11 +656,15 @@ end
 # the round before, a combination of a def that names none of them is
 # kept as `before` pinned it (#537); with `changed` nil each is pinned
 # afresh.
-def pin_combinations(definitions, calls, answers, names, strict, changed, mentions, before)
+def pin_combinations(definitions, calls, answers, names, strict, changed, mentions, before, read)
   mutable pinned = []
+  before_keys = before.map { it.key }
+  read_keys = read.map { it.found.key }
+  # The calls are sorted by the name called once, and not searched whole
+  # for each def (#537): that search was most of a round.
+  sorted = calls_by_name(calls)
   definitions.each do |definition|
-    sites = calls.select { it[0] == definition.name }
-    steady = changed.some? && unaffected?(definition.name, changed, mentions)
+    sites = calls_of(sorted, definition.name)
     met = unique_types(sites.map { [type_at(it, 1), type_at(it, 2), type_at(it, 3) == true] })
     met.each do |combination|
       arguments = type_at(combination, 0)
@@ -573,7 +672,12 @@ def pin_combinations(definitions, calls, answers, names, strict, changed, mentio
       next unless arguments.all? { concrete?(it) } && (handed.nil? || concrete?(handed))
       leaves = type_at(combination, 2)
       key = combination_key(definition.name, arguments, handed, leaves)
-      kept = steady ? before.find { it.key == key } : nil
+      # Kept as the round before pinned it where nothing its body read
+      # has changed: its body's calls say which answers that was.
+      held = changed.nil? ? nil : before_keys.index(key)
+      body = held.nil? ? nil : read_keys.index(key)
+      steady = body.some? && unaffected?(definition.name, (read[body] or panic("a body read is missing")).keys, changed, mentions)
+      kept = steady ? before[held] : nil
       pinned << (kept or pin_combination(definition, arguments, handed, leaves, answers, names, strict))
     end
   end
@@ -949,10 +1053,10 @@ def settle_pins(definitions, statements, names, fixed, starting, strict, progres
     began = progress.nil? ? 0 : System.monotonic_time
     moving = fields + pinned_answers(pinned)
     answers = fixed + moving
-    changed = (reusing && !checking && moving_before.some?) ? changed_names(moving_before, moving) : nil
+    changed = (reusing && !checking && moving_before.some?) ? changed_between(moving_before, moving) : nil
     gathered = gathered_round(statements, names, answers, pinned, changed, mentions, read_before)
     walk = gathered.walk
-    settled = pin_combinations(definitions, walk.calls, answers, names, strict, changed, mentions, pinned)
+    settled = pin_combinations(definitions, walk.calls, answers, names, strict, changed, mentions, pinned, gathered.read)
     made = settled_fields(walk.calls)
     found = round_entries(settled, made)
     # Said while it works, where the build was asked to (#543): a round
@@ -1032,7 +1136,7 @@ def settled_fields(calls)
   end
   # And each struct the program makes, by a name of its own (#572): an
   # `in` test for one it never makes is never true.
-  calls.select { it[0] == MAKING }.map { made_key(type_at(type_at(it, 1), 0)) }.uniq.each do |key|
+  calls_of(calls_by_name(calls), MAKING).map { made_key(type_at(type_at(it, 1), 0)) }.uniq.each do |key|
     bindings << [key, ["boolean"]]
   end
   bindings
@@ -1117,12 +1221,18 @@ def type_methods(nodes, core)
   CoreMethods.new(definitions: definitions, shapes: shapes)
 end
 
-# Whether a def mentions none of the names that changed (#537).
-def unaffected?(name, changed, mentions)
+# Whether nothing a combination's body read has changed (#537): it calls
+# none of the combinations whose answers changed, is of no def one of
+# them is of, since a def's answers are read together, and mentions none
+# of the names every other changed entry goes by. `keys` is the
+# combinations its body calls.
+def unaffected?(name, keys, changed, mentions)
   found = mentions.assoc(name)
   return false if found.nil?
+  return false if changed.owners.include?(name)
+  return false unless keys.intersection(changed.keys).empty?
   mentioned = type_at(found, 1)
-  changed.none? { mentioned.include?(it) }
+  mentioned.intersection(changed.names).empty?
 end
 
 def unique_types(types)

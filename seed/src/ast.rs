@@ -174,10 +174,14 @@ pub enum GuardAction {
     Return(Option<Box<Expression>>),
 }
 
+/// A block's statements and parameters are shared, not owned (#537): a
+/// block handed to a def is kept beside the call for as long as the def
+/// runs, and again for each `yield`, and copying its whole tree each time
+/// was a cost paid by every walk the core writes in Portland.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Block {
-    pub body: Vec<Statement>,
-    pub parameters: Vec<String>,
+    pub body: std::rc::Rc<Vec<Statement>>,
+    pub parameters: std::rc::Rc<Vec<String>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

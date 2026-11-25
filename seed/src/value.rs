@@ -102,9 +102,26 @@ pub enum Value {
 /// Two strings are equal when they are the same *text*, not the same bytes
 /// (ADR 0038): NFC-normalized comparison, with the byte-equal and all-ASCII
 /// fast paths taken first. Storage is never normalized — only the question.
+///
+/// Most comparisons are of two different names, in a list searched by
+/// name, and are settled where the two first differ (#537). An ASCII
+/// character is its own decomposition and combines with nothing before
+/// it, so once the bytes part at an ASCII character on each side, or one
+/// side ends and the other goes on with one, the texts differ whatever
+/// follows. Only a difference at a byte past ASCII needs the whole of
+/// both read.
 pub fn canonically_equal(left: &str, right: &str) -> bool {
-    if left == right {
-        return true;
+    let (first, second) = (left.as_bytes(), right.as_bytes());
+    let shared = first
+        .iter()
+        .zip(second)
+        .take_while(|(one, other)| one == other)
+        .count();
+    match (first.get(shared), second.get(shared)) {
+        (None, None) => return true,
+        (Some(one), Some(other)) if one.is_ascii() && other.is_ascii() => return false,
+        (Some(next), None) | (None, Some(next)) if next.is_ascii() => return false,
+        _ => {}
     }
     if left.is_ascii() && right.is_ascii() {
         return false;
@@ -639,6 +656,23 @@ impl fmt::Display for Value {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn strings_are_equal_by_their_text_wherever_they_first_differ() {
+        use super::canonically_equal;
+        assert!(canonically_equal("", ""));
+        assert!(canonically_equal("parse", "parse"));
+        assert!(!canonically_equal("parse", "parsed"));
+        assert!(!canonically_equal("parse", "pars"));
+        assert!(!canonically_equal("parse", "purse"));
+        // One code point, and a letter with a combining accent.
+        assert!(canonically_equal("caf\u{e9}", "cafe\u{301}"));
+        assert!(canonically_equal("caf\u{e9}s", "cafe\u{301}s"));
+        assert!(!canonically_equal("caf\u{e9}s", "cafe\u{301}t"));
+        assert!(!canonically_equal("cafe", "cafe\u{301}"));
+        assert!(!canonically_equal("cafa\u{301}", "cafe\u{301}"));
+        assert!(!canonically_equal("\u{e9}", "\u{e8}"));
+    }
+
     use super::format_float;
 
     /// #102: Ruby's `Float#to_s`, each expectation taken from Ruby 4.0.9's
