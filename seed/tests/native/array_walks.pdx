@@ -29,3 +29,13 @@ empty_fruits = fruits.select { it.length > 20 }
 p(empty_fruits.sort_by { it.length })
 puts([4, 8, 15].sum)
 puts fruits.map { it.length }.sum
+
+# `index`, `intersection`, `max_by`, `reverse`, and `uniq`.
+puts(fruits.index("kiwi") or -1)
+puts(fruits.index("plum") or -1)
+p(fruits.intersection(["date", "plum", "fig", "date"]))
+p(fruits.max_by { it.length })
+p(empty_fruits.max_by { it.length })
+p(fruits.reverse)
+p(["b", "a", "b", "c", "a"].uniq)
+p([3, 3, 1, 3].uniq)

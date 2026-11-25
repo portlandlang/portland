@@ -61,11 +61,51 @@ NATIVE_CORE_SOURCE = <<~PORTLAND
       gathered
     end
 
+    def index(wanted)
+      mutable place = 0
+      self.each do |element|
+        return place if element == wanted
+        place += 1
+      end
+      nil
+    end
+
+    def intersection(others)
+      mutable shared = []
+      self.each do |element|
+        shared << element if others.include?(element) && !shared.include?(element)
+      end
+      shared
+    end
+
+    def max_by
+      mutable best = nil
+      mutable best_key = nil
+      self.each do |element|
+        key = yield(element)
+        if best_key.nil? || key > best_key
+          best = element
+          best_key = key
+        end
+      end
+      best
+    end
+
     def none?
       self.each do |element|
         return false if yield(element)
       end
       true
+    end
+
+    def reverse
+      mutable turned = []
+      mutable place = self.length - 1
+      while place >= 0
+        turned << self[place]
+        place -= 1
+      end
+      turned
     end
 
     def sort_by
@@ -89,6 +129,14 @@ NATIVE_CORE_SOURCE = <<~PORTLAND
         total += element
       end
       total
+    end
+
+    def uniq
+      mutable kept = []
+      self.each do |element|
+        kept << element unless kept.include?(element)
+      end
+      kept
     end
   end
   PORTLAND
