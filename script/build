@@ -77,9 +77,17 @@ name=$(basename "$program" .pdx)
 output=$root/target/portland
 mkdir -p "$output"
 # A stale .ll from an earlier build must not be compiled when this one refuses.
-rm -f "$output/$name.ll" "$output/$name"
+rm -f "$output/$name.ll" "$output/$name" "$output/$name.sources" "$output/$name.fingerprint"
 "$PDX" compiler/build.pdx "$program" "$output/$name.ll" $verbose
 [ -z "$verbose" ] || echo "clang: compiling $output/$name.ll" >&2
 # The IR names no target, so clang supplies the host's and would warn that it did.
 xcrun clang "$optimization" -Wno-override-module -Wl,-dead_strip -mmacosx-version-min="$(macos_deployment_target)" -o "$output/$name" "$output/$name.ll" "$runtime"
+# What the binary was built from, and a fingerprint of what those files
+# held (#588): `pdx lint` runs a native linter only while its source reads
+# as it did here. The compiler listed the program's own files; the core
+# it is compiled with and the runtime it is linked with are source too.
+for source in "$root"/core/*.pdx "$root"/compiler/native_core.pdx "$root"/runtime/src/*.rs "$root"/ruby_rules/src/*.rs "$root"/source_form/src/*.rs; do
+  echo "$source" >> "$output/$name.sources"
+done
+"$PDX" --fingerprint "$output/$name.sources" > "$output/$name.fingerprint"
 echo "$output/$name"

@@ -21,6 +21,12 @@ struct ProgramLoad
   nodes
 end
 
+# A program gathered from the path of its entry file: its statements, and
+# the files they were read from (#588), the entry file first. Those files
+# are what a build is made of, and what must read the same for the build
+# to stand.
+def gathered_program(path) = load_program_file(canonical_path(path), true, ProgramLoad.new(files: [], nodes: []))
+
 # One file's statements gathered, and those of the files it requires in
 # their places. `entry` is whether this is the file the build was handed,
 # which may bind what it likes at its top level.
@@ -43,7 +49,7 @@ def load_program_file(path, entry, loading)
 end
 
 # A program's statements, from the path of its entry file.
-def program_nodes(path) = load_program_file(canonical_path(path), true, ProgramLoad.new(files: [], nodes: [])).nodes
+def program_nodes(path) = gathered_program(path).nodes
 
 # The path a `require_relative "name"` line names, as written, or nil for
 # any other statement.
