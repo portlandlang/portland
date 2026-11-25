@@ -1195,7 +1195,9 @@ def lower_value(node, bindings, context)
   # answers nothing anyone reads.
   in MethodCallNode(receiver:, name: "each", arguments: [], block:)
     refuse_native("each without a block", node) if block.nil?
-    walked = lower_value(receiver, bindings, inner)
+    # A maybe is opened for the walk, and nil refuses by the method's
+    # name, as for any method (#591).
+    walked = opened_for(lower_value(receiver, bindings, inner), "each")
     refuse_native("a call with a dot, .each, on #{with_article(walked.type)}", node) unless walked.type in ["array", *]
     leaves = native_block_leaves?(block, bindings + yielding_answers(context.answers, context.yielding))
     refuse_leaving_inside(block, leaves, context.root, node)

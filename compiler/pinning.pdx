@@ -863,7 +863,9 @@ def pin_walk(node, walk, answers, names)
     current = pin_statement(argument, current, answers, names)
   end
   scope = current.bindings + answers
-  receiver = synthesize(node.receiver, scope)
+  # A maybe is opened for the walk (#591), so the block is handed what
+  # the array holds.
+  receiver = opened_natively(synthesize(node.receiver, scope), scope)
   arguments = node.arguments.map { synthesize(it, scope) }
   mutable inner = current.bindings
   mutable index = 0
