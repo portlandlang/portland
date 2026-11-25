@@ -526,13 +526,16 @@ end
 # The library's functions, declared (#560): one line for each function,
 # from the table the calls are read by.
 def llvm_library_declarations
-  NATIVE_LIBRARY.map do |entry|
+  # One declaration for each function, which more than one row may name:
+  # `join` is the same function for an array of Strings and of Integers.
+  declared = NATIVE_LIBRARY.map do |entry|
     taken = type_at(entry, 2).map { (it == ["integer"] || it == ["element"]) ? "i64" : "ptr" }
     answer = type_at(entry, 3)
     answered = answer == ["boolean"] ? "zeroext i1" : ((answer == ["integer"] || answer == ["maybe", ["integer"]]) ? "i64" : "ptr")
     asked = type_at(entry, 0) == ["integer"] ? "i64" : "ptr"
     "declare #{answered} @#{type_at(entry, 4)}(#{([asked] + taken).join(", ")})"
   end
+  declared.uniq
 end
 
 def llvm_line(emitter, instruction)

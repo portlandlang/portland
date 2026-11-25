@@ -18,3 +18,14 @@ puts numbers.any? { it > 10 }
 puts numbers.count { it.even? }
 puts "a\nb\nc\n".count("\n")
 puts "héllo".count("l")
+
+# `sort_by` orders by what the block answers, keeping the order of those
+# that answer alike, and `sum` adds Integers up.
+fruits = ["pear", "fig", "banana", "kiwi", "apple", "date"]
+p(fruits.sort_by { it.length })
+p(fruits.sort_by { it })
+p([5, 3, 9, 1].sort_by { 0 - it })
+empty_fruits = fruits.select { it.length > 20 }
+p(empty_fruits.sort_by { it.length })
+puts([4, 8, 15].sum)
+puts fruits.map { it.length }.sum

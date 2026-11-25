@@ -1,6 +1,6 @@
 //! The whole-suite runs: the language spec on both implementations, the
-//! checker over the compiler's own source, and the linter and the parser
-//! built natively and held to the seed. Each takes over a minute,
+//! checker over the compiler's own source, and the linter, the parser, and
+//! the report built natively and held to the seed. Each takes over a minute,
 //! which is most of the gate, so they live in their own test binary — cargo
 //! reports them in a block of their own, apart from the hundred quick ones in
 //! `run_pdx_files.rs`.
@@ -351,6 +351,57 @@ fn the_parser_built_natively_writes_the_trees_the_seed_does() {
             native.stdout == seed.stdout,
             "the native parser's tree differs from the seed's for {}",
             file.display()
+        );
+    }
+}
+
+/// The report builds natively (#30): `report.pdx`, compiled and run over
+/// the compiler's own source and the core, reads back what the seed
+/// reads back running the same file, with every concern and with each
+/// one named.
+#[test]
+fn the_report_built_natively_reads_back_what_the_seed_does() {
+    let root = format!("{}/..", env!("CARGO_MANIFEST_DIR"));
+    let program = format!("{root}/compiler/report.pdx");
+    let built = Command::new(format!("{root}/script/build"))
+        .arg(&program)
+        .env("PDX", env!("CARGO_BIN_EXE_pdx"))
+        .output()
+        .expect("failed to run script/build");
+    assert!(
+        built.status.success(),
+        "report.pdx should build: {}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let binary = String::from_utf8(built.stdout).unwrap().trim().to_string();
+
+    let mut files: Vec<String> = [format!("{root}/compiler"), format!("{root}/core")]
+        .iter()
+        .flat_map(|directory| std::fs::read_dir(directory).unwrap())
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "pdx"))
+        .map(|path| path.to_string_lossy().into_owned())
+        .collect();
+    files.sort();
+
+    for concern in [None, Some("panic"), Some("mutable"), Some("together")] {
+        let arguments: Vec<&str> = concern
+            .into_iter()
+            .chain(files.iter().map(String::as_str))
+            .collect();
+        let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(&program)
+            .args(&arguments)
+            .output()
+            .expect("failed to run pdx");
+        let native = Command::new(&binary)
+            .args(&arguments)
+            .output()
+            .expect("failed to run the native report");
+        assert!(native.status.success(), "the native report should run");
+        assert!(
+            native.stdout == seed.stdout,
+            "the native report differs from the seed's for {concern:?}"
         );
     }
 }

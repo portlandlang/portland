@@ -67,6 +67,29 @@ NATIVE_CORE_SOURCE = <<~PORTLAND
       end
       true
     end
+
+    def sort_by
+      mutable sorted = []
+      mutable keys = []
+      self.each do |element|
+        key = yield(element)
+        mutable place = sorted.length
+        while place > 0 && keys[place - 1] > key
+          place -= 1
+        end
+        sorted = sorted.slice(0, place) + [element] + sorted.drop(place)
+        keys = keys.slice(0, place) + [key] + keys.drop(place)
+      end
+      sorted
+    end
+
+    def sum
+      mutable total = 0
+      self.each do |element|
+        total += element
+      end
+      total
+    end
   end
   PORTLAND
 

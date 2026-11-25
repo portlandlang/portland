@@ -110,17 +110,23 @@ pub unsafe extern "C" fn portland_array_join_with(
 }
 
 /// # Safety
-/// `array` is null or points at a live array of Strings.
+/// `array` is null or points at a live array of Strings or of Integers.
 unsafe fn joined(array: *mut ArrayBlock, separator: &str) -> *mut StringBlock {
     unsafe {
         if array.is_null() {
             return string_of("");
         }
         let elements = std::slice::from_raw_parts(elements_of(array), (*array).length as usize);
-        let pieces: Vec<&str> = elements
-            .iter()
-            .map(|element| text_of(*element as *const StringBlock))
-            .collect();
+        // An Integer is joined as it is written out, as the seed joins
+        // one; the array's kind says which it holds.
+        let pieces: Vec<String> = if (*array).kind == INTEGERS {
+            elements.iter().map(|element| element.to_string()).collect()
+        } else {
+            elements
+                .iter()
+                .map(|element| text_of(*element as *const StringBlock).to_string())
+                .collect()
+        };
         string_of(&pieces.join(separator))
     }
 }
