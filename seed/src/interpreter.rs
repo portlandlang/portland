@@ -8,6 +8,24 @@
 /// the guard against.
 type HashMap<K, V> = std::collections::HashMap<K, V, std::hash::BuildHasherDefault<NameHasher>>;
 
+/// The names a nested scope opened with: each written after the last in
+/// `names`, and where each one stops in `ends`.
+struct OpenedScope {
+    names: String,
+    ends: Vec<usize>,
+}
+
+impl OpenedScope {
+    fn holds(&self, name: &str) -> bool {
+        let mut start = 0;
+        self.ends.iter().any(|end| {
+            let held = &self.names[start..*end];
+            start = *end;
+            held == name
+        })
+    }
+}
+
 /// FNV-1a over the bytes of a name.
 pub struct NameHasher(u64);
 
@@ -3231,6 +3249,31 @@ impl<W: std::io::Write> Interpreter<W> {
         }
     }
 
+    /// The names bound as a nested scope opens (#537), written end to end
+    /// in one piece with where each stops. A block runs for every element
+    /// of every walk, and remembering the names as a set of copies, each
+    /// allocated and hashed, was a tenth of the compiler's run.
+    fn open_scope(&self) -> OpenedScope {
+        let mut names = String::new();
+        let mut ends = Vec::with_capacity(self.variables.len());
+        for name in self.variables.keys() {
+            names.push_str(name);
+            ends.push(names.len());
+        }
+        OpenedScope { names, ends }
+    }
+
+    /// A nested scope closes: the names first bound inside it go, and the
+    /// ones it opened with stay. Nothing bound outside can be unbound
+    /// inside, so as many names as before are the same names, which is
+    /// what nearly every block and loop turn ends with.
+    fn close_scope(&mut self, opened: OpenedScope) {
+        if self.variables.len() == opened.ends.len() {
+            return;
+        }
+        self.variables.retain(|name, _| opened.holds(name));
+    }
+
     /// Run statements until done or a `return`/`break` starts unwinding.
     /// A body below the file's top level — a branch's, a loop's, a block's
     /// — where a require is out of place (ADR 0077 §3).
@@ -3670,10 +3713,9 @@ impl<W: std::io::Write> Interpreter<W> {
                     // (the block rule of ADR 0001, applied to loops): names
                     // first assigned inside the body die at iteration end,
                     // so plain immutable bindings work per-iteration.
-                    let preexisting: std::collections::HashSet<String> =
-                        self.variables.keys().cloned().collect();
+                    let opened = self.open_scope();
                     self.run_nested(body);
-                    self.variables.retain(|name, _| preexisting.contains(name));
+                    self.close_scope(opened);
                     match self.pending {
                         None => {}
                         Some(Pending::Break { target: None }) => {
@@ -9033,8 +9075,7 @@ impl<W: std::io::Write> Interpreter<W> {
                 arguments.len()
             );
         }
-        let preexisting: std::collections::HashSet<String> =
-            self.variables.keys().cloned().collect();
+        let opened = self.open_scope();
         let shadowed: Vec<(String, Option<Binding>)> = block
             .parameters
             .iter()
@@ -9064,14 +9105,15 @@ impl<W: std::io::Write> Interpreter<W> {
         if matches!(self.pending, Some(Pending::Next)) {
             self.pending = None;
         }
-        // Fresh block-locals die at end; outer bindings survive.
-        self.variables.retain(|name, _| preexisting.contains(name));
+        // The parameters go back to what they hid, or go; then fresh
+        // block-locals die at end, and outer bindings survive.
         for (parameter, original) in shadowed {
             match original {
                 Some(binding) => self.variables.insert(parameter, binding),
                 None => self.variables.remove(&parameter),
             };
         }
+        self.close_scope(opened);
         result
     }
 
