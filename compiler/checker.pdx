@@ -1423,7 +1423,7 @@ def declared_globals(nodes)
     globals = with_bound(globals, node.name, EnumType.new(name: node.name)) if node in EnumDefNode
     # A module's name is a name a bare reference may use as a receiver
     # (`Stats.mean`); its type is nobody's, so its methods answer unknown.
-    globals = with_bound(globals, module_name(node), ["module", module_name(node)]) if node in ModuleDefNode
+    globals = with_bound(globals, module_name(node), ModuleType.new(name: module_name(node))) if node in ModuleDefNode
   end
   nodes.each do |node|
     globals = with_bound(globals, node.name, synthesize_def_return(node, globals)) if node in DefNode

@@ -1098,6 +1098,7 @@ def kind_word(type)
   in KeywordType then "keyword"
   in MatchDataType then "matchdata"
   in MaybeType then "maybe"
+  in ModuleType then "module"
   in NilType then "nil"
   in NothingType then "nothing"
   in RandomType then "random"
@@ -1542,6 +1543,7 @@ def render_type(type)
   in StructType(name:) then name
   in ClassType(name:) then name
   in EnumType(name:) then name
+  in ModuleType(name:) then name
   # Ruby's own capitals (ADR 0086).
   in MatchDataType then "MatchData"
   in BooleanType then "Boolean"
