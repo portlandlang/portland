@@ -9758,7 +9758,20 @@ impl<W: std::io::Write> Interpreter<W> {
                     format!("{}'s block produced no value", handed.method)
                 }
             }
-            (other, _) => format!("{other:?} produced no value"),
+            // Anything else is named as the program wrote it (#473): a
+            // call by its name, and the rest by the kind of thing it is.
+            (
+                Expression::Call { name, .. }
+                | Expression::MethodCall { name, .. }
+                | Expression::Variable(name),
+                _,
+            ) => format!("{name} produced no value"),
+            (Expression::Yield(_), None) => "yield produced no value".to_string(),
+            (Expression::If { .. }, _) => "the if produced no value".to_string(),
+            (Expression::Case { .. } | Expression::CaseIn { .. }, _) => {
+                "the case produced no value".to_string()
+            }
+            (_, _) => "the expression produced no value".to_string(),
         }
     }
 
@@ -13381,5 +13394,31 @@ end
     #[should_panic(expected = "produced no value")]
     fn puts_produces_no_value() {
         evaluate("1 + puts(\"value\")");
+    }
+
+    // An expression read for a value it did not produce is named as the
+    // program wrote it (#473), not in Rust's debug form.
+    #[test]
+    #[should_panic(expected = "puts produced no value")]
+    fn an_element_that_produces_no_value_is_named() {
+        evaluate("list = [puts(1)]");
+    }
+
+    #[test]
+    #[should_panic(expected = "show produced no value")]
+    fn a_bare_call_that_produces_no_value_is_named() {
+        evaluate("def show = puts(1)\np([show])\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "go produced no value")]
+    fn a_call_with_a_block_that_produces_no_value_is_named() {
+        evaluate("def go = yield\np([go { puts 1 }])\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "upcase produced no value")]
+    fn a_method_that_produces_no_value_is_named() {
+        evaluate("struct Word\n  def upcase = puts(1)\nend\np([Word.new.upcase])\n");
     }
 }
