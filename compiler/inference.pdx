@@ -259,14 +259,14 @@ def arm_bindings(node, branch, nil_seen, types)
   pattern = branch.pattern
   plain = if (subject in MaybeType) && nil_seen then subject.inner else subject end
   if pattern in IdentifierNode
-    mutable pairs = [[pattern.name, plain]]
+    mutable pairs = bound_one(pattern.name, plain)
     pairs = with_bound(pairs, node.subject.name, plain) if node.subject in IdentifierNode
     return pairs
   end
   if (pattern in NilNode) && (node.subject in IdentifierNode) && (subject in MaybeType)
-    return [[node.subject.name, NilType.new]]
+    return bound_one(node.subject.name, NilType.new)
   end
-  pattern_names(pattern).map { [it, UnknownType.new] }
+  bind_unknowns(no_bindings, pattern_names(pattern))
 end
 
 # Bindings in layers, from any shape they are held in while the compiler
@@ -509,6 +509,9 @@ def body_exits?(body)
   return false if body.nil? || body.empty?
   exit?(body.last)
 end
+
+# Bindings of one name (#607), as a proof binds what it proved.
+def bound_one(name, type) = Bindings.new(near: {name => type}, far: nil)
 
 def branch_answer(body, types)
   return NilType.new if body.nil? || body.empty?
@@ -842,8 +845,8 @@ def comparison_proof(node, types)
   return no_proof if name.nil?
   inner = maybe_inner(name, types)
   return no_proof if inner.nil?
-  return [[[name, NilType.new]], [[name, inner]]] if node.operator == "=="
-  [[[name, inner]], [[name, NilType.new]]]
+  return [bound_one(name, NilType.new), bound_one(name, inner)] if node.operator == "=="
+  [bound_one(name, inner), bound_one(name, NilType.new)]
 end
 
 # The names every match test anywhere in an expression captures.
@@ -1163,6 +1166,9 @@ def kind_word(type)
   end
 end
 
+# One Hash from name to type as bindings of one layer (#607).
+def layer_of(names) = Bindings.new(near: names, far: nil)
+
 # A type the library's table writes, as it is for the value asked (#560):
 # `element` is what the array asked holds, and `self` the array itself.
 def library_type(written, receiver)
@@ -1243,7 +1249,6 @@ def names?(node, name) = (node in IdentifierNode) && node.name == name
 # Bindings with each name a proof narrowed bound to what it proved, where
 # it stood (#572).
 def narrowed_bindings(bindings, proved)
-  return bindings if proved.empty?
   # What was proved of a name that may not be there is bound beside the
   # name, under a key of its own, and is new here unless a proof around
   # this one bound it.
@@ -1254,7 +1259,7 @@ def narrowings(condition, types)
   proof = proof_of(condition, types)
   # A match test in a condition — `if x in [head, tail]` — binds its
   # captures on both sides, since the runtime binds them regardless.
-  captured = condition_captures(condition).map { [it, UnknownType.new] }
+  captured = bind_unknowns(no_bindings, condition_captures(condition))
   [with_bindings(when_true(proof), captured), with_bindings(when_false(proof), captured)]
 end
 
@@ -1382,7 +1387,11 @@ def nil_comparison_name(left, right)
   nil
 end
 
-def no_proof = [[], []]
+# Bindings of no name (#607): where a walk starts, and what a condition
+# that proves nothing binds.
+def no_bindings = Bindings.new(near: {}, far: nil)
+
+def no_proof = [no_bindings, no_bindings]
 
 # Whether a node holds a `break` that is the block's own around it: not
 # one inside a loop, which is the loop's, nor one inside a block handed
@@ -1515,8 +1524,8 @@ def predicate_proof(node, types)
   name = node.receiver.name
   inner = maybe_inner(name, types)
   return no_proof if inner.nil?
-  return [[[name, inner]], [[name, NilType.new]]] if node.name == "some?"
-  return [[[name, NilType.new]], [[name, inner]]] if node.name == "nil?"
+  return [bound_one(name, inner), bound_one(name, NilType.new)] if node.name == "some?"
+  return [bound_one(name, NilType.new), bound_one(name, inner)] if node.name == "nil?"
   no_proof
 end
 
@@ -1532,8 +1541,8 @@ def proof_of(condition, types)
   in LogicalNode(operator:, left:, right:)
     left_proof = proof_of(left, types)
     right_proof = proof_of(right, types)
-    return [with_bindings(when_true(right_proof), when_true(left_proof)), []] if operator == "&&"
-    return [[], with_bindings(when_false(right_proof), when_false(left_proof))] if operator == "||"
+    return [with_bindings(when_true(right_proof), when_true(left_proof)), no_bindings] if operator == "&&"
+    return [no_bindings, with_bindings(when_false(right_proof), when_false(left_proof))] if operator == "||"
     no_proof
   else
     no_proof
@@ -1668,7 +1677,7 @@ def returns_in_body(body, mutable types)
   mutable found = []
   body.each do |statement|
     found += return_types_in(statement, types)
-    types = bind_after(statement, types, [])
+    types = bind_after(statement, types, no_bindings)
   end
   found
 end
@@ -1691,7 +1700,7 @@ def safe_as_if(node)
 end
 
 def scan_program(nodes)
-  mutable types = []
+  mutable types = no_bindings
   nodes.each do |node|
     if node in DefNode
       types = with_bound(types, node.name, synthesize_def_return(node, types))
@@ -1702,7 +1711,7 @@ def scan_program(nodes)
       # exhaustiveness off the name; nothing reads it yet.
       types = with_bound(types, node.name, EnumType.new(name: node.name))
     else
-      types = bind_after(node, types, [])
+      types = bind_after(node, types, no_bindings)
     end
   end
   types
@@ -1766,7 +1775,7 @@ end
 def shape_narrowings(condition, types)
   proof = proof_of(condition, types)
   [when_true(proof), when_false(proof)].map do |proved|
-    bindings_hash(proved).select { |name, type| proved_key?(name) || synthesize_name(name, types) == ANY_STRUCT }
+    layer_of(bindings_hash(proved).select { |name, type| proved_key?(name) || synthesize_name(name, types) == ANY_STRUCT })
   end
 end
 
@@ -1783,9 +1792,9 @@ def shape_proof(node, types)
   return no_proof unless (node.subject in IdentifierNode) && (node.pattern in StructPatternNode) && node.pattern.fields.empty?
   held = synthesize_name(node.subject.name, types)
   return no_proof unless synthesize_name(node.pattern.name, types) == ClassType.new(name: node.pattern.name)
-  return [[[node.subject.name, StructType.new(name: node.pattern.name)]], []] if held == ANY_STRUCT
+  return [bound_one(node.subject.name, StructType.new(name: node.pattern.name)), no_bindings] if held == ANY_STRUCT
   return no_proof unless native_reading?(types) && (held in MaybeType) && (held.inner in StructType)
-  [[[proved_key(node.subject.name), StructType.new(name: node.pattern.name)]], []]
+  [bound_one(proved_key(node.subject.name), StructType.new(name: node.pattern.name)), no_bindings]
 end
 
 # The type a field of this name has, read off a value that is one of
@@ -2090,7 +2099,7 @@ def synthesize_body(body, mutable types)
   body.each do |statement|
     early += return_types_in(statement, types)
     last = statement_answer(statement, types)
-    types = bind_after(statement, types, [])
+    types = bind_after(statement, types, no_bindings)
   end
   merge_candidates(early + [last])
 end
@@ -2477,10 +2486,11 @@ end
 # of a name is proved no further than the body.
 def unnarrowed(before, after)
   # A proof bound beside a name inside the body goes with the body.
-  kept = bindings_hash(after).reject { |name, type| proved_key?(name) && binding_type(before, name).nil? }
-  wide = bindings_hash(before).select { |name, type| type == ANY_STRUCT }
-  return kept if wide.empty?
-  kept.map { |name, type| [name, (wide.key?(name) ? ANY_STRUCT : type)] }.to_h
+  mutable kept = bindings_hash(after).reject { |name, type| proved_key?(name) && binding_type(before, name).nil? }
+  bindings_hash(before).each do |name, type|
+    kept = kept.merge({name => ANY_STRUCT}) if type == ANY_STRUCT && kept.key?(name)
+  end
+  layer_of(kept)
 end
 
 def when_false(proof) = type_at(proof, 1)

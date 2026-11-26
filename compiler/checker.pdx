@@ -311,7 +311,7 @@ def calls_in_node(node, locals, globals, mutable found)
   return found if node.nil?
   case node
   in DefNode
-    mutable inner = []
+    mutable inner = no_bindings
     node.parameters.each do |parameter|
       inner = with_bound(inner, parameter.name, parameter_type(parameter, globals))
     end
@@ -1041,7 +1041,7 @@ def check_program_with(nodes, source, file, imports, sharpened)
   # A bare name is judged (#98) only where every name the file can see is
   # in view: a require the walk could not resolve may declare anything.
   judging = nodes.none? { computed_require?(it) }
-  scope = Scope.new(arities: whole.arities, contracts: whole.contracts, enums: whole.enums, file: file, globals: whole.globals, home: "", inside: nil, judging: judging, locals: [], private_constants: whole.private_constants, shapes: whole.shapes, sharpened: sharpened, source: source.lines, traits: whole.traits, visibilities: whole.visibilities)
+  scope = Scope.new(arities: whole.arities, contracts: whole.contracts, enums: whole.enums, file: file, globals: whole.globals, home: "", inside: nil, judging: judging, locals: no_bindings, private_constants: whole.private_constants, shapes: whole.shapes, sharpened: sharpened, source: source.lines, traits: whole.traits, visibilities: whole.visibilities)
   annotated = check_annotations(nodes, source, scope, [])
   found = check_requires(nodes, false, scope, annotated)
   walked = check_redefinitions(nodes, "", scope, imported_names(imports), found)
@@ -1417,7 +1417,7 @@ end
 # types in source order — a def that calls a later def reads that call as
 # unknown, which is a decline, not a wrong answer.
 def declared_globals(nodes)
-  mutable globals = []
+  mutable globals = no_bindings
   nodes.each do |node|
     globals = register_struct(node, globals) if node in StructDefNode
     globals = with_bound(globals, node.name, EnumType.new(name: node.name)) if node in EnumDefNode
@@ -1520,7 +1520,7 @@ end
 def def_scope(node, scope)
   agreed = scope.sharpened.find { it[0] == node.name }
   agreed_pairs = if agreed.nil? then [] else value_at_checked(agreed, 1) end
-  mutable locals = []
+  mutable locals = no_bindings
   node.parameters.each do |parameter|
     sharpened = agreed_pairs.find { it[0] == parameter.name }
     type = if sharpened.nil? then parameter_type(parameter, scope.globals) else value_at_checked(sharpened, 1) end
@@ -1529,7 +1529,7 @@ def def_scope(node, scope)
   scope.with(locals: locals)
 end
 
-def empty_declarations = Declarations.new(arities: [], builtins: [], constants: [], contracts: [], enums: [], globals: [], private_constants: [], shapes: [], traits: [], visibilities: [])
+def empty_declarations = Declarations.new(arities: [], builtins: [], constants: [], contracts: [], enums: [], globals: no_bindings, private_constants: [], shapes: [], traits: [], visibilities: [])
 
 def enum_owning(enums, case_name)
   found = enums.find { it[0] == case_name }
@@ -1647,7 +1647,7 @@ end
 # def returns either — a bare call inside a struct may reach the struct's
 # own methods before the program's, which this increment does not model.
 def method_scope(node, scope)
-  type_names = bindings_hash(scope.globals).select { |name, type| (type in ClassType) || (type in EnumType) }
+  type_names = layer_of(bindings_hash(scope.globals).select { |name, type| (type in ClassType) || (type in EnumType) })
   def_scope(node, scope.with(arities: [], contracts: [], globals: type_names, judging: false))
 end
 
@@ -1854,7 +1854,7 @@ def sharpen_parameters(entry, files)
   mutable calls = []
   files.each do |file|
     globals = merge_declarations(declarations_of(file.nodes), file.imports).globals
-    calls = calls_in(file.nodes, [], globals, calls)
+    calls = calls_in(file.nodes, no_bindings, globals, calls)
   end
   defs = entry.nodes.select { it in DefNode }
   entry_declarations = merge_declarations(declarations_of(entry.nodes), entry.imports)
