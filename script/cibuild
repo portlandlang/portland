@@ -1,7 +1,10 @@
 #!/bin/sh
-# What CI runs: bootstrap the toolchain, then the full test suite and linters.
+# What CI runs: bootstrap the toolchain, then the full test suite and
+# linters, then the native tool builds (#600), which the default suite
+# leaves out and a pull request must pass.
 set -e
 cd "$(dirname "$0")/.."
 
 script/bootstrap
 script/test
+script/test --native
