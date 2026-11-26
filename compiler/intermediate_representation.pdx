@@ -1017,6 +1017,11 @@ def lower_system(node, bindings, context, root)
     refuse_native("System.read_file of #{with_article(named.type)}", node) unless named.type == StringType.new
     return IntermediateSystem.new(type: MaybeType.new(inner: StringType.new), name: "read_file", arguments: [named])
   end
+  if node.name == "core_source" && node.arguments.length == 1
+    named = lower_value(node.arguments[0], bindings, context)
+    refuse_native("System.core_source of #{with_article(named.type)}", node) unless named.type == StringType.new
+    return IntermediateSystem.new(type: StringType.new, name: "core_source", arguments: [named])
+  end
   refuse_native("System.#{node.name}", node)
 end
 

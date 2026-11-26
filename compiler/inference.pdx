@@ -2012,6 +2012,11 @@ def synthesize_call(node, types)
   if node.name == "read_file" && (node.receiver in IdentifierNode) && node.receiver.name == "System" && native_reading?(types)
     return MaybeType.new(inner: StringType.new)
   end
+  # `System.core_source` answers a core file's text, which the binary
+  # carries, so it is always there (#591).
+  if node.name == "core_source" && (node.receiver in IdentifierNode) && node.receiver.name == "System" && native_reading?(types)
+    return StringType.new
+  end
   return type_function_answer(node) if builtin_type_function?(node, types)
   receiver = synthesize(node.receiver, types)
   # A method the core writes for the receiver's type is a def of its own

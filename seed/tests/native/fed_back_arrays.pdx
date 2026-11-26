@@ -1,0 +1,13 @@
+# An empty array handed to a def that answers it grown (#591), and the
+# answer handed back in: the def is pinned as handed the empty array
+# first, and its answer says what the array holds.
+def visit(path, seen)
+  return seen if seen.include?(path)
+  seen + [path]
+end
+
+mutable seen = []
+["a", "b", "a", "c"].each do |path|
+  seen = visit(path, seen)
+end
+p(seen)

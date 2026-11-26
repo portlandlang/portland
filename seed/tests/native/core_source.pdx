@@ -1,0 +1,3 @@
+# The core's own files, as the binary running this carries them (#591,
+# ADR 0093): the checker reads the core's declarations off their text.
+puts System.core_source("kernel.pdx")
