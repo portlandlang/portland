@@ -782,7 +782,7 @@ def lower_function(definition, found, context)
   names = context.arities.map { it[0] }
   settled = settled_start(definition.body, found.parameters, yielding_answers(context.answers, found.block), names)
   inside = context.with(procedure: found.answer == NOTHING, yielding: found.block, answer: found.answer, home: found.answer, pinned: settled)
-  lowered = lower_body(definition.body, definition, "a def", found.parameters, found.answer, inside)
+  lowered = lower_body(definition.body, definition, "a def", as_bindings(found.parameters), found.answer, inside)
   locals = placed_locals(bindings_hash(lowered.bindings).reject { |name, type| found.parameters.any? { it[0] == name } })
   IntermediateFunction.new(name: definition.name, key: found.key, parameters: placed_locals(found.parameters), answer: found.answer, locals: locals, body: lowered.nodes, block: found.block, returned: returned_into?(definition.body))
 end
@@ -835,7 +835,7 @@ def lower_program(written, core: nil, progress: nil)
   called.each do |found|
     functions << lower_function(found.definition, found, context)
   end
-  entry = lower_statements(statements, [], context)
+  entry = lower_statements(statements, no_bindings, context)
   functions << IntermediateFunction.new(name: "main", key: nil, parameters: [], answer: NilType.new, locals: placed_locals(entry.bindings).reverse, body: entry.nodes, block: nil, returned: false)
   IntermediateProgram.new(functions: functions, structs: pinned.structs.map { |made| [made.name, struct_fields(made, context)] })
 end

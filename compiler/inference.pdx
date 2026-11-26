@@ -414,14 +414,9 @@ end
 # bindings by a name goes through here, and every binding through
 # `with_bound` and `with_bindings`, so what holds them is said once.
 def binding_type(types, name)
-  if types in Bindings
-    found = types.near[name]
-    return found if found.some?
-    return types.far.nil? ? nil : binding_type(types.far, name)
-  end
-  return types[name] if types in Hash
-  found = types.assoc(name)
-  found.nil? ? nil : type_at(found, 1)
+  found = types.near[name]
+  return found if found.some?
+  types.far.nil? ? nil : binding_type(types.far, name)
 end
 
 # Bindings as one Hash from name to type (#607), every layer flattened,
@@ -1373,14 +1368,9 @@ def native_owner(type)
   nil
 end
 
-# Whether these bindings are the native build's: its name is the last of
-# them, where pinning keeps it, so a checker's bindings answer no after
-# one look and are never walked for it.
-def native_reading?(types)
-  return binding_type(types, NATIVE_READING).some? if (types in Bindings) || (types in Hash)
-  last = types.last
-  last.some? && last[0] == NATIVE_READING
-end
+# Whether these bindings are the native build's: pinning binds its name
+# with the answers, beneath every layer a walk lays over them.
+def native_reading?(types) = binding_type(types, NATIVE_READING).some?
 
 def nil_arm?(branch) = (branch.pattern in NilNode) && branch.guard.nil?
 
