@@ -251,6 +251,25 @@ pub unsafe extern "C" fn portland_hash_value_at(hash: *const HashBlock, place: i
     }
 }
 
+/// A Hash in its source form, as the seed's `inspect` writes it: each key
+/// and its value with ` => ` between, in the order the keys went in.
+///
+/// # Safety
+/// `hash` points at a live Hash.
+pub unsafe fn hash_source(hash: *const HashBlock) -> String {
+    unsafe {
+        let keys = (*hash).keys;
+        let values = (*hash).values;
+        let mut written = Vec::with_capacity((*keys).length as usize);
+        for index in 0..(*keys).length as usize {
+            let key = word_source(STRINGS, elements_of(keys).add(index).read());
+            let value = word_source((*values).kind, elements_of(values).add(index).read());
+            written.push(format!("{key} => {value}"));
+        }
+        format!("{{{}}}", written.join(", "))
+    }
+}
+
 /// One name fewer holds this Hash, and the last one frees it, with its
 /// two arrays.
 ///

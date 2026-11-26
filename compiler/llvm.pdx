@@ -292,6 +292,7 @@ def llvm_array_kind(type)
   in BooleanType then 1
   in StringType then 2
   in StructType then 4
+  in HashType then 5
   else 3
   end
 end
