@@ -181,6 +181,14 @@ struct IntermediateFunction
   returned
 end
 
+# A Hash literal (#607): its keys and its values, each an array in the
+# order the pairs are written, which the runtime makes one Hash of.
+struct IntermediateHash
+  type
+  keys
+  values
+end
+
 # `array[index]`, `first`, and `last` (#503): the element as a maybe, nil
 # past either end. A negative index counts from the end.
 struct IntermediateIndex
@@ -1123,6 +1131,18 @@ def lower_value(node, bindings, context)
     end
     refuse_native("an array of #{render_type(first)}", node) unless native_type?(ArrayType.new(element: first))
     IntermediateArray.new(type: ArrayType.new(element: first), elements: values)
+  # A Hash literal (#607): String keys, and values of one type, each
+  # opened as an array's elements are.
+  in HashNode(pairs:)
+    refuse_native("an empty hash", node) if pairs.empty?
+    keys = pairs.map { opened_for(lower_value(it.key, bindings, inner), "[]") }
+    values = pairs.map { opened_for(lower_value(it.value, bindings, inner), "[]") }
+    held = values.first.type
+    refuse_native("a hash keyed by anything but Strings", node) unless keys.all? { it.type == StringType.new }
+    refuse_native("a hash holding #{with_article(held)} and another type", node) unless values.all? { it.type == held }
+    type = HashType.new(key: StringType.new, value: held)
+    refuse_native("a hash of #{render_type(held)}", node) unless native_type?(type)
+    IntermediateHash.new(type: type, keys: IntermediateArray.new(type: ArrayType.new(element: StringType.new), elements: keys), values: IntermediateArray.new(type: ArrayType.new(element: held), elements: values))
   in BinaryNode(operator:, left:, right:)
     # `== nil` asks whether a value is there (#503).
     if %w[== !=].include?(operator) && ((left in NilNode) || (right in NilNode))
@@ -1183,6 +1203,9 @@ def lower_value(node, bindings, context)
       refuse_native("an index into a String by #{with_article(place.type)}", node) unless place.type == IntegerType.new
       return library_call("[]", opened_for(held, "[]"), [place], node)
     end
+    # A Hash is looked up by its key, and answers nothing where the key
+    # is not there (#607).
+    return library_call("[]", opened_for(held, "[]"), [lower_value(index, bindings, inner)], node) if plain_of(held.type) in HashType
     refuse_native("an index into #{with_article(held.type)}", node) unless held.type in ArrayType
     position = lower_value(index, bindings, inner)
     refuse_native("an index that is #{with_article(position.type)}", node) unless position.type == IntegerType.new
@@ -1376,6 +1399,11 @@ def lower_yield(node, bindings, context, root)
   IntermediateYield.new(type: handed.answer, arguments: arguments, leaves: handed.leaves)
 end
 
+# A Hash the native build holds (#607): String keys, and values an array
+# could hold, other than a Boolean, which a lookup has no way to answer
+# as nothing, and other than another Hash.
+def native_hash?(type) = type.key == StringType.new && type.value != BooleanType.new && !(type.value in HashType) && native_value?(type.value)
+
 def native_method_answer(type, name)
   case type
   in IntegerType
@@ -1435,7 +1463,10 @@ end
 def native_value?(type)
   return true if type == IntegerType.new || type == BooleanType.new || type == StringType.new
   return true if type in StructType
-  (type in ArrayType) && native_value?(type.element)
+  return native_hash?(type) if type in HashType
+  # An array of Hashes is unbuilt (#607): the runtime has no kind of
+  # element for one.
+  (type in ArrayType) && !(type.element in HashType) && native_value?(type.element)
 end
 
 # A value with a maybe opened for a method of this name.

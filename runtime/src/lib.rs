@@ -272,6 +272,17 @@ pub extern "C" fn portland_exit_check() {
             "{count} {noun} still held when the program ended — the native build missed a release (#497)"
         ));
     }
+    if cfg!(debug_assertions) && hash::live_hashes() != 0 {
+        let count = hash::live_hashes();
+        let noun = if count == 1 {
+            "Hash was"
+        } else {
+            "Hashes were"
+        };
+        refuse(&format!(
+            "{count} {noun} still held when the program ended — the native build missed a release (#607)"
+        ));
+    }
 }
 
 /// An array as a native program holds it (ADR 0096): a pointer to this
@@ -1079,8 +1090,8 @@ mod tests {
 
     /// The tally of live Strings is one number for the whole process, and
     /// tests run side by side, so each test that makes a String holds this
-    /// while it counts.
-    static COUNTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    /// while it counts. The Hash's tests hold it too.
+    pub(crate) static COUNTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     fn text_of(text: *const StringBlock) -> String {
         String::from_utf8(unsafe { bytes_of(text) }.to_vec()).unwrap()
@@ -1351,4 +1362,5 @@ mod tests {
     }
 }
 
+mod hash;
 mod library;

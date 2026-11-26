@@ -84,6 +84,9 @@ NATIVE_LIBRARY = [
   [ArrayType.new(element: StringType.new), "join", [], StringType.new, "portland_array_join"],
   [ArrayType.new(element: StringType.new), "join", [StringType.new], StringType.new, "portland_array_join_with"],
   [ArrayType.new(element: ElementType.new), "slice", [IntegerType.new, IntegerType.new], SelfType.new, "portland_array_slice"],
+  # A Hash keyed by Strings (#607). Its element is its value.
+  [HashType.new(key: StringType.new, value: ElementType.new), "length", [], IntegerType.new, "portland_hash_length"],
+  [HashType.new(key: StringType.new, value: ElementType.new), "size", [], IntegerType.new, "portland_hash_length"],
   [IntegerType.new, "chr", [], StringType.new, "portland_integer_chr"],
   [IntegerType.new, "chr", [StringType.new], StringType.new, "portland_integer_chr_encoded"],
   [IntegerType.new, "gcd", [IntegerType.new], IntegerType.new, "portland_integer_gcd"],
@@ -111,7 +114,8 @@ NATIVE_LIBRARY = [
   # with brackets and reach the library under these names.
   [StringType.new, "[]", [IntegerType.new], MaybeType.new(inner: StringType.new), "portland_string_character"],
   [StringType.new, "[..]", [IntegerType.new, IntegerType.new, IntegerType.new], StringType.new, "portland_string_range"],
-  [ArrayType.new(element: ElementType.new), "[..]", [IntegerType.new, IntegerType.new, IntegerType.new], SelfType.new, "portland_array_range"]
+  [ArrayType.new(element: ElementType.new), "[..]", [IntegerType.new, IntegerType.new, IntegerType.new], SelfType.new, "portland_array_range"],
+  [HashType.new(key: StringType.new, value: ElementType.new), "[]", [StringType.new], MaybeType.new(inner: ElementType.new), "portland_hash_get"]
 ]
 
 # The name the native build's pinning reads under (#503): bound by it and
@@ -1077,6 +1081,8 @@ end
 # A type the library's table writes, as it is for the value asked (#560):
 # `element` is what the array asked holds, and `self` the array itself.
 def library_type(written, receiver)
+  # A Hash's element is its value (#607).
+  return receiver.value if written == ElementType.new && (receiver in HashType)
   return receiver.element if written == ElementType.new
   return receiver if written == SelfType.new
   return MaybeType.new(inner: library_type(written.inner, receiver)) if written in MaybeType
@@ -1216,7 +1222,7 @@ def native_library_entry(receiver, name, arguments)
   NATIVE_LIBRARY.find do |entry|
     asked = type_at(entry, 0)
     taken = type_at(entry, 2)
-    fits = asked == receiver || (asked == ArrayType.new(element: ElementType.new) && (receiver in ArrayType))
+    fits = asked == receiver || (asked == ArrayType.new(element: ElementType.new) && (receiver in ArrayType)) || ((asked in HashType) && (receiver in HashType) && asked.key == receiver.key && asked.value == ElementType.new)
     fits && type_at(entry, 1) == name && taken.length == arguments.length && taken.map { library_type(it, receiver) } == arguments
   end
 end
@@ -2147,6 +2153,9 @@ def synthesize_index(node, types)
     return UnknownType.new
   end
   return MaybeType.new(inner: StringType.new) if opened == StringType.new && synthesize(node.index, types) == IntegerType.new
+  # A Hash looked up by its key's type answers its value, or nothing
+  # where the key is not there (#607).
+  return maybe_of(receiver.value) if (receiver in HashType) && synthesize(node.index, types) == receiver.key
   return UnknownType.new unless (receiver in ArrayType) && synthesize(node.index, types) == IntegerType.new
   maybe_of(receiver.element)
 end
