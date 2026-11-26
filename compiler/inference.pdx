@@ -15,7 +15,7 @@
 #
 #   ["integer"] ["float"] ["string"] ["boolean"] ["symbol"] ["nil"]
 #   ["range", element]         — element is the ends' type (ADR 0081), or ["unknown"]
-#   ["array", element]         — element is a type, or ["unknown"]
+#   ArrayType(element)         — element is a type, or ["unknown"]
 #   ["hash", key, value]
 #   MaybeType(inner)           — the wrapper, never a union (ADR 0040 §3)
 #   ["struct", "Name"]         — an instance
@@ -71,8 +71,11 @@ require_relative "type_kinds"
 # and the struct it holds says which it is.
 ANY_STRUCT = ["struct", "*"]
 
-# What a maybe's place before its inner type read as, while a read by
-# place is still written (#593).
+# What an array's place before its element's type read as, while a read
+# by place is still written (#593).
+ARRAY_KIND = "array"
+
+# And a maybe's, before its inner type.
 MAYBE_KIND = "maybe"
 
 # The methods of a String and of an array the native build holds by name
@@ -80,24 +83,24 @@ MAYBE_KIND = "maybe"
 # answers, and the runtime function that does it. `element` stands for
 # what the array asked holds, and `self` for the array asked.
 NATIVE_LIBRARY = [
-  [["array", ["element"]], "+", [["self"]], ["self"], "portland_array_concat"],
-  [["array", ["element"]], "drop", [["integer"]], ["self"], "portland_array_drop"],
-  [["array", ["element"]], "include?", [["element"]], ["boolean"], "portland_array_include"],
-  [["array", ["integer"]], "join", [], ["string"], "portland_array_join"],
-  [["array", ["integer"]], "join", [["string"]], ["string"], "portland_array_join_with"],
-  [["array", ["string"]], "join", [], ["string"], "portland_array_join"],
-  [["array", ["string"]], "join", [["string"]], ["string"], "portland_array_join_with"],
-  [["array", ["element"]], "slice", [["integer"], ["integer"]], ["self"], "portland_array_slice"],
+  [ArrayType.new(element: ["element"]), "+", [["self"]], ["self"], "portland_array_concat"],
+  [ArrayType.new(element: ["element"]), "drop", [["integer"]], ["self"], "portland_array_drop"],
+  [ArrayType.new(element: ["element"]), "include?", [["element"]], ["boolean"], "portland_array_include"],
+  [ArrayType.new(element: ["integer"]), "join", [], ["string"], "portland_array_join"],
+  [ArrayType.new(element: ["integer"]), "join", [["string"]], ["string"], "portland_array_join_with"],
+  [ArrayType.new(element: ["string"]), "join", [], ["string"], "portland_array_join"],
+  [ArrayType.new(element: ["string"]), "join", [["string"]], ["string"], "portland_array_join_with"],
+  [ArrayType.new(element: ["element"]), "slice", [["integer"], ["integer"]], ["self"], "portland_array_slice"],
   [["integer"], "chr", [], ["string"], "portland_integer_chr"],
   [["integer"], "chr", [["string"]], ["string"], "portland_integer_chr_encoded"],
   [["integer"], "gcd", [["integer"]], ["integer"], "portland_integer_gcd"],
   [["integer"], "**", [["integer"]], ["integer"], "portland_integer_power"],
   [["integer"], "to_s", [["integer"]], ["string"], "portland_integer_to_s_base"],
   [["string"], "bytesize", [], ["integer"], "portland_string_bytesize"],
-  [["string"], "chars", [], ["array", ["string"]], "portland_string_chars"],
+  [["string"], "chars", [], ArrayType.new(element: ["string"]), "portland_string_chars"],
   [["string"], "chop", [], ["string"], "portland_string_chop"],
   [["string"], "chr", [], ["string"], "portland_string_chr"],
-  [["string"], "codepoints", [], ["array", ["integer"]], "portland_string_codepoints"],
+  [["string"], "codepoints", [], ArrayType.new(element: ["integer"]), "portland_string_codepoints"],
   [["string"], "count", [["string"]], ["integer"], "portland_string_count"],
   [["string"], "downcase", [], ["string"], "portland_string_downcase"],
   [["string"], "end_with?", [["string"]], ["boolean"], "portland_string_end_with"],
@@ -105,8 +108,8 @@ NATIVE_LIBRARY = [
   [["string"], "index", [["string"]], MaybeType.new(inner: ["integer"]), "portland_string_index"],
   [["string"], "rjust", [["integer"], ["string"]], ["string"], "portland_string_rjust"],
   [["string"], "slice", [["integer"], ["integer"]], ["string"], "portland_string_slice"],
-  [["string"], "split", [["string"]], ["array", ["string"]], "portland_string_split"],
-  [["string"], "split", [["string"], ["integer"]], ["array", ["string"]], "portland_string_split_limit"],
+  [["string"], "split", [["string"]], ArrayType.new(element: ["string"]), "portland_string_split"],
+  [["string"], "split", [["string"], ["integer"]], ArrayType.new(element: ["string"]), "portland_string_split_limit"],
   [["string"], "start_with?", [["string"]], ["boolean"], "portland_string_start_with"],
   [["string"], "strip", [], ["string"], "portland_string_strip"],
   [["string"], "to_i", [], ["integer"], "portland_string_to_i"],
@@ -115,7 +118,7 @@ NATIVE_LIBRARY = [
   # with brackets and reach the library under these names.
   [["string"], "[]", [["integer"]], MaybeType.new(inner: ["string"]), "portland_string_character"],
   [["string"], "[..]", [["integer"], ["integer"], ["integer"]], ["string"], "portland_string_range"],
-  [["array", ["element"]], "[..]", [["integer"], ["integer"], ["integer"]], ["self"], "portland_array_range"]
+  [ArrayType.new(element: ["element"]), "[..]", [["integer"], ["integer"], ["integer"]], ["self"], "portland_array_range"]
 ]
 
 # The name the native build's pinning reads under (#503): bound by it and
@@ -413,12 +416,12 @@ def block_parameter_type(receiver, index, name, argument_types, parameter_count:
   end
   # An arrangement handed over by the combinatorics (#104) is an array of
   # the receiver's elements.
-  if index == 0 && (receiver in ["array", *]) && %w[combination repeated_combination permutation repeated_permutation product].include?(name)
+  if index == 0 && (receiver in ArrayType) && %w[combination repeated_combination permutation repeated_permutation product].include?(name)
     return receiver
   end
   # A neighbouring pair (#110): chunk_while and slice_when hand two
   # elements, not one spread.
-  if (receiver in ["array", *]) && (name == "chunk_while" || name == "slice_when")
+  if (receiver in ArrayType) && (name == "chunk_while" || name == "slice_when")
     return element_type(receiver) if index <= 1
     return ["unknown"]
   end
@@ -426,7 +429,7 @@ def block_parameter_type(receiver, index, name, argument_types, parameter_count:
   # that yields one value take the element's own elements.
   if parameter_count >= 2
     element = element_type(receiver)
-    return type_at(element, 1) if element in ["array", *]
+    return element.element if element in ArrayType
     return ["unknown"]
   end
   return ["unknown"] unless index == 0
@@ -489,7 +492,7 @@ def builtin_table(type)
   in ["float"] then %w[abs/0 abs2/0 angle/0 arg/0 between?/2 ceil/0 clamp/1-2 class/0 conj/0 conjugate/0 denominator/0 div/1 divmod/1 eql?/1 failure?/0 fdiv/1 finite?/0 floor/0 i/0 imag/0 imaginary/0 infinite?/0 magnitude/0 modulo/1 nan?/0 negative?/0 next_float/0 nil?/0 numerator/0 phase/0 polar/0 positive?/0 pow/1 prev_float/0 quo/1 rationalize/0-1 real/0 real?/0 rect/0 rectangular/0 remainder/1 round/0 some?/0 to_c/0 to_f/0 to_i/0 to_r/0 to_s/0 truncate/0 zero?/0]
   in ["boolean"] then %w[class/0 eql?/1 failure?/0 nil?/0 some?/0 to_s/0]
   in ["symbol"] then %w[!~/1 =~/1 capitalize/0 class/0 downcase/0 empty?/0 encoding/0 end_with?/0+ eql?/1 failure?/0 id2name/0 intern/0 length/0 match/1-2& match?/1-2 name/0 next/0 nil?/0 size/0 slice/1-2 some?/0 start_with?/0+ succ/0 swapcase/0 to_s/0 to_sym/0 upcase/0]
-  in ["array", *] then %w[all?/0-1& any?/0-1& assoc/1 at/1 bsearch/0& bsearch_index/0& chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& combination/1& compact/0 count/0-1& cycle/1& detect/0& difference/0+ dig/1+ drop/1 drop_while/0& each/0& each_cons/1 each_index/0& each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& include?/1 index/0-1& inject/1& intersect?/1 intersection/0+ join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& permutation/0-1& product/0+& rassoc/1 reduce/1& reject/0& repeated_combination/1& repeated_permutation/1& reverse/0 reverse_each/0& rfind/0& rindex/0-1& rotate/0-1 sample/0-1 select/0& shuffle/0 size/0 slice/2 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transpose/0 union/0+ uniq/0 values_at/0+ zip/1]
+  in ArrayType then %w[all?/0-1& any?/0-1& assoc/1 at/1 bsearch/0& bsearch_index/0& chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& combination/1& compact/0 count/0-1& cycle/1& detect/0& difference/0+ dig/1+ drop/1 drop_while/0& each/0& each_cons/1 each_index/0& each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& include?/1 index/0-1& inject/1& intersect?/1 intersection/0+ join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& permutation/0-1& product/0+& rassoc/1 reduce/1& reject/0& repeated_combination/1& repeated_permutation/1& reverse/0 reverse_each/0& rfind/0& rindex/0-1& rotate/0-1 sample/0-1 select/0& shuffle/0 size/0 slice/2 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transpose/0 union/0+ uniq/0 values_at/0+ zip/1]
   in ["hash", *] then %w[all?/0-1& any?/0-1& assoc/1 chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& detect/0& dig/1+ drop/1 drop_while/0& each/0& each_key/0& each_pair/0& each_value/0& each_with_index/0& empty?/0 entries/0 eql?/1 except/0+ failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& has_key?/1 has_value?/1 include?/1 inject/1& invert/0 key/1 key?/1 keys/0 length/0 map/0& max/0& max_by/0& member?/1 merge/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& rassoc/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice/0+ slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transform_keys/0& transform_values/0& uniq/0 value?/1 values/0 values_at/0+ zip/1]
   in ["random"] then %w[class/0 eql?/1 failure?/0 nil?/0 rand/0-1 seed/0 some?/0 to_s/0]
   in ["range", *] then %w[all?/0-1& any?/0-1& begin/0 bsearch/0& chunk/0& chunk_while/0& clamp/1-2 class/0 collect/0& collect_concat/0& count/0-1& cover?/1& cycle/1& detect/0& drop_while/0& each/0& each_with_index/0& end/0 entries/0& eql?/1 exclude_end?/0 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& grep/1& grep_v/1& group_by/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& member?/1& min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& overlap?/1 partition/0& reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& step/0-1& sum/0-1& take_while/0& to_a/0& to_h/0& to_s/0 to_set/0&]
@@ -566,16 +569,16 @@ def call_answer(receiver, node, types)
     ["unknown"]
   when "match?", "!~", "casefold?" then ["boolean"]
   when "source", "pre_match", "post_match" then ["string"]
-  when "names" then ["array", ["string"]]
-  when "scan", "captures" then ["array", ["unknown"]]
+  when "names" then ArrayType.new(element: ["string"])
+  when "scan", "captures" then ArrayType.new(element: ["unknown"])
   when "named_captures" then ["hash", ["string"], ["unknown"]]
   when "options" then ["integer"]
   when "regexp" then ["regexp"]
   when "rindex"
     return MaybeType.new(inner: ["integer"]) if receiver == ["string"]
     ["unknown"]
-  when "partition", "rpartition" then ["array", ["string"]]
-  when "codepoints", "bytes" then ["array", ["integer"]]
+  when "partition", "rpartition" then ArrayType.new(element: ["string"])
+  when "codepoints", "bytes" then ArrayType.new(element: ["integer"])
   when "casecmp?" then ["boolean"]
   when "empty?", "include?", "member?", "key?", "has_key?", "start_with?", "end_with?", "zero?", "positive?", "negative?", "even?", "odd?", "nil?", "some?", "nan?", "finite?", "infinite?", "between?", "allbits?", "anybits?", "nobits?", "all?", "none?", "one?", "intersect?", "any?", "exclude_end?", "cover?", "overlap?", "valid_encoding?", "subset?", "superset?", "proper_subset?", "proper_superset?", "disjoint?"
     ["boolean"]
@@ -590,13 +593,13 @@ def call_answer(receiver, node, types)
   when "add", "delete", "union"
     return ["set"] if receiver == ["set"]
     ["unknown"]
-  when "chars", "grapheme_clusters", "split", "lines" then ["array", ["string"]]
+  when "chars", "grapheme_clusters", "split", "lines" then ArrayType.new(element: ["string"])
   when "keys"
-    return ["array", type_at(receiver, 1)] if receiver in ["hash", *]
-    ["array", ["unknown"]]
+    return ArrayType.new(element: type_at(receiver, 1)) if receiver in ["hash", *]
+    ArrayType.new(element: ["unknown"])
   when "values"
-    return ["array", type_at(receiver, 2)] if receiver in ["hash", *]
-    ["array", ["unknown"]]
+    return ArrayType.new(element: type_at(receiver, 2)) if receiver in ["hash", *]
+    ArrayType.new(element: ["unknown"])
   # A range's ends (#111), each a maybe where the range is open.
   when "begin", "end"
     return MaybeType.new(inner: type_at(receiver, 1)) if receiver in ["range", *]
@@ -616,20 +619,20 @@ def call_answer(receiver, node, types)
     # With a count, `first(2)` answers a slice, not a maybe; the survey for
     # ADR 0047 shape 3 found this arm calling one an Integer?.
     return ["unknown"] unless node.arguments.empty?
-    return MaybeType.new(inner: type_at(receiver, 1)) if receiver in ["array", *]
+    return MaybeType.new(inner: receiver.element) if receiver in ArrayType
     return MaybeType.new(inner: type_at(receiver, 1)) if receiver in ["range", *]
     return MaybeType.new(inner: ["unknown"]) if receiver == ["set"]
     ["unknown"]
   # The arrangements of an array are arrays of its elements (#104).
   when "combination", "repeated_combination", "permutation", "repeated_permutation"
-    return ["array", receiver] if receiver in ["array", *]
+    return ArrayType.new(element: receiver) if receiver in ArrayType
     ["unknown"]
-  when "product" then ["array", ["array", ["unknown"]]]
+  when "product" then ArrayType.new(element: ArrayType.new(element: ["unknown"]))
   # `flatten` without a depth reaches the innermost elements (#108); with a
   # depth, how deep the array stays nested is the argument's to say.
   when "flatten"
-    return flattened_type(receiver) if (receiver in ["array", *]) && node.arguments.empty?
-    return ["array", ["unknown"]] if receiver in ["array", *]
+    return flattened_type(receiver) if (receiver in ArrayType) && node.arguments.empty?
+    return ArrayType.new(element: ["unknown"]) if receiver in ArrayType
     synthesize_shape_answer(receiver, name)
   when "sort", "uniq", "compact", "slice", "merge", "step", "to_a", "entries", "clamp", "take", "drop", "take_while", "drop_while", "rotate", "difference", "intersection", "cycle"
     synthesize_shape_answer(receiver, name)
@@ -745,7 +748,7 @@ def class_answer(receiver)
   in ["float"]     then ["type", "Float"]
   in ["boolean"]   then ["type", "Boolean"]
   in ["symbol"]    then ["type", "Symbol"]
-  in ["array", *]  then ["type", "Array"]
+  in ArrayType  then ["type", "Array"]
   in ["hash", *]   then ["type", "Hash"]
   in ["range", *]  then ["type", "Range"]
   in ["random"]    then ["type", "Random"]
@@ -845,7 +848,7 @@ def dispatched_calls(node, receiver, types)
 end
 
 def element_type(receiver)
-  return type_at(receiver, 1) if receiver in ["array", *]
+  return receiver.element if receiver in ArrayType
   return type_at(receiver, 1) if receiver in ["range", *]
   ["unknown"]
 end
@@ -888,7 +891,7 @@ def field_key(owner, field) = "#{owner}.#{field}"
 # says nothing of what it holds, and the def it is handed to does. One
 # no other call names stays as it is.
 def filled_arguments(name, arguments, types)
-  empty = ["array", ["unknown"]]
+  empty = ArrayType.new(element: ["unknown"])
   return arguments unless arguments.any? { it == empty || ((it in ["keyword", *]) && type_at(it, 2) == empty) }
   mutable place = 0
   mutable filled = []
@@ -909,8 +912,8 @@ end
 # element type.
 def flattened_type(receiver)
   element = type_at(receiver, 1)
-  return flattened_type(element) if element in ["array", *]
-  ["array", element]
+  return flattened_type(element) if element in ArrayType
+  ArrayType.new(element: element)
 end
 
 # A name already bound, rebound somewhere inside a nested body, is unknown
@@ -1007,11 +1010,11 @@ end
 def joined_plain(first, second)
   return first if first == second
   return ANY_STRUCT if (first in ["struct", *]) && (second in ["struct", *])
-  return nil unless (first in ["array", *]) && (second in ["array", *])
-  return second if first == ["array", ["unknown"]]
-  return first if second == ["array", ["unknown"]]
-  element = joined_plain(type_at(first, 1), type_at(second, 1)) or return nil
-  ["array", element]
+  return nil unless (first in ArrayType) && (second in ArrayType)
+  return second if first == ArrayType.new(element: ["unknown"])
+  return first if second == ArrayType.new(element: ["unknown"])
+  element = joined_plain(first.element, second.element) or return nil
+  ArrayType.new(element: element)
 end
 
 # The one type these make together, each joined to the ones before it
@@ -1038,7 +1041,7 @@ def library_type(written, receiver)
   return type_at(receiver, 1) if written == ["element"]
   return receiver if written == ["self"]
   return MaybeType.new(inner: library_type(written.inner, receiver)) if written in MaybeType
-  return ["array", library_type(type_at(written, 1), receiver)] if (written in ["array", *]) && type_at(written, 1) == ["element"]
+  return ArrayType.new(element: library_type(written.element, receiver)) if (written in ArrayType) && written.element == ["element"]
   written
 end
 
@@ -1050,7 +1053,7 @@ def made_key(name) = "#{name}.new&"
 # a domain failure is unknown, as every fallible builtin is; `frexp` and
 # `lgamma` answer a pair.
 def math_answer(name)
-  return ["array", ["unknown"]] if name == "frexp" || name == "lgamma"
+  return ArrayType.new(element: ["unknown"]) if name == "frexp" || name == "lgamma"
   return ["unknown"] if %w[acos acosh asin atanh gamma log log10 log1p log2 sqrt].include?(name)
   return ["float"] if %w[atan atan2 cbrt cos cosh erf erfc exp expm1 hypot ldexp sin sinh tan tanh asinh].include?(name)
   ["unknown"]
@@ -1174,7 +1177,7 @@ def native_library_entry(receiver, name, arguments)
   NATIVE_LIBRARY.find do |entry|
     asked = type_at(entry, 0)
     taken = type_at(entry, 2)
-    fits = asked == receiver || (asked == ["array", ["element"]] && (receiver in ["array", *]))
+    fits = asked == receiver || (asked == ArrayType.new(element: ["element"]) && (receiver in ArrayType))
     fits && type_at(entry, 1) == name && taken.length == arguments.length && taken.map { library_type(it, receiver) } == arguments
   end
 end
@@ -1220,7 +1223,7 @@ end
 # whose `class` is the core's, and a struct's own name. Nil where the
 # native build compiles no methods for the type.
 def native_owner(type)
-  return "Array" if type in ["array", *]
+  return "Array" if type in ArrayType
   return type_at(type, 1) if type in ["struct", *]
   nil
 end
@@ -1436,7 +1439,7 @@ end
 # it is the plainest thing that could work in a dump.
 def render_type(type)
   case type
-  in ["array", element] then "[" + render_type(element) + "]"
+  in ArrayType(element:) then "[" + render_type(element) + "]"
   in ["hash", key, entry] then "{" + render_type(key) + " => " + render_type(entry) + "}"
   in MaybeType(inner:) then render_type(inner) + "?"
   in ["struct", "*"] then "Struct"
@@ -1677,8 +1680,8 @@ def synthesize(node, types)
   in SymbolNode then ["symbol"]
   in NilNode then ["nil"]
   in RangeNode then synthesize_range(node, types)
-  in WordArrayNode then ["array", ["string"]]
-  in SymbolArrayNode then ["array", ["symbol"]]
+  in WordArrayNode then ArrayType.new(element: ["string"])
+  in SymbolArrayNode then ArrayType.new(element: ["symbol"])
   in ArrayNode then synthesize_array(node, types)
   in HashNode then synthesize_hash(node, types)
   in IdentifierNode then synthesize_identifier(node, types)
@@ -1728,20 +1731,20 @@ def synthesize_append(node, types)
   # Read as the native build runs it, a maybe appended is opened first
   # (#566).
   value = opened_natively(synthesize(node.value, types), types)
-  return ["array", value] if current == ["array", ["unknown"]]
-  return current if (current in ["array", *]) && type_at(current, 1) == value
+  return ArrayType.new(element: value) if current == ArrayType.new(element: ["unknown"])
+  return current if (current in ArrayType) && current.element == value
   # Read as the native build runs it, one struct appended to an array of
   # another makes it an array of one of several structs (#572).
-  if (current in ["array", *]) && native_reading?(types)
-    element = joined_plain(type_at(current, 1), value)
-    return ["array", element] if element.some?
+  if (current in ArrayType) && native_reading?(types)
+    element = joined_plain(current.element, value)
+    return ArrayType.new(element: element) if element.some?
   end
-  return ["array", ["unknown"]] if current in ["array", *]
+  return ArrayType.new(element: ["unknown"]) if current in ArrayType
   ["unknown"]
 end
 
 def synthesize_array(node, types)
-  return ["array", ["unknown"]] if node.elements.empty?
+  return ArrayType.new(element: ["unknown"]) if node.elements.empty?
   # Read as the native build runs it, a maybe written into an array is
   # opened first, as one appended is (#566).
   first = opened_natively(synthesize(node.elements.first, types), types)
@@ -1749,7 +1752,7 @@ def synthesize_array(node, types)
   node.elements.each do |element|
     uniform = false unless opened_natively(synthesize(element, types), types) == first
   end
-  return ["array", first] if uniform
+  return ArrayType.new(element: first) if uniform
   # Read as the native build runs it, a literal of more than one struct
   # is an array of one of several structs (#572).
   if native_reading?(types)
@@ -1757,9 +1760,9 @@ def synthesize_array(node, types)
     node.elements.each do |element|
       joined = joined.nil? ? nil : joined_plain(joined, opened_natively(synthesize(element, types), types))
     end
-    return ["array", joined] if joined.some?
+    return ArrayType.new(element: joined) if joined.some?
   end
-  ["array", ["unknown"]]
+  ArrayType.new(element: ["unknown"])
 end
 
 def synthesize_bare_call(node, types)
@@ -1791,24 +1794,24 @@ def synthesize_binary(node, types)
     return ["integer"] if numeric?(left) && numeric?(right)
     return ["integer"] if left == ["string"] && right == ["string"]
     return ["integer"] if left == ["symbol"] && right == ["symbol"]
-    return ["integer"] if (left in ["array", *]) && (right in ["array", *])
+    return ["integer"] if (left in ArrayType) && (right in ArrayType)
     ["unknown"]
   when "+", "-", "*", "%"
     return tower_answer(left, right) if numeric?(left) && numeric?(right)
     return ["string"] if left == ["string"] && right == ["string"]
     # Read as the native build runs it, two arrays joined are an array of
     # what theirs make together, and an empty one is the other (#572).
-    if native_reading?(types) && node.operator == "+" && (left in ["array", *]) && (right in ["array", *])
+    if native_reading?(types) && node.operator == "+" && (left in ArrayType) && (right in ArrayType)
       return (joined_plain(left, right) or left)
     end
     # And an array joined with what is not known is read as that array,
     # so a def that joins an array with what it answers itself has a way
     # out to be read from. The other side is held to it once it is known.
     if native_reading?(types) && node.operator == "+"
-      return left if (left in ["array", *]) && left != ["array", ["unknown"]] && right == ["unknown"]
-      return right if (right in ["array", *]) && right != ["array", ["unknown"]] && left == ["unknown"]
+      return left if (left in ArrayType) && left != ArrayType.new(element: ["unknown"]) && right == ["unknown"]
+      return right if (right in ArrayType) && right != ArrayType.new(element: ["unknown"]) && left == ["unknown"]
     end
-    return left if (left in ["array", *]) && (right in ["array", *])
+    return left if (left in ArrayType) && (right in ArrayType)
     # A set's union and difference answer a set (ADR 0082).
     return ["set"] if left == ["set"] && (node.operator == "+" || node.operator == "-")
     ["unknown"]
@@ -1840,26 +1843,26 @@ def synthesize_block_call(node, receiver, types)
   # with the names it rebinds already forgotten.
   body = synthesize_body(node.block.body, forget_types(inner, assigned_names_in_body(node.block.body)))
   case node.name
-  when "map", "collect" then ["array", body]
+  when "map", "collect" then ArrayType.new(element: body)
   when "find", "detect", "rfind", "min_by", "max_by"
-    return MaybeType.new(inner: element_type(receiver)) if receiver in ["array", *]
+    return MaybeType.new(inner: element_type(receiver)) if receiver in ArrayType
     ["unknown"]
   # A summed block answers whatever its block does (#104).
   when "sum" then ["unknown"]
   when "count", "index", "find_index", "rindex" then synthesize_numeric_answer(receiver, node.name)
   # Binary search answers a maybe of the element, or of its position (#104).
   when "bsearch"
-    return MaybeType.new(inner: element_type(receiver)) if (receiver in ["array", *]) || (receiver in ["range", *])
+    return MaybeType.new(inner: element_type(receiver)) if (receiver in ArrayType) || (receiver in ["range", *])
     ["unknown"]
   when "bsearch_index" then MaybeType.new(inner: ["integer"])
   # The arrangements handed to a block answer the array; cycle answers nil.
   when "combination", "repeated_combination", "permutation", "repeated_permutation", "product"
-    return receiver if receiver in ["array", *]
+    return receiver if receiver in ArrayType
     ["unknown"]
   when "cycle" then ["nil"]
   when "all?", "any?", "none?", "one?" then ["boolean"]
   when "select", "filter", "reject", "each", "each_with_index", "reverse_each"
-    return receiver if (receiver in ["array", *]) || (receiver in ["hash", *]) || receiver == ["set"]
+    return receiver if (receiver in ArrayType) || (receiver in ["hash", *]) || receiver == ["set"]
     ["unknown"]
   # A set's groups (ADR 0082): the block's answers to sets of its members.
   when "classify"
@@ -1885,18 +1888,18 @@ def synthesize_block_call(node, receiver, types)
   # A hash's sort_by, take_while, and drop_while answer its pairs as an
   # array, as Ruby's do (#105), so only an array keeps its own type here.
   when "sort_by", "take_while", "drop_while", "each_index"
-    return receiver if receiver in ["array", *]
+    return receiver if receiver in ArrayType
     ["unknown"]
   # Ruby's runs and groups (#110): the runs are arrays of the receiver,
   # the groups a hash from the block's answers to them, and filter_map
   # keeps the block's answers less nil and false.
   when "chunk_while", "slice_when", "slice_before", "slice_after"
-    return ["array", receiver] if receiver in ["array", *]
+    return ArrayType.new(element: receiver) if receiver in ArrayType
     ["unknown"]
   when "group_by"
-    return ["hash", body, receiver] if receiver in ["array", *]
+    return ["hash", body, receiver] if receiver in ArrayType
     ["unknown"]
-  when "filter_map" then ["array", ["unknown"]]
+  when "filter_map" then ArrayType.new(element: ["unknown"])
   else
     ["unknown"]
   end
@@ -2069,12 +2072,12 @@ def synthesize_index(node, types)
   # (#563). A maybe is opened for either.
   opened = opened_natively(receiver, types)
   if node.index in RangeNode
-    return opened if opened == ["string"] || (opened in ["array", *])
+    return opened if opened == ["string"] || (opened in ArrayType)
     return ["unknown"]
   end
   return MaybeType.new(inner: ["string"]) if opened == ["string"] && synthesize(node.index, types) == ["integer"]
-  return ["unknown"] unless (receiver in ["array", *]) && synthesize(node.index, types) == ["integer"]
-  maybe_of(type_at(receiver, 1))
+  return ["unknown"] unless (receiver in ArrayType) && synthesize(node.index, types) == ["integer"]
+  maybe_of(receiver.element)
 end
 
 def synthesize_logical(node, types)
@@ -2128,12 +2131,12 @@ def synthesize_numeric_answer(receiver, name, arguments_empty: true)
     return receiver if (receiver == ["string"] || receiver == ["symbol"]) && (name == "succ" || name == "next")
     ["unknown"]
   when "index", "find_index", "rindex"
-    return MaybeType.new(inner: ["integer"]) if receiver == ["string"] || (receiver in ["array", *])
+    return MaybeType.new(inner: ["integer"]) if receiver == ["string"] || (receiver in ArrayType)
     ["unknown"]
   when "sum"
     # Whole numbers stay whole; anything else about the elements is 3b,
     # and an init (`sum(0.5)`, `sum("")`) is the caller's to say.
-    return ["integer"] if receiver == ["array", ["integer"]] && arguments_empty
+    return ["integer"] if receiver == ArrayType.new(element: ["integer"]) && arguments_empty
     ["unknown"]
   when "to_i", "floor", "ceil", "round", "truncate", "div", "ceildiv" then ["integer"]
   else
@@ -2164,11 +2167,11 @@ end
 def synthesize_shape_answer(receiver, name)
   case name
   when "sort", "uniq", "compact", "flatten", "slice", "take", "drop", "take_while", "drop_while", "rotate", "difference", "intersection"
-    return receiver if receiver in ["array", *]
+    return receiver if receiver in ArrayType
     # A set's algebra answers a set; its Enumerable walks answer arrays
     # (ADR 0082), as Ruby's do.
     return receiver if receiver == ["set"] && %w[difference flatten intersection].include?(name)
-    return ["array", ["unknown"]] if receiver == ["set"] && %w[compact drop sort take take_while drop_while uniq].include?(name)
+    return ArrayType.new(element: ["unknown"]) if receiver == ["set"] && %w[compact drop sort take take_while drop_while uniq].include?(name)
     # A hash's compact and slice answer a hash (#105).
     return receiver if (receiver in ["hash", *]) && (name == "compact" || name == "slice")
     return ["string"] if receiver == ["string"] && name == "slice"
@@ -2176,12 +2179,12 @@ def synthesize_shape_answer(receiver, name)
   when "merge"
     return receiver if receiver in ["hash", *]
     ["unknown"]
-  when "step" then ["array", ["integer"]]
+  when "step" then ArrayType.new(element: ["integer"])
   when "to_a", "entries"
-    return receiver if receiver in ["array", *]
+    return receiver if receiver in ArrayType
     # A range walks its integers (ADR 0081), so only one over them lists.
-    return ["array", ["integer"]] if receiver == ["range", ["integer"]]
-    return ["array", ["unknown"]] if receiver == ["set"]
+    return ArrayType.new(element: ["integer"]) if receiver == ["range", ["integer"]]
+    return ArrayType.new(element: ["unknown"]) if receiver == ["set"]
     ["unknown"]
   else
     ["unknown"]
@@ -2193,7 +2196,7 @@ def synthesize_text_answer(receiver, name)
   return ["string"] if receiver == ["string"]
   # A symbol's case changers answer a symbol (ADR 0071).
   return ["symbol"] if receiver == ["symbol"]
-  return receiver if receiver in ["array", *]
+  return receiver if receiver in ArrayType
   ["unknown"]
 end
 
@@ -2226,6 +2229,7 @@ def type_at(list, target_index)
   # its kind first, then what it holds. A read of this kind goes once
   # every one is written by the field's name.
   return [MAYBE_KIND, list.inner].slice(target_index, 1).first if list in MaybeType
+  return [ARRAY_KIND, list.element].slice(target_index, 1).first if list in ArrayType
   # Read through a run of one, so the walk is one step however long the
   # list is (#537). An index answers a maybe, and a nil that is there
   # comes back wrapped; a block's parameter is the element itself.
@@ -2245,9 +2249,9 @@ def type_function_answer_for(type_name, name)
   return math_answer(name) if type_name == "Math"
   case name
   when "sqrt"                              then ["integer"]
-  when "arguments"                         then ["array", ["string"]]
+  when "arguments"                         then ArrayType.new(element: ["string"])
   when "wall_clock_time", "monotonic_time" then ["integer"]
-  when "entropy"                           then ["array", ["integer"]]
+  when "entropy"                           then ArrayType.new(element: ["integer"])
   # The two captures answer the text the block wrote (#251).
   when "capture_standard_output", "capture_standard_error" then if type_name == "System" then ["string"] else ["unknown"] end
   # `JSON.parse` answers the document's shape, which is unknown; the two
@@ -2258,7 +2262,7 @@ def type_function_answer_for(type_name, name)
   when "[]"
     case type_name
     when "Set"   then ["set"]
-    when "Array" then ["array", ["unknown"]]
+    when "Array" then ArrayType.new(element: ["unknown"])
     when "Hash"  then ["hash", ["unknown"], ["unknown"]]
     else ["unknown"]
     end
@@ -2275,7 +2279,7 @@ def type_function_answer_for(type_name, name)
     when "Regexp" then ["regexp"]
     when "Range"  then ["range", ["unknown"]]
     when "Set"    then ["set"]
-    else ["array", ["unknown"]]
+    else ArrayType.new(element: ["unknown"])
     end
   else ["unknown"]
   end

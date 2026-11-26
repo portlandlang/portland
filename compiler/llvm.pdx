@@ -417,7 +417,7 @@ end
 # array, or a maybe of either.
 def llvm_counted?(type)
   return llvm_counted?(type.inner) if type in MaybeType
-  type == ["string"] || (type in ["array", *]) || (type in ["struct", *])
+  type == ["string"] || (type in ArrayType) || (type in ["struct", *])
 end
 
 # A value that was handed over and is done with: released if it is
@@ -562,7 +562,7 @@ def llvm_local(name) = "%\"#{name}.handed\""
 # instruction or two. A String asked is released once it has answered.
 def llvm_method(emitter, type, name, operand)
   # An array's length is the second word of its block.
-  if type in ["array", *]
+  if type in ArrayType
     place = llvm_named(emitter, "getelementptr i64, ptr #{operand}, i64 1")
     length = llvm_named(place.emitter, "load i64, ptr #{place.operand}")
     released = llvm_drop(length.emitter, type, operand)
@@ -729,7 +729,7 @@ def llvm_same(emitter, type, left, right)
   # An array and a struct are equal by what they hold (#579), which the
   # runtime reads off the kind an array carries and the shape a struct
   # does.
-  return llvm_named(emitter, "call zeroext i1 @portland_array_equal(ptr #{left}, ptr #{right})") if type in ["array", *]
+  return llvm_named(emitter, "call zeroext i1 @portland_array_equal(ptr #{left}, ptr #{right})") if type in ArrayType
   return llvm_named(emitter, "call zeroext i1 @portland_struct_equal(ptr #{left}, ptr #{right})") if type in ["struct", *]
   llvm_named(emitter, "icmp eq #{llvm_type(type)} #{left}, #{right}")
 end
@@ -925,7 +925,7 @@ def llvm_type(type)
   in ["integer"] then "i64"
   in ["boolean"] then "i1"
   in ["string"] then "ptr"
-  in ["array", *] then "ptr"
+  in ArrayType then "ptr"
   in ["struct", *] then "ptr"
   in MaybeType then "{ i1, #{llvm_type(type.inner)} }"
   in ["nothing"] then "void"

@@ -180,7 +180,7 @@ end
 def answers_demand?(type, methods, demand)
   return methods.include?(demand.slice(1, demand.length - 1)) if demand.start_with?(".")
   return true if demand == "==" || demand == "!="
-  return (type == ["string"]) || (type in ["array", *]) || (type in ["hash", *]) if demand == "[]"
+  return (type == ["string"]) || (type in ArrayType) || (type in ["hash", *]) if demand == "[]"
   !(type in ["struct", *])
 end
 
@@ -1597,7 +1597,7 @@ end
 def known?(type)
   case type
   in ["unknown"] then false
-  in ["array", element] then known?(element)
+  in ArrayType(element:) then known?(element)
   in ["hash", key, entry] then known?(key) && known?(entry)
   in MaybeType(inner:) then known?(inner)
   in ["range", element] then known?(element)
@@ -1674,22 +1674,22 @@ def operator_takes?(operator, left, right)
     # Sets order by the subset relations (ADR 0082).
     return true if left == ["set"] && right == ["set"]
     # Arrays order element by element, under `<=>` alone.
-    operator == "<=>" && (left in ["array", *]) && (right in ["array", *])
+    operator == "<=>" && (left in ArrayType) && (right in ArrayType)
   when "+"
     return true if numeric?(left) && numeric?(right)
     return true if left == ["string"] && right == ["string"]
     # A set's union and difference take any enumerable (ADR 0082).
     return true if left == ["set"] && set_operand_type?(right)
-    (left in ["array", *]) && (right in ["array", *])
+    (left in ArrayType) && (right in ArrayType)
   when "*"
     return true if numeric?(left) && numeric?(right)
     return true if left == ["string"] && right == ["integer"]
-    (left in ["array", *]) && right == ["integer"]
+    (left in ArrayType) && right == ["integer"]
   # An array less another is the elements the other lacks (#104).
   when "-"
     return true if numeric?(left) && numeric?(right)
     return true if left == ["set"] && set_operand_type?(right)
-    (left in ["array", *]) && (right in ["array", *])
+    (left in ArrayType) && (right in ArrayType)
   when "/", "%", "**" then numeric?(left) && numeric?(right)
   else
     # An operator this table does not know is not one it may refuse.
@@ -1702,7 +1702,7 @@ end
 def orderable_pair_types?(left, right)
   return true if numeric?(left) && numeric?(right)
   return true if left == right && (left == ["string"] || left == ["symbol"])
-  (left in ["array", *]) && (right in ["array", *])
+  (left in ArrayType) && (right in ArrayType)
 end
 
 # A fully known builtin value type — never a maybe, struct, or enum.
@@ -1823,7 +1823,7 @@ end
 
 # The types a set's algebra takes on the right (ADR 0082): a set, an array,
 # a range, or a hash.
-def set_operand_type?(type) = type == ["set"] || (type in ["range", *]) || (type in ["array", *]) || (type in ["hash", *])
+def set_operand_type?(type) = type == ["set"] || (type in ["range", *]) || (type in ArrayType) || (type in ["hash", *])
 
 def shape_methods(declaration, traits)
   mutable methods = %w[each each_pair eql? failure? filter length members nil? select size some? to_a to_h to_s values with] + declaration.fields

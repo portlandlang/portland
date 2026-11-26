@@ -329,7 +329,7 @@ def builtin_type_of(value)
   return ["float"] if value in Float
   return ["boolean"] if value in Boolean
   return ["hash", ["unknown"], ["unknown"]] if value in Hash
-  return ["array", ["unknown"]] if plain_array?(value)
+  return ArrayType.new(element: ["unknown"]) if plain_array?(value)
   return ["random"] if value in Random
   return ["regexp"] if value in Regexp
   return ["matchdata"] if value in MatchData

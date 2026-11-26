@@ -38,7 +38,7 @@ COMBINATION_LIMIT = 48
 # changes nothing, and a rebinding to another type leaves the name unknown.
 # An array whose elements are not known yet is the same array once they
 # are: an empty literal, named by its first append.
-EMPTY_ARRAY = ["array", ["unknown"]]
+EMPTY_ARRAY = ArrayType.new(element: ["unknown"])
 
 # The name a struct being made is gathered under (#532), with the struct
 # and the type of each field it was handed.
@@ -200,7 +200,7 @@ def answer_key?(key) = key.include?("(")
 # together, or nil where none answers an array (#572).
 def answered_array(name, answers)
   opening = "#{name}("
-  arrays = answers.select { it[0].start_with?(opening) && (type_at(it, 1) in ["array", *]) && concrete?(type_at(it, 1)) }.map { type_at(it, 1) }
+  arrays = answers.select { it[0].start_with?(opening) && (type_at(it, 1) in ArrayType) && concrete?(type_at(it, 1)) }.map { type_at(it, 1) }
   arrays.empty? ? nil : joined_types(arrays)
 end
 
@@ -471,7 +471,7 @@ def handed_arrays(pinned)
       label = named ? type_at(argument, 1) : place.to_s
       type = named ? type_at(argument, 2) : argument
       place += 1 unless named
-      next unless (type in ["array", *]) && concrete?(type)
+      next unless (type in ArrayType) && concrete?(type)
       key = handed_array_key(combination.name, label)
       held = found.assoc(key)
       if held.nil?
@@ -1052,8 +1052,8 @@ def rebound(bindings, name, type)
     return rebound(bindings.reject { it[0] == proved_key(name) }, name, type)
   end
   return bindings if type_at(found, 1) == type
-  return bindings if type == EMPTY_ARRAY && (type_at(found, 1) in ["array", *])
-  return bindings.map { it[0] == name ? [name, type] : it } if type_at(found, 1) == EMPTY_ARRAY && (type in ["array", *])
+  return bindings if type == EMPTY_ARRAY && (type_at(found, 1) in ArrayType)
+  return bindings.map { it[0] == name ? [name, type] : it } if type_at(found, 1) == EMPTY_ARRAY && (type in ArrayType)
   # A name that holds nil at one binding and a value at another holds a
   # maybe of that value (#505), whichever came first, and one that holds
   # one struct and then another holds one of several (#572).
