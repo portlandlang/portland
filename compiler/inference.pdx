@@ -251,7 +251,7 @@ def arm_bindings(node, branch, nil_seen, types)
   plain = if (subject in MaybeType) && nil_seen then subject.inner else subject end
   if pattern in IdentifierNode
     mutable pairs = [[pattern.name, plain]]
-    pairs = [[node.subject.name, plain]] + pairs if node.subject in IdentifierNode
+    pairs = with_bound(pairs, node.subject.name, plain) if node.subject in IdentifierNode
     return pairs
   end
   if (pattern in NilNode) && (node.subject in IdentifierNode) && (subject in MaybeType)
@@ -359,8 +359,8 @@ def bind_after_core(statement, locals, globals)
   in AssignmentNode(name:, value:)
     return locals if value.nil?
     widened = forget_types(locals, assigned_names_in(value))
-    [[name, synthesize(value, widened + globals)]] + widened
-  in AppendNode(name:) then [[name, synthesize(statement, locals + globals)]] + locals
+    with_bound(widened, name, synthesize(value, with_bindings(globals, widened)))
+  in AppendNode(name:) then with_bound(locals, name, synthesize(statement, with_bindings(globals, locals)))
   in MatchAssertNode(pattern:) then bind_unknowns(locals, pattern_names(pattern))
   in MatchTestNode(pattern:) then bind_unknowns(locals, pattern_names(pattern))
   in TogetherNode(lines:) then bind_unknowns(locals, task_line_names(lines))
@@ -368,7 +368,7 @@ def bind_after_core(statement, locals, globals)
   # proved for the branch that stays holds below it (the first form —
   # `return if x.nil?`, plain x after). A rebinding inside still wins.
   in IfNode
-    guarded = guard_proof(statement, locals + globals) + locals
+    guarded = with_bindings(locals, guard_proof(statement, with_bindings(globals, locals)))
     forget_types(guarded, assigned_names_in(statement))
   # A `case/in` arm's captures outlive the case (capture_spec pins it), as
   # unknowns — which arm ran is not the tree's to say.
@@ -386,9 +386,18 @@ end
 def bind_unknowns(locals, names)
   mutable bound = locals
   names.each do |name|
-    bound = [[name, UnknownType.new]] + bound
+    bound = with_bound(bound, name, UnknownType.new)
   end
   bound
+end
+
+# What a name is bound to in these bindings, or nil where it is not bound
+# (#607). The newest binding of a name is the one read. Every read of the
+# bindings by a name goes through here, and every binding through
+# `with_bound` and `with_bindings`, so what holds them is said once.
+def binding_type(types, name)
+  found = types.assoc(name)
+  found.nil? ? nil : type_at(found, 1)
 end
 
 def block_body(block)
@@ -853,12 +862,12 @@ end
 # structs, or no struct writes such a method.
 def dispatched_calls(node, receiver, types)
   return [] unless opened_natively(receiver, types) == ANY_STRUCT
-  listed = types.assoc(any_method_key(node.name))
+  listed = method_owners_bound(types, node.name)
   return [] if listed.nil?
   handed = (receiver in MaybeType) ? OpenedNode.new(kind: "opened", value: node.receiver, name: node.name, line: node.line) : node.receiver
-  answering = type_at(listed, 1).select do |owner|
-    shape = types.assoc(method_shape_key(owner, node.name))
-    shape.some? && shape_answers?(type_at(shape, 1), node)
+  answering = listed.select do |owner|
+    shape = method_shape_bound(types, owner, node.name)
+    shape.some? && shape_answers?(shape, node)
   end
   answering.map do |owner|
     narrowed = NarrowedNode.new(kind: "narrowed", value: handed, name: owner, line: node.line)
@@ -919,11 +928,11 @@ def filled_arguments(name, arguments, types)
   mutable filled = []
   arguments.each do |argument|
     if argument in KeywordType
-      known = empty_literal?(argument.type) ? types.assoc(handed_array_key(name, argument.label)) : nil
-      filled << (known.nil? ? argument : KeywordType.new(label: argument.label, type: type_at(known, 1)))
+      known = empty_literal?(argument.type) ? binding_type(types, handed_array_key(name, argument.label)) : nil
+      filled << (known.nil? ? argument : KeywordType.new(label: argument.label, type: known))
     else
-      known = empty_literal?(argument) ? types.assoc(handed_array_key(name, place.to_s)) : nil
-      filled << (known.nil? ? argument : type_at(known, 1))
+      known = empty_literal?(argument) ? binding_type(types, handed_array_key(name, place.to_s)) : nil
+      filled << (known or argument)
       place += 1
     end
   end
@@ -948,8 +957,8 @@ def forget_types(locals, names)
   return locals if native_reading?(locals)
   mutable widened = locals
   names.each do |name|
-    next if locals.none? { it[0] == name }
-    widened = [[name, UnknownType.new]] + widened
+    next if binding_type(locals, name).nil?
+    widened = with_bound(widened, name, UnknownType.new)
   end
   widened
 end
@@ -1157,6 +1166,21 @@ end
 # type, and the method.
 def method_def_name(owner, name) = "#{owner}##{name}"
 
+# The structs that write a method of this name, as pinning bound them
+# (#572), or nil where none does. Read through here, as the bindings'
+# types are read through `binding_type` (#607).
+def method_owners_bound(types, name)
+  found = types.assoc(any_method_key(name))
+  found.nil? ? nil : type_at(found, 1)
+end
+
+# A method's shape as pinning bound it, or nil where the owner writes no
+# method of the name (#607).
+def method_shape_bound(types, owner, name)
+  found = types.assoc(method_shape_key(owner, name))
+  found.nil? ? nil : type_at(found, 1)
+end
+
 # The name a method's shape is bound under: the calls it answers. A
 # method answers only the calls it was written for, and anything else is
 # the floor's (ADR 0093).
@@ -1201,12 +1225,12 @@ end
 # for what it does. One that answers a value or nil answers that maybe
 # (#572): `names.map { it[0] }` is read for what it answers.
 def native_block_answer(node, arguments, types)
-  yielded = types.assoc(yields_key(node.name, arguments))
+  yielded = yielded_types(types, yields_key(node.name, arguments))
   mutable inner = types
   mutable index = 0
   node.block.parameters.each do |parameter|
-    type = yielded.nil? ? nil : type_at(type_at(yielded, 1), index)
-    inner = [[parameter, (type or UnknownType.new)]] + inner
+    type = yielded.nil? ? nil : type_at(yielded, index)
+    inner = with_bound(inner, parameter, (type or UnknownType.new))
     index += 1
   end
   return NOTHING if native_nothing?(node.block.body, inner)
@@ -1220,7 +1244,7 @@ end
 # or by yielding to a block that can.
 def native_block_leaves?(block, types)
   return true if block_breaks?(block.body) || block_returns?(block.body)
-  yields?(block.body) && types.any? { it[0] == YIELD_LEAVES }
+  yields?(block.body) && binding_type(types, YIELD_LEAVES).some?
 end
 
 # What a call to one of the program's defs answers under the native
@@ -1230,8 +1254,7 @@ def native_call_answer(node, types)
   arguments = filled_arguments(node.name, native_argument_types(node.arguments, types), types)
   handed = node.block.nil? ? nil : native_block_answer(node, arguments, types)
   leaves = node.block.some? && native_block_leaves?(node.block, types)
-  found = types.assoc(combination_key(node.name, arguments, handed, leaves))
-  found.nil? ? UnknownType.new : type_at(found, 1)
+  binding_type(types, combination_key(node.name, arguments, handed, leaves)) or UnknownType.new
 end
 
 # The library's row for a method asked of a value with these arguments
@@ -1252,8 +1275,8 @@ end
 def native_method_call(node, receiver, types)
   owner = native_owner(opened_natively(receiver, types))
   return nil if owner.nil?
-  shape = types.assoc(method_shape_key(owner, node.name))
-  return nil if shape.nil? || !shape_answers?(type_at(shape, 1), node)
+  shape = method_shape_bound(types, owner, node.name)
+  return nil if shape.nil? || !shape_answers?(shape, node)
   # A receiver that is a maybe is opened for the method, which is handed
   # the value, and nil refuses by the method's name (#503).
   handed = (receiver in MaybeType) ? OpenedNode.new(kind: "opened", value: node.receiver, name: node.name, line: node.line) : node.receiver
@@ -1274,8 +1297,7 @@ def native_nothing?(body, types)
     return native_nothing?((last.then_body or []), types) && (other.empty? || native_nothing?(other, types))
   end
   if last in YieldNode
-    handed = types.assoc(YIELD)
-    return handed.some? && type_at(handed, 1) == NOTHING
+    return binding_type(types, YIELD) == NOTHING
   end
   return false unless last in CallNode
   return true if last.name == "puts"
@@ -1347,8 +1369,7 @@ def ordered_pairs(nodes, types, kind)
     next unless node.kind == kind
     next if seen.include?(node.name)
     seen << node.name
-    found = types.assoc(node.name)
-    ordered << [node.name, type_at(found, 1)]
+    ordered << [node.name, binding_type(types, node.name)]
   end
   ordered
 end
@@ -1459,8 +1480,8 @@ def proof_of(condition, types)
   in LogicalNode(operator:, left:, right:)
     left_proof = proof_of(left, types)
     right_proof = proof_of(right, types)
-    return [when_true(left_proof) + when_true(right_proof), []] if operator == "&&"
-    return [[], when_false(left_proof) + when_false(right_proof)] if operator == "||"
+    return [with_bindings(when_true(right_proof), when_true(left_proof)), []] if operator == "&&"
+    return [[], with_bindings(when_false(right_proof), when_false(left_proof))] if operator == "||"
     no_proof
   else
     no_proof
@@ -1490,10 +1511,10 @@ def real_numeric?(type) = numeric?(type) && type != ComplexType.new
 # name `Order.unit`, which no identifier can spell, so the one list holds
 # both. The checker's program-wide scan registers structs the same way.
 def register_struct(node, mutable types)
-  types = [[node.name, ClassType.new(name: node.name)]] + types
+  types = with_bound(types, node.name, ClassType.new(name: node.name))
   node.type_functions.each do |function|
     next unless function in DefNode
-    types = [[node.name + "." + function.name, synthesize_def_return(function, types)]] + types
+    types = with_bound(types, node.name + "." + function.name, synthesize_def_return(function, types))
   end
   types
 end
@@ -1555,8 +1576,8 @@ def return_types_in(node, types)
     return returns_in_body(settled, types) if settled.some?
     proof = narrowings(node.condition, types)
     mutable found = []
-    found += returns_in_body(node.then_body, when_true(proof) + types)
-    found += returns_in_body(node.else_body, when_false(proof) + types)
+    found += returns_in_body(node.then_body, with_bindings(types, when_true(proof)))
+    found += returns_in_body(node.else_body, with_bindings(types, when_false(proof)))
     found
   # A loop body may have run before any statement in it is read again, so
   # it is walked with its own rebindings already forgotten.
@@ -1572,7 +1593,7 @@ def return_types_in(node, types)
     mutable found = []
     mutable nil_seen = false
     node.branches.each do |branch|
-      found += returns_in_body(branch.body, arm_bindings(node, branch, nil_seen, types) + types)
+      found += returns_in_body(branch.body, with_bindings(types, arm_bindings(node, branch, nil_seen, types)))
       nil_seen = true if nil_arm?(branch)
     end
     found += returns_in_body(node.else_body, types)
@@ -1613,13 +1634,13 @@ def scan_program(nodes)
   mutable types = []
   nodes.each do |node|
     if node in DefNode
-      types = [[node.name, synthesize_def_return(node, types)]] + types
+      types = with_bound(types, node.name, synthesize_def_return(node, types))
     elsif node in StructDefNode
       types = register_struct(node, types)
     elsif node in EnumDefNode
       # Recorded so a later increment can hang membership and
       # exhaustiveness off the name; nothing reads it yet.
-      types = [[node.name, EnumType.new(name: node.name)]] + types
+      types = with_bound(types, node.name, EnumType.new(name: node.name))
     else
       types = bind_after(node, types, [])
     end
@@ -1639,10 +1660,9 @@ def settled_arm(node, types)
   held = synthesize_name(test.subject.name, types)
   # Only of a struct the program declares: a builtin type's name is bound
   # nowhere, and its tests are the build's to settle elsewhere.
-  declared = types.assoc(test.pattern.name)
-  return nil unless declared.some? && type_at(declared, 1) == ClassType.new(name: test.pattern.name)
+  return nil unless binding_type(types, test.pattern.name) == ClassType.new(name: test.pattern.name)
   # A struct the program never makes is one no value is.
-  return (node.else_body or []) if types.assoc(made_key(test.pattern.name)).nil?
+  return (node.else_body or []) if binding_type(types, made_key(test.pattern.name)).nil?
   return nil unless (held in StructType) && held != ANY_STRUCT
   held.name == test.pattern.name ? (node.then_body or []) : (node.else_body or [])
 end
@@ -1933,7 +1953,7 @@ def synthesize_block_call(node, receiver, types)
   mutable inner = types
   argument_types = node.arguments.map { synthesize(it, types) }
   node.block.parameters.each_with_index do |parameter, index|
-    inner = [[parameter, block_parameter_type(receiver, index, node.name, argument_types)]] + inner
+    inner = with_bound(inner, parameter, block_parameter_type(receiver, index, node.name, argument_types))
   end
   # A block body may run many times or never — like a loop's, it is read
   # with the names it rebinds already forgotten.
@@ -2054,8 +2074,8 @@ def synthesize_call(node, types)
       # struct that has it holds one type there (#572).
       shared = holder == ANY_STRUCT ? shared_field(node.name, types) : nil
       return shared if shared.some?
-      field = types.assoc(field_key(holder.name, node.name))
-      return type_at(field, 1) if field.some?
+      field = binding_type(types, field_key(holder.name, node.name))
+      return field if field.some?
     end
     # A method the library holds answers what its row says (#560).
     if node.block.nil?
@@ -2092,7 +2112,7 @@ def synthesize_case_in(node, types)
   mutable answers = []
   mutable nil_seen = false
   node.branches.each do |branch|
-    answers << synthesize_body(branch.body, arm_bindings(node, branch, nil_seen, types) + types)
+    answers << synthesize_body(branch.body, with_bindings(types, arm_bindings(node, branch, nil_seen, types)))
     nil_seen = true if nil_arm?(branch)
   end
   total = node.branches.any? { (it.pattern in IdentifierNode) && it.guard.nil? }
@@ -2107,7 +2127,7 @@ end
 # other disagreement is an opinion withheld.
 def synthesize_def_return(node, mutable types)
   node.parameters.each do |parameter|
-    types = [[parameter.name, parameter_type(parameter, types)]] + types
+    types = with_bound(types, parameter.name, parameter_type(parameter, types))
   end
   synthesize_body(node.body, types)
 end
@@ -2127,20 +2147,19 @@ def synthesize_hash(node, types)
 end
 
 def synthesize_identifier(node, types)
-  found = types.assoc(node.name)
+  found = binding_type(types, node.name)
   # A name that may not be there, proved to be a struct, is that struct
   # (#572): the proof is bound beside it.
-  if found.some? && (type_at(found, 1) in MaybeType(inner: StructType))
-    proved = types.assoc(proved_key(node.name))
-    return type_at(proved, 1) if proved.some?
+  if found in MaybeType(inner: StructType)
+    proved = binding_type(types, proved_key(node.name))
+    return proved if proved.some?
   end
-  return type_at(found, 1) if found.some?
+  return found if found.some?
   plain = synthesize_name(node.name, types)
   # A def with no parameters is called by its bare name; under the
   # native reading it is kept by its combination, which has none.
   return plain unless plain == UnknownType.new && native_reading?(types)
-  called = types.assoc(combination_key(node.name, [], nil, false))
-  called.nil? ? plain : type_at(called, 1)
+  binding_type(types, combination_key(node.name, [], nil, false)) or plain
 end
 
 # An if in value position (the ternary desugars here too, ADR 0046):
@@ -2151,8 +2170,8 @@ def synthesize_if(node, types)
   settled = native_reading?(types) ? settled_arm(node, types) : nil
   return branch_answer(settled, types) if settled.some?
   proof = narrowings(node.condition, types)
-  yes = branch_answer(node.then_body, when_true(proof) + types)
-  no = branch_answer(node.else_body, when_false(proof) + types)
+  yes = branch_answer(node.then_body, with_bindings(types, when_true(proof)))
+  no = branch_answer(node.else_body, with_bindings(types, when_false(proof)))
   # Read as the native build runs it, an arm that ends in `panic`
   # answers nothing, so the `if` answers what the other arm does (#572).
   if native_reading?(types)
@@ -2193,7 +2212,7 @@ def synthesize_logical(node, types)
   # The right side is read under what the left proved — `x.some? && x + 1`
   # sees a plain x; `x.nil? || x + 1` likewise.
   proof = narrowings(node.left, types)
-  right_types = if node.operator == "&&" then when_true(proof) + types else when_false(proof) + types end
+  right_types = if node.operator == "&&" then with_bindings(types, when_true(proof)) else with_bindings(types, when_false(proof)) end
   right = synthesize(node.right, right_types)
   return left if left == right
   # Read as the native build runs it, nil gives way to the right of an
@@ -2220,11 +2239,10 @@ def synthesize_logical(node, types)
 end
 
 def synthesize_name(name, types)
-  found = types.assoc(name)
+  found = binding_type(types, name)
   # A builtin type's bare name is the type as a value (ADR 0074).
   return ClassType.new(name: name) if found.nil? && %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(name)
-  return UnknownType.new if found.nil?
-  type_at(found, 1)
+  found or UnknownType.new
 end
 
 def synthesize_numeric_answer(receiver, name, arguments_empty: true)
@@ -2408,6 +2426,27 @@ end
 def when_false(proof) = type_at(proof, 1)
 
 def when_true(proof) = type_at(proof, 0)
+
+# These bindings with newer ones laid over them (#607): where both bind a
+# name, the newer is read.
+def with_bindings(types, newer) = newer + types
+
+# These bindings with one more, which is read over any older binding of
+# the name (#607).
+def with_bound(types, name, type) = [[name, type]] + types
+
+# These bindings with every binding of a name gone (#607).
+def without_bound(types, name)
+  return types if binding_type(types, name).nil?
+  types.reject { it[0] == name }
+end
+
+# What a combination yields, one type for each value, as pinning bound it
+# under its yields key, or nil where it bound none (#607).
+def yielded_types(types, key)
+  found = types.assoc(key)
+  found.nil? ? nil : type_at(found, 1)
+end
 
 # Whether a body yields anywhere, the blocks written in it included: a
 # `yield` inside one reaches the def's own block.

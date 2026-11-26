@@ -519,9 +519,8 @@ end
 # pinning settled it as a maybe of that, because another binding of the
 # name is nil or a maybe.
 def held_type(name, type, context)
-  pinned = context.pinned.assoc(name)
-  return type if pinned.nil?
-  settled = type_at(pinned, 1)
+  settled = binding_type(context.pinned, name)
+  return type if settled.nil?
   return settled if (settled in MaybeType) && native_type?(settled) && (type == NilType.new || type == settled.inner)
   # One bound to a struct here and to another elsewhere holds one of
   # several (#572), and so with an array of them.
@@ -567,8 +566,7 @@ end
 # grown array, or the String with the value after it.
 def lower_append(statement, append, bindings, context)
   refuse_native("a << bound to another name", statement) unless append.name == statement.name
-  found = bindings.assoc(append.name) or refuse_native("a << onto #{append.name}, which is not a local", statement)
-  held = type_at(found, 1)
+  held = binding_type(bindings, append.name) or refuse_native("a << onto #{append.name}, which is not a local", statement)
   # A String takes what is appended as `+` does (#557): the name is bound
   # to the two joined, and a maybe on either side is opened as `+` opens
   # its operands.
@@ -655,8 +653,7 @@ def lower_body(body, owner, what, bindings, answer, context)
   end
   if last in AssignmentNode
     stored = lower_statement(last, lowered.bindings, context)
-    bound = stored.bindings.assoc(last.name)
-    held = IntermediateLocal.new(type: type_at(bound, 1), name: last.name)
+    held = IntermediateLocal.new(type: binding_type(stored.bindings, last.name), name: last.name)
     value = fitted(held, answer) or refuse_native("#{what} whose last expression is #{with_article(held.type)} where it answers #{with_article(answer)}", last)
     return Lowered.new(nodes: lowered.nodes + stored.nodes + [IntermediateReturn.new(value: value)], bindings: stored.bindings)
   end
@@ -665,7 +662,7 @@ def lower_body(body, owner, what, bindings, answer, context)
   # that is missing or empty answers nil.
   ending = (case_as_if(last) or last)
   # Only the arm that runs is built (#572).
-  settled = (ending in IfNode) ? settled_arm(ending, lowered.bindings + context.answers) : nil
+  settled = (ending in IfNode) ? settled_arm(ending, with_bindings(context.answers, lowered.bindings)) : nil
   if settled.some?
     rest = lower_body((settled.empty? ? [nil_node(line: ending.line)] : settled), owner, what, lowered.bindings, answer, context)
     return Lowered.new(nodes: lowered.nodes + rest.nodes, bindings: rest.bindings)
@@ -674,7 +671,7 @@ def lower_body(body, owner, what, bindings, answer, context)
     test = lower_condition(ending.condition, lowered.bindings, context)
     nothing = [nil_node(line: ending.line)]
     # Each arm is read with what the condition proved for it (#572).
-    proof = shape_narrowings(ending.condition, lowered.bindings + context.answers)
+    proof = shape_narrowings(ending.condition, with_bindings(context.answers, lowered.bindings))
     taken = lower_body(((ending.then_body or []).empty? ? nothing : ending.then_body), owner, what, narrowed_bindings(lowered.bindings, when_true(proof)), answer, context)
     after_then = unnarrowed(lowered.bindings, taken.bindings)
     other = lower_body(((ending.else_body or []).empty? ? nothing : ending.else_body), owner, what, narrowed_bindings(after_then, when_false(proof)), answer, context)
@@ -702,7 +699,7 @@ def lower_call(node, name, arguments, bindings, context, root)
   below = context.with(root: nil)
   # What the call hands over by place, and then by name in the names'
   # own order (#536), which is how the combination is named.
-  scope = bindings + yielding_answers(context.answers, context.yielding)
+  scope = with_bindings(yielding_answers(context.answers, context.yielding), bindings)
   # An empty array handed over is the array the def's other calls hand
   # it in that place (#572), as pinning read it.
   written_placed = arguments.reject { it in KeywordArgumentNode }.map { lower_value(it, bindings, below) }
@@ -892,22 +889,22 @@ def lower_statement(statement, bindings, context)
     chosen = (case_as_if(value) or value)
     return lower_statement(bound_in_arms(statement, chosen), bindings, context) if arms_are_bodies?(chosen)
     lowered = settled_empty(lower_value(value, bindings, context.with(root: "value")), name, bindings, context)
-    found = bindings.assoc(name)
+    found = binding_type(bindings, name)
     # A local that holds a maybe takes a plain value as a maybe that is
     # there, and nil as one that is not.
-    holding = found.some? ? type_at(found, 1) : held_type(name, lowered.type, context)
+    holding = (found or held_type(name, lowered.type, context))
     stored = fitted(lowered, holding) or refuse_native("#{name} rebound from #{with_article(holding)} to #{with_article(lowered.type)}", statement)
     # A name bound to nil and to nothing else is nil wherever it is read,
     # and is given no place of its own (#572): a parameter left out whose
     # default is nil is one.
-    return Lowered.new(nodes: [], bindings: [[name, NilType.new]] + bindings) if found.nil? && holding == NilType.new && stored.type == NilType.new
+    return Lowered.new(nodes: [], bindings: with_bound(bindings, name, NilType.new)) if found.nil? && holding == NilType.new && stored.type == NilType.new
     return Lowered.new(nodes: [], bindings: bindings) if found.some? && holding == NilType.new && stored.type == NilType.new
     refuse_native("a binding of #{with_article(stored.type)}", statement) unless native_type?(stored.type) || empty_literal?(stored.type)
     # The name holds what it was fitted to, which is more than the value
     # where it is one of several structs (#572).
     # What was proved of the name goes when the name is bound again.
-    held = bindings.assoc(proved_key(name)).nil? ? bindings : bindings.reject { it[0] == proved_key(name) }
-    after = found.nil? ? [[name, holding]] + held : held
+    held = without_bound(bindings, proved_key(name))
+    after = found.nil? ? with_bound(held, name, holding) : held
     Lowered.new(nodes: [IntermediateStore.new(name: name, value: stored)], bindings: after)
   # A struct or a trait written out declares, and runs nothing.
   in StructDefNode then Lowered.new(nodes: [], bindings: bindings)
@@ -937,15 +934,15 @@ def lower_statement(statement, bindings, context)
   # where the other arm always leaves (#572), as pinning read it.
   in IfNode(condition:, then_body:, else_body:)
     # Only the arm that runs is built (#572).
-    settled = settled_arm(statement, bindings + context.answers)
+    settled = settled_arm(statement, with_bindings(context.answers, bindings))
     return lower_statements(settled, bindings, context) if settled.some?
     test = lower_condition(condition, bindings, context)
-    proof = shape_narrowings(condition, bindings + context.answers)
+    proof = shape_narrowings(condition, with_bindings(context.answers, bindings))
     taken = lower_statements((then_body or []), narrowed_bindings(bindings, when_true(proof)), context)
     after_then = unnarrowed(bindings, taken.bindings)
     other = lower_statements((else_body or []), narrowed_bindings(after_then, when_false(proof)), context)
     after_else = unnarrowed(bindings, other.bindings)
-    Lowered.new(nodes: [IntermediateBranch.new(condition: test, then_body: taken.nodes, else_body: other.nodes)], bindings: narrowed_bindings(after_else, shape_guard(statement, bindings + context.answers)))
+    Lowered.new(nodes: [IntermediateBranch.new(condition: test, then_body: taken.nodes, else_body: other.nodes)], bindings: narrowed_bindings(after_else, shape_guard(statement, with_bindings(context.answers, bindings))))
   in ReturnNode(value:)
     return lower_block_return(statement, value, bindings, context) if context.inside_block
     if context.procedure
@@ -1038,7 +1035,7 @@ def lower_value(node, bindings, context)
   # A method asked of one of several structs is the method of whichever
   # the value is (#572).
   if node in MethodCallNode
-    reading = bindings + yielding_answers(context.answers, context.yielding)
+    reading = with_bindings(yielding_answers(context.answers, context.yielding), bindings)
     several = dispatched_calls(node, synthesize(node.receiver, reading), reading)
     return lower_dispatch(node, several, bindings, context) unless several.empty?
   end
@@ -1056,7 +1053,7 @@ def lower_value(node, bindings, context)
   # A method the core writes for the receiver's type is a def (#525), and
   # a call with a dot that it answers is a call of that def.
   if node in MethodCallNode
-    scope = bindings + yielding_answers(context.answers, context.yielding)
+    scope = with_bindings(yielding_answers(context.answers, context.yielding), bindings)
     called = native_method_call(node, synthesize(node.receiver, scope), scope)
     return lower_value(called, bindings, context) if called.some?
     # `System` is the floor's (ADR 0068), where no local has the name.
@@ -1081,8 +1078,8 @@ def lower_value(node, bindings, context)
     IntermediateOpen.new(type: plain_of(held.type), value: held, name: name)
   # `self` is a method's first parameter (#525).
   in SelfNode
-    receiver = bindings.assoc("self") or refuse_native("self outside a method", node)
-    IntermediateLocal.new(type: type_at(receiver, 1), name: "self")
+    receiver = binding_type(bindings, "self") or refuse_native("self outside a method", node)
+    IntermediateLocal.new(type: receiver, name: "self")
   # `value in Boolean` (#525): whether a local is of a type, which its own
   # type settles before the program runs.
   in MatchTestNode(subject:, pattern:)
@@ -1107,17 +1104,17 @@ def lower_value(node, bindings, context)
   # answered as, makes it a maybe that is not there (#505).
   in NilNode then IntermediateConstant.new(type: NilType.new, value: nil)
   in IdentifierNode(name:)
-    found = bindings.assoc(name)
-    refuse_native("an array that is never given an element, #{name}", node) if found.some? && type_at(found, 1) == EMPTY_ARRAY
-    refuse_native("a hash that is never given a pair, #{name}", node) if found.some? && type_at(found, 1) == EMPTY_HASH
-    return IntermediateConstant.new(type: NilType.new, value: nil) if found.some? && type_at(found, 1) == NilType.new
+    found = binding_type(bindings, name)
+    refuse_native("an array that is never given an element, #{name}", node) if found == EMPTY_ARRAY
+    refuse_native("a hash that is never given a pair, #{name}", node) if found == EMPTY_HASH
+    return IntermediateConstant.new(type: NilType.new, value: nil) if found == NilType.new
     # A name that may not be there, proved to be a struct, is opened and
     # read as that struct (#572): an `in` test found it there.
-    if found.some? && (type_at(found, 1) in MaybeType(inner: StructType))
-      proved = bindings.assoc(proved_key(name))
-      return IntermediateOpen.new(type: type_at(proved, 1), value: IntermediateLocal.new(type: type_at(found, 1), name: name), name: name) if proved.some?
+    if found in MaybeType(inner: StructType)
+      proved = binding_type(bindings, proved_key(name))
+      return IntermediateOpen.new(type: proved, value: IntermediateLocal.new(type: found, name: name), name: name) if proved.some?
     end
-    return IntermediateLocal.new(type: type_at(found, 1), name: name) if found.some?
+    return IntermediateLocal.new(type: found, name: name) if found.some?
     lower_call(node, name, [], bindings, inner, nil)
   in ArrayNode(elements:)
     # A maybe written into an array is opened first, as one appended is
@@ -1264,7 +1261,7 @@ def lower_value(node, bindings, context)
     end
     refuse_native("a condition that is #{with_article(first.type)}", left) unless first.type == BooleanType.new
     # The right of an `&&` is read with what the left proved (#572).
-    proof = shape_narrowings(left, bindings + inner.answers)
+    proof = shape_narrowings(left, with_bindings(inner.answers, bindings))
     second = lower_condition(right, narrowed_bindings(bindings, operator == "&&" ? when_true(proof) : when_false(proof)), inner)
     IntermediateLogical.new(type: BooleanType.new, operator: operator, left: first, right: second)
   in UnaryNode(operator: "-", operand:)
@@ -1284,7 +1281,7 @@ def lower_value(node, bindings, context)
     # name, as for any method (#591).
     walked = opened_for(lower_value(receiver, bindings, inner), "each")
     refuse_native("a call with a dot, .each, on #{with_article(walked.type)}", node) unless walked.type in ArrayType
-    leaves = native_block_leaves?(block, bindings + yielding_answers(context.answers, context.yielding))
+    leaves = native_block_leaves?(block, with_bindings(yielding_answers(context.answers, context.yielding), bindings))
     refuse_leaving_inside(block, leaves, context.root, node)
     handed = PinnedBlock.new(parameters: [walked.type.element], answer: NOTHING, reason: nil, leaves: leaves)
     IntermediateWalk.new(type: walked.type, array: walked, block: lower_block(block, handed, bindings, inner))
@@ -1296,7 +1293,7 @@ def lower_value(node, bindings, context)
     refuse_native("times without a block", node) if block.nil?
     counted = lower_value(receiver, bindings, inner)
     refuse_native("a call with a dot, .times, on #{with_article(counted.type)}", node) unless counted.type == IntegerType.new
-    leaves = native_block_leaves?(block, bindings + yielding_answers(context.answers, context.yielding))
+    leaves = native_block_leaves?(block, with_bindings(yielding_answers(context.answers, context.yielding), bindings))
     refuse_leaving_inside(block, leaves, context.root, node)
     handed = PinnedBlock.new(parameters: (block.parameters.empty? ? [] : [IntegerType.new]), answer: NOTHING, reason: nil, leaves: leaves)
     IntermediateCount.new(type: IntegerType.new, count: counted, block: lower_block(block, handed, bindings, inner))
@@ -1333,7 +1330,7 @@ def lower_value(node, bindings, context)
     lower_library(node, bindings, inner) or refuse_native(native_name_of(node), node)
   in IfNode(condition:, then_body:, else_body:)
     # Only the arm that runs is built (#572).
-    settled = settled_arm(node, bindings + inner.answers)
+    settled = settled_arm(node, with_bindings(inner.answers, bindings))
     if settled.some?
       refuse_native("an if read for its value whose arms are not one expression each", node) unless settled.length <= 1
       return lower_value((settled.first or nil_node(line: node.line)), bindings, inner)
@@ -1342,7 +1339,7 @@ def lower_value(node, bindings, context)
     other = else_body or []
     refuse_native("an if read for its value whose arms are not one expression each", node) unless taken.length == 1 && other.length <= 1
     # Each arm is read with what the condition proved for it (#572).
-    proof = shape_narrowings(condition, bindings + inner.answers)
+    proof = shape_narrowings(condition, with_bindings(inner.answers, bindings))
     # An arm that is a `panic` stops the program, so it answers nothing
     # and is given the type of the other arm (#572).
     if panics?(taken) || panics?(other)
@@ -1627,19 +1624,18 @@ end
 # appends and merges that follow (#607).
 def settled_empty(lowered, name, bindings, context)
   return lowered unless empty_literal?(lowered.type)
-  found = bindings.assoc(name)
-  return lowered.with(type: type_at(found, 1)) if found.some? && fills_empty?(lowered.type, type_at(found, 1))
-  pinned = context.pinned.assoc(name)
-  return lowered if pinned.nil? || !native_type?(type_at(pinned, 1)) || !fills_empty?(lowered.type, type_at(pinned, 1))
-  lowered.with(type: type_at(pinned, 1))
+  found = binding_type(bindings, name)
+  return lowered.with(type: found) if found.some? && fills_empty?(lowered.type, found)
+  pinned = binding_type(context.pinned, name)
+  return lowered if pinned.nil? || !native_type?(pinned) || !fills_empty?(lowered.type, pinned)
+  lowered.with(type: pinned)
 end
 
 # A struct's fields as [name, type] pairs, in the order written, each at
 # the type pinning settled for it. A field nothing ever made has none.
 def struct_fields(made, context)
   made.fields.map do |field|
-    settled = context.answers.assoc(field_key(made.name, field))
-    [field, settled.nil? ? UnknownType.new : type_at(settled, 1)]
+    [field, (binding_type(context.answers, field_key(made.name, field)) or UnknownType.new)]
   end
 end
 
