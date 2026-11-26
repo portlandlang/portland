@@ -1,13 +1,17 @@
 #!/bin/sh
 # Run the test suite and linters.
 #
-#   script/test          everything — the same as --all
-#   script/test --all    everything
-#   script/test --fast   everything but seed/tests/whole_suites.rs: the
-#                        language spec on both implementations, the checker
-#                        over the compiler's own source, and the linter built
-#                        natively, whose build is minutes of the seed working
-#                        out the front end's types.
+#   script/test          everything but the native tool builds — the same
+#                        as --all
+#   script/test --all    everything but the native tool builds
+#   script/test --fast   that, less seed/tests/whole_suites.rs: the language
+#                        spec on both implementations and the checker over
+#                        the compiler's own source
+#   script/test --native only seed/tests/native_tools.rs: the linter, the
+#                        parser, and the report built natively and held to
+#                        the seed (#600). Each build is minutes of the seed
+#                        working out the front end's types, so they are a
+#                        step of their own, which script/cibuild runs.
 #
 # Each group is its own labeled step, so the output says what ran — the whole
 # suites run in the background alongside the rest and print last. cargo's
@@ -23,8 +27,9 @@ cd "$(dirname "$0")/.."
 case "${1:---all}" in
   --all) scope=all ;;
   --fast) scope=fast ;;
+  --native) scope=native ;;
   *)
-    echo "usage: script/test [--all | --fast]" >&2
+    echo "usage: script/test [--all | --fast | --native]" >&2
     exit 64
     ;;
 esac
@@ -35,6 +40,12 @@ step() {
   echo ""
   echo "== $1"
 }
+
+if [ "$scope" = native ]; then
+  step "native tools — seed/tests/native_tools.rs: the linter, the parser, and the report built natively and held to the seed (minutes)"
+  cargo test --package portland-seed --quiet --test native_tools
+  exit 0
+fi
 
 step "format — cargo fmt --check"
 cargo fmt --check
@@ -91,7 +102,7 @@ step "docs checks — script/docs/check"
 script/docs/check
 
 if [ "$scope" = all ]; then
-  step "whole suites — seed/tests/whole_suites.rs: the language spec on both implementations, the checker over the compiler's own source, the linter, the parser, and the report built natively (minutes, started with the unit tests)"
+  step "whole suites — seed/tests/whole_suites.rs: the language spec on both implementations, the checker over the compiler's own source (started with the unit tests)"
   whole_suites_status=0
   wait "$whole_suites_pid" || whole_suites_status=$?
   cat "$whole_suites_output"
