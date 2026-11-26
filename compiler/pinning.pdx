@@ -1408,7 +1408,11 @@ def value_candidates(node, scope)
   other = node.else_body or []
   first = taken.last
   second = other.last
-  (first.nil? ? [NilType.new] : value_candidates(first, scope)) + (second.nil? ? [NilType.new] : value_candidates(second, scope))
+  # Each arm read with what the condition proved for it (#607), as the
+  # walk reads it: inside a `case` arm for a struct, the subject is that
+  # struct, and a call handed it names the combination pinned for it.
+  proof = shape_narrowings(node.condition, scope)
+  (first.nil? ? [NilType.new] : value_candidates(first, with_bindings(scope, when_true(proof)))) + (second.nil? ? [NilType.new] : value_candidates(second, with_bindings(scope, when_false(proof))))
 end
 
 # A block's body walked (#572), with each local the block binds at the
