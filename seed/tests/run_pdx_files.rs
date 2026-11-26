@@ -6242,8 +6242,8 @@ fn portland_refusals_render_the_house_voice() {
         format!(
             "require_relative \"{library}\"\n\
              puts render_refusal([\"condition\", \"if\", [\"string\"], \"name\"])\n\
-             puts render_refusal([\"condition\", \"if\", [\"maybe\", [\"struct\", \"User\"]], \"user\"])\n\
-             puts render_refusal([\"condition\", \"if\", [\"maybe\", [\"integer\"]], nil])\n\
+             puts render_refusal([\"condition\", \"if\", MaybeType.new(inner: [\"struct\", \"User\"]), \"user\"])\n\
+             puts render_refusal([\"condition\", \"if\", MaybeType.new(inner: [\"integer\"]), nil])\n\
              puts render_refusal([\"condition\", \"while\", [\"integer\"], nil])\n\
              puts render_refusal([\"operand\", \"&&\", [\"string\"]])\n\
              puts render_refusal([\"no_method\", \"token\", [\"struct\", \"Token\"], \"knd\"])\n\
@@ -6251,7 +6251,7 @@ fn portland_refusals_render_the_house_voice() {
              puts render_refusal([\"no_method\", \"\\\"Shane\\\"\", [\"string\"], \"knd\"])\n\
              puts render_refusal([\"no_method\", \"\\\"Lorem ipsum dolor sit amet, consectetur adipiscing elit\\\"\", [\"string\"], \"knd\"])\n\
              puts render_refusal([\"no_method\", \"orders.select.map.first.second.third.fourth.fifth\", [\"string\"], \"knd\"])\n\
-             puts render_refusal([\"unhandled_maybe\", \"users.first\", [\"maybe\", [\"string\"]], \"upcase\"])\n\
+             puts render_refusal([\"unhandled_maybe\", \"users.first\", MaybeType.new(inner: [\"string\"]), \"upcase\"])\n\
              puts render_refusal([\"operator\", \"+\", [\"string\"], [\"integer\"]])\n\
              puts render_refusal([\"unary\", \"-\", [\"string\"]])\n\
              puts render_refusal([\"annotation\", \"handle\", [\"integer\"], \"String\"])\n\

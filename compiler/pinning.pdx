@@ -1048,7 +1048,7 @@ def rebound(bindings, name, type)
   return [[name, type]] + bindings if found.nil?
   # What was proved of the name was proved of what it held (#572), and
   # goes when the name is bound again.
-  if (type_at(found, 1) in ["maybe", ["struct", *]]) && bindings.assoc(proved_key(name)).some?
+  if (type_at(found, 1) in MaybeType(inner: ["struct", *])) && bindings.assoc(proved_key(name)).some?
     return rebound(bindings.reject { it[0] == proved_key(name) }, name, type)
   end
   return bindings if type_at(found, 1) == type

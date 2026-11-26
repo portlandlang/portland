@@ -17,7 +17,7 @@
 #   ["range", element]         — element is the ends' type (ADR 0081), or ["unknown"]
 #   ["array", element]         — element is a type, or ["unknown"]
 #   ["hash", key, value]
-#   ["maybe", inner]           — the wrapper, never a union (ADR 0040 §3)
+#   MaybeType(inner)           — the wrapper, never a union (ADR 0040 §3)
 #   ["struct", "Name"]         — an instance
 #   ["struct", "*"]            — an instance of one of the program's structs,
 #                                whichever (#572): only the native build's
@@ -63,12 +63,17 @@
 # on that read fired on the evaluator's own source.
 
 require_relative "parser"
+require_relative "type_kinds"
 
 # A value that is one of the program's structs, whichever (#572): what
 # a field made with one struct in one place and another elsewhere holds.
 # No struct can be named `*`. It is a struct wherever one is asked for,
 # and the struct it holds says which it is.
 ANY_STRUCT = ["struct", "*"]
+
+# What a maybe's place before its inner type read as, while a read by
+# place is still written (#593).
+MAYBE_KIND = "maybe"
 
 # The methods of a String and of an array the native build holds by name
 # (#560), each as what it is asked of, its name, what it takes, what it
@@ -97,7 +102,7 @@ NATIVE_LIBRARY = [
   [["string"], "downcase", [], ["string"], "portland_string_downcase"],
   [["string"], "end_with?", [["string"]], ["boolean"], "portland_string_end_with"],
   [["string"], "include?", [["string"]], ["boolean"], "portland_string_include"],
-  [["string"], "index", [["string"]], ["maybe", ["integer"]], "portland_string_index"],
+  [["string"], "index", [["string"]], MaybeType.new(inner: ["integer"]), "portland_string_index"],
   [["string"], "rjust", [["integer"], ["string"]], ["string"], "portland_string_rjust"],
   [["string"], "slice", [["integer"], ["integer"]], ["string"], "portland_string_slice"],
   [["string"], "split", [["string"]], ["array", ["string"]], "portland_string_split"],
@@ -108,7 +113,7 @@ NATIVE_LIBRARY = [
   [["string"], "upcase", [], ["string"], "portland_string_upcase"],
   # `text[index]`, and `text[from..to]` and an array's, which are written
   # with brackets and reach the library under these names.
-  [["string"], "[]", [["integer"]], ["maybe", ["string"]], "portland_string_character"],
+  [["string"], "[]", [["integer"]], MaybeType.new(inner: ["string"]), "portland_string_character"],
   [["string"], "[..]", [["integer"], ["integer"], ["integer"]], ["string"], "portland_string_range"],
   [["array", ["element"]], "[..]", [["integer"], ["integer"], ["integer"]], ["self"], "portland_array_range"]
 ]
@@ -225,13 +230,13 @@ def any_method_key(name) = "//#{name}"
 def arm_bindings(node, branch, nil_seen, types)
   subject = synthesize(node.subject, types)
   pattern = branch.pattern
-  plain = if (subject in ["maybe", *]) && nil_seen then type_at(subject, 1) else subject end
+  plain = if (subject in MaybeType) && nil_seen then subject.inner else subject end
   if pattern in IdentifierNode
     mutable pairs = [[pattern.name, plain]]
     pairs = [[node.subject.name, plain]] + pairs if node.subject in IdentifierNode
     return pairs
   end
-  if (pattern in NilNode) && (node.subject in IdentifierNode) && (subject in ["maybe", *])
+  if (pattern in NilNode) && (node.subject in IdentifierNode) && (subject in MaybeType)
     return [[node.subject.name, ["nil"]]]
   end
   pattern_names(pattern).map { [it, ["unknown"]] }
@@ -557,7 +562,7 @@ def call_answer(receiver, node, types)
   # nil on a string, a symbol, or a pattern; the predicates answer booleans;
   # a match's and a pattern's readers answer text or arrays of it.
   when "=~", "match"
-    return ["maybe", ["matchdata"]] if receiver == ["string"] || receiver == ["symbol"] || receiver == ["regexp"]
+    return MaybeType.new(inner: ["matchdata"]) if receiver == ["string"] || receiver == ["symbol"] || receiver == ["regexp"]
     ["unknown"]
   when "match?", "!~", "casefold?" then ["boolean"]
   when "source", "pre_match", "post_match" then ["string"]
@@ -567,7 +572,7 @@ def call_answer(receiver, node, types)
   when "options" then ["integer"]
   when "regexp" then ["regexp"]
   when "rindex"
-    return ["maybe", ["integer"]] if receiver == ["string"]
+    return MaybeType.new(inner: ["integer"]) if receiver == ["string"]
     ["unknown"]
   when "partition", "rpartition" then ["array", ["string"]]
   when "codepoints", "bytes" then ["array", ["integer"]]
@@ -594,7 +599,7 @@ def call_answer(receiver, node, types)
     ["array", ["unknown"]]
   # A range's ends (#111), each a maybe where the range is open.
   when "begin", "end"
-    return ["maybe", type_at(receiver, 1)] if receiver in ["range", *]
+    return MaybeType.new(inner: type_at(receiver, 1)) if receiver in ["range", *]
     ["unknown"]
   # A hash's own answers (#105).
   when "invert"
@@ -602,7 +607,7 @@ def call_answer(receiver, node, types)
     ["unknown"]
   when "has_value?", "value?" then ["boolean"]
   when "key"
-    return ["maybe", type_at(receiver, 1)] if receiver in ["hash", *]
+    return MaybeType.new(inner: type_at(receiver, 1)) if receiver in ["hash", *]
     ["unknown"]
   when "values_at", "except", "to_h"
     return receiver if (receiver in ["hash", *]) && name != "values_at"
@@ -611,9 +616,9 @@ def call_answer(receiver, node, types)
     # With a count, `first(2)` answers a slice, not a maybe; the survey for
     # ADR 0047 shape 3 found this arm calling one an Integer?.
     return ["unknown"] unless node.arguments.empty?
-    return ["maybe", type_at(receiver, 1)] if receiver in ["array", *]
-    return ["maybe", type_at(receiver, 1)] if receiver in ["range", *]
-    return ["maybe", ["unknown"]] if receiver == ["set"]
+    return MaybeType.new(inner: type_at(receiver, 1)) if receiver in ["array", *]
+    return MaybeType.new(inner: type_at(receiver, 1)) if receiver in ["range", *]
+    return MaybeType.new(inner: ["unknown"]) if receiver == ["set"]
     ["unknown"]
   # The arrangements of an array are arrays of its elements (#104).
   when "combination", "repeated_combination", "permutation", "repeated_permutation"
@@ -828,7 +833,7 @@ def dispatched_calls(node, receiver, types)
   return [] unless opened_natively(receiver, types) == ANY_STRUCT
   listed = types.assoc(any_method_key(node.name))
   return [] if listed.nil?
-  handed = (receiver in ["maybe", *]) ? OpenedNode.new(kind: "opened", value: node.receiver, name: node.name, line: node.line) : node.receiver
+  handed = (receiver in MaybeType) ? OpenedNode.new(kind: "opened", value: node.receiver, name: node.name, line: node.line) : node.receiver
   answering = type_at(listed, 1).select do |owner|
     shape = types.assoc(method_shape_key(owner, node.name))
     shape.some? && shape_answers?(type_at(shape, 1), node)
@@ -987,8 +992,8 @@ def joined_pair(first, second)
   return first if first == second
   return maybe_of(second) if first == ["nil"]
   return maybe_of(first) if second == ["nil"]
-  plain_first = (first in ["maybe", *]) ? type_at(first, 1) : first
-  plain_second = (second in ["maybe", *]) ? type_at(second, 1) : second
+  plain_first = (first in MaybeType) ? first.inner : first
+  plain_second = (second in MaybeType) ? second.inner : second
   maybe = plain_first != first || plain_second != second
   plain = joined_plain(plain_first, plain_second) or return nil
   maybe ? maybe_of(plain) : plain
@@ -1022,8 +1027,8 @@ end
 # A value's type and a maybe of it, either way round, as the maybe; a
 # maybe and nil as the maybe; anything else unknown.
 def joined_with_maybe(first, second)
-  return first if first == ["maybe", second] || ((first in ["maybe", *]) && second == ["nil"])
-  return second if second == ["maybe", first] || ((second in ["maybe", *]) && first == ["nil"])
+  return first if first == MaybeType.new(inner: second) || ((first in MaybeType) && second == ["nil"])
+  return second if second == MaybeType.new(inner: first) || ((second in MaybeType) && first == ["nil"])
   ["unknown"]
 end
 
@@ -1032,7 +1037,7 @@ end
 def library_type(written, receiver)
   return type_at(receiver, 1) if written == ["element"]
   return receiver if written == ["self"]
-  return ["maybe", library_type(type_at(written, 1), receiver)] if written in ["maybe", *]
+  return MaybeType.new(inner: library_type(written.inner, receiver)) if written in MaybeType
   return ["array", library_type(type_at(written, 1), receiver)] if (written in ["array", *]) && type_at(written, 1) == ["element"]
   written
 end
@@ -1054,13 +1059,13 @@ end
 # The plain type under a maybe-typed name, or nil for anything else.
 def maybe_inner(name, types)
   found = synthesize_name(name, types)
-  return nil unless found in ["maybe", *]
-  type_at(found, 1)
+  return nil unless found in MaybeType
+  found.inner
 end
 
 def maybe_of(type)
-  return type if (type in ["maybe", *]) || type == ["nil"] || type == ["unknown"]
-  ["maybe", type]
+  return type if (type in MaybeType) || type == ["nil"] || type == ["unknown"]
+  MaybeType.new(inner: type)
 end
 
 # Agreement answers the type; a lone nil among agreeing others makes a
@@ -1185,7 +1190,7 @@ def native_method_call(node, receiver, types)
   return nil if shape.nil? || !shape_answers?(type_at(shape, 1), node)
   # A receiver that is a maybe is opened for the method, which is handed
   # the value, and nil refuses by the method's name (#503).
-  handed = (receiver in ["maybe", *]) ? OpenedNode.new(kind: "opened", value: node.receiver, name: node.name, line: node.line) : node.receiver
+  handed = (receiver in MaybeType) ? OpenedNode.new(kind: "opened", value: node.receiver, name: node.name, line: node.line) : node.receiver
   CallNode.new(kind: "call", name: method_def_name(owner, node.name), arguments: [handed] + node.arguments, block: node.block, line: node.line)
 end
 
@@ -1264,8 +1269,8 @@ end
 
 # A maybe as the native build reads it where its value is needed.
 def opened_natively(type, types)
-  return type unless (type in ["maybe", *]) && native_reading?(types)
-  type_at(type, 1)
+  return type unless (type in MaybeType) && native_reading?(types)
+  type.inner
 end
 
 def ordered_pairs(nodes, types, kind)
@@ -1433,7 +1438,7 @@ def render_type(type)
   case type
   in ["array", element] then "[" + render_type(element) + "]"
   in ["hash", key, entry] then "{" + render_type(key) + " => " + render_type(entry) + "}"
-  in ["maybe", inner] then render_type(inner) + "?"
+  in MaybeType(inner:) then render_type(inner) + "?"
   in ["struct", "*"] then "Struct"
   in ["struct", name] then name
   in ["type", name] then name
@@ -1600,7 +1605,7 @@ def shape_proof(node, types)
   held = synthesize_name(node.subject.name, types)
   return no_proof unless synthesize_name(node.pattern.name, types) == ["type", node.pattern.name]
   return [[[node.subject.name, ["struct", node.pattern.name]]], []] if held == ANY_STRUCT
-  return no_proof unless native_reading?(types) && (held in ["maybe", *]) && (type_at(held, 1) in ["struct", *])
+  return no_proof unless native_reading?(types) && (held in MaybeType) && (held.inner in ["struct", *])
   [[[proved_key(node.subject.name), ["struct", node.pattern.name]]], []]
 end
 
@@ -1719,7 +1724,7 @@ def synthesize_append(node, types)
   return ["string"] if current == ["string"]
   # Read as the native build runs it, a maybe of a String is opened to be
   # appended to (#557).
-  return ["string"] if current == ["maybe", ["string"]] && native_reading?(types)
+  return ["string"] if current == MaybeType.new(inner: ["string"]) && native_reading?(types)
   # Read as the native build runs it, a maybe appended is opened first
   # (#566).
   value = opened_natively(synthesize(node.value, types), types)
@@ -1837,16 +1842,16 @@ def synthesize_block_call(node, receiver, types)
   case node.name
   when "map", "collect" then ["array", body]
   when "find", "detect", "rfind", "min_by", "max_by"
-    return ["maybe", element_type(receiver)] if receiver in ["array", *]
+    return MaybeType.new(inner: element_type(receiver)) if receiver in ["array", *]
     ["unknown"]
   # A summed block answers whatever its block does (#104).
   when "sum" then ["unknown"]
   when "count", "index", "find_index", "rindex" then synthesize_numeric_answer(receiver, node.name)
   # Binary search answers a maybe of the element, or of its position (#104).
   when "bsearch"
-    return ["maybe", element_type(receiver)] if (receiver in ["array", *]) || (receiver in ["range", *])
+    return MaybeType.new(inner: element_type(receiver)) if (receiver in ["array", *]) || (receiver in ["range", *])
     ["unknown"]
-  when "bsearch_index" then ["maybe", ["integer"]]
+  when "bsearch_index" then MaybeType.new(inner: ["integer"])
   # The arrangements handed to a block answer the array; cycle answers nil.
   when "combination", "repeated_combination", "permutation", "repeated_permutation", "product"
     return receiver if receiver in ["array", *]
@@ -1920,7 +1925,7 @@ def synthesize_call(node, types)
   # `or` takes the failure's place, and reads it there as text or
   # nothing (#534).
   if node.name == "read_file" && (node.receiver in IdentifierNode) && node.receiver.name == "System" && native_reading?(types)
-    return ["maybe", ["string"]]
+    return MaybeType.new(inner: ["string"])
   end
   return type_function_answer(node) if builtin_type_function?(node, types)
   receiver = synthesize(node.receiver, types)
@@ -2017,7 +2022,7 @@ def synthesize_identifier(node, types)
   found = types.assoc(node.name)
   # A name that may not be there, proved to be a struct, is that struct
   # (#572): the proof is bound beside it.
-  if found.some? && (type_at(found, 1) in ["maybe", ["struct", *]])
+  if found.some? && (type_at(found, 1) in MaybeType(inner: ["struct", *]))
     proved = types.assoc(proved_key(node.name))
     return type_at(proved, 1) if proved.some?
   end
@@ -2067,7 +2072,7 @@ def synthesize_index(node, types)
     return opened if opened == ["string"] || (opened in ["array", *])
     return ["unknown"]
   end
-  return ["maybe", ["string"]] if opened == ["string"] && synthesize(node.index, types) == ["integer"]
+  return MaybeType.new(inner: ["string"]) if opened == ["string"] && synthesize(node.index, types) == ["integer"]
   return ["unknown"] unless (receiver in ["array", *]) && synthesize(node.index, types) == ["integer"]
   maybe_of(type_at(receiver, 1))
 end
@@ -2084,14 +2089,14 @@ def synthesize_logical(node, types)
   # `or`, and a value that is always there is itself (#572).
   if native_reading?(types) && node.operator == "||"
     return right if left == ["nil"]
-    return left if left != ["boolean"] && left != ["unknown"] && !(left in ["maybe", *])
+    return left if left != ["boolean"] && left != ["unknown"] && !(left in MaybeType)
   end
-  return ["unknown"] unless left in ["maybe", *]
+  return ["unknown"] unless left in MaybeType
   # `maybe or default` answers the plain type when the default is one of
   # it, and `maybe or return` the plain type outright — below the guard
   # the name is plain (the third form of ADR 0040 §3). Anything else is
   # an opinion withheld.
-  inner = type_at(left, 1)
+  inner = left.inner
   return inner if exit?(node.right)
   return inner if right == inner
   # Read as the native build runs it, one struct standing in for one of
@@ -2123,7 +2128,7 @@ def synthesize_numeric_answer(receiver, name, arguments_empty: true)
     return receiver if (receiver == ["string"] || receiver == ["symbol"]) && (name == "succ" || name == "next")
     ["unknown"]
   when "index", "find_index", "rindex"
-    return ["maybe", ["integer"]] if receiver == ["string"] || (receiver in ["array", *])
+    return MaybeType.new(inner: ["integer"]) if receiver == ["string"] || (receiver in ["array", *])
     ["unknown"]
   when "sum"
     # Whole numbers stay whole; anything else about the elements is 3b,
@@ -2152,7 +2157,7 @@ def synthesize_safe_call(node, types)
   guarded = native_reading?(types) ? safe_as_if(node) : nil
   return synthesize(guarded, types) if guarded.some?
   receiver = synthesize(node.receiver, types)
-  plain = if receiver in ["maybe", *] then type_at(receiver, 1) else receiver end
+  plain = if receiver in MaybeType then receiver.inner else receiver end
   maybe_of(call_answer(plain, node, types))
 end
 
@@ -2217,6 +2222,10 @@ end
 # Raw positional read: host indexing lifts nil, and a type cell can hold
 # ["nil"] legitimately.
 def type_at(list, target_index)
+  # A type that is a struct (#593) is read by place as the array it was:
+  # its kind first, then what it holds. A read of this kind goes once
+  # every one is written by the field's name.
+  return [MAYBE_KIND, list.inner].slice(target_index, 1).first if list in MaybeType
   # Read through a run of one, so the walk is one step however long the
   # list is (#537). An index answers a maybe, and a nil that is there
   # comes back wrapped; a block's parameter is the element itself.

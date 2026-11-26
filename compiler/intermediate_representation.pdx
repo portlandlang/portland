@@ -461,7 +461,7 @@ def field_offset(fields, place)
   mutable offset = 0
   fields.slice(0, place).each do |field|
     # A field that is only ever nil is kept as a maybe that is not there.
-    offset += (type_at(field, 1) in ["maybe", *]) || type_at(field, 1) == ["nil"] ? 2 : 1
+    offset += (type_at(field, 1) in MaybeType) || type_at(field, 1) == ["nil"] ? 2 : 1
   end
   offset
 end
@@ -475,13 +475,13 @@ def fitted(value, type)
   return value if held_as?(value.type, type)
   # An empty array is the array it is held as, whatever that holds.
   return value.with(type: type) if value.type == EMPTY_ARRAY && (type in ["array", *])
-  return nil unless type in ["maybe", *]
-  if value.type == EMPTY_ARRAY && (type_at(type, 1) in ["array", *])
-    return IntermediateSome.new(type: type, value: value.with(type: type_at(type, 1)))
+  return nil unless type in MaybeType
+  if value.type == EMPTY_ARRAY && (type.inner in ["array", *])
+    return IntermediateSome.new(type: type, value: value.with(type: type.inner))
   end
   return IntermediateConstant.new(type: type, value: nil) if value.type == ["nil"]
-  return IntermediateSome.new(type: type, value: value) if held_as?(value.type, type_at(type, 1))
-  return value if (value.type in ["maybe", *]) && held_as?(type_at(value.type, 1), type_at(type, 1))
+  return IntermediateSome.new(type: type, value: value) if held_as?(value.type, type.inner)
+  return value if (value.type in MaybeType) && held_as?(value.type.inner, type.inner)
   nil
 end
 
@@ -513,7 +513,7 @@ def held_type(name, type, context)
   pinned = context.pinned.assoc(name)
   return type if pinned.nil?
   settled = type_at(pinned, 1)
-  return settled if (settled in ["maybe", *]) && native_type?(settled) && (type == ["nil"] || type == type_at(settled, 1))
+  return settled if (settled in MaybeType) && native_type?(settled) && (type == ["nil"] || type == settled.inner)
   # One bound to a struct here and to another elsewhere holds one of
   # several (#572), and so with an array of them.
   return settled if native_type?(settled) && held_as?(type, settled)
@@ -524,7 +524,7 @@ end
 # between quotes, a maybe as its value or `nil`, and everything else as
 # it is written out.
 def inspected(value, node)
-  return IntermediateInspect.new(type: ["string"], value: value) if value.type == ["string"] || (value.type in ["maybe", *])
+  return IntermediateInspect.new(type: ["string"], value: value) if value.type == ["string"] || (value.type in MaybeType)
   # Nil itself in its source form (#572).
   return IntermediateConstant.new(type: ["string"], value: "nil") if value.type == ["nil"]
   written_out(value, node)
@@ -536,12 +536,12 @@ end
 def joined_type(first, second)
   return first if first == second
   # Nil beside a maybe is that maybe.
-  return second if first == ["nil"] && (second in ["maybe", *])
-  return first if second == ["nil"] && (first in ["maybe", *])
-  return ["maybe", second] if first == ["nil"] && native_value?(second)
-  return ["maybe", first] if second == ["nil"] && native_value?(first)
-  return first if first == ["maybe", second]
-  return second if second == ["maybe", first]
+  return second if first == ["nil"] && (second in MaybeType)
+  return first if second == ["nil"] && (first in MaybeType)
+  return MaybeType.new(inner: second) if first == ["nil"] && native_value?(second)
+  return MaybeType.new(inner: first) if second == ["nil"] && native_value?(first)
+  return first if first == MaybeType.new(inner: second)
+  return second if second == MaybeType.new(inner: first)
   # One struct and another are one of several (#572).
   joined_plain(first, second)
 end
@@ -959,7 +959,7 @@ def lower_statement(statement, bindings, context)
     refuse_native("puts of anything but one value", statement) unless arguments.length == 1
     handed = lower_value(arguments[0], bindings, context)
     # A maybe is opened, and nil refuses as the seed's `puts` does.
-    value = (handed.type in ["maybe", *]) ? IntermediateOpen.new(type: type_at(handed.type, 1), value: handed, name: "puts") : handed
+    value = (handed.type in MaybeType) ? IntermediateOpen.new(type: handed.type.inner, value: handed, name: "puts") : handed
     # An Integer is printed as it is; everything else as its text.
     shown = value.type == ["integer"] ? value : written_out(value, statement)
     Lowered.new(nodes: [IntermediatePrint.new(value: shown)], bindings: bindings)
@@ -1007,7 +1007,7 @@ def lower_system(node, bindings, context, root)
     refuse_native("System.read_file read without an or beside it — it answers a failure where the file cannot be read, and a failure", node) unless root == "or"
     named = lower_value(node.arguments[0], bindings, context)
     refuse_native("System.read_file of #{with_article(named.type)}", node) unless named.type == ["string"]
-    return IntermediateSystem.new(type: ["maybe", ["string"]], name: "read_file", arguments: [named])
+    return IntermediateSystem.new(type: MaybeType.new(inner: ["string"]), name: "read_file", arguments: [named])
   end
   refuse_native("System.#{node.name}", node)
 end
@@ -1079,14 +1079,14 @@ def lower_value(node, bindings, context)
       asked = lower_value(subject, bindings, inner)
       refuse_native("an in test of #{with_article(asked.type)}", node) unless plain_of(asked.type) in ["struct", *]
       # A maybe is the struct named only where it is there.
-      return IntermediateShaped.new(type: ["boolean"], value: asked, name: pattern.name) if asked.type == ANY_STRUCT || (asked.type in ["maybe", *])
+      return IntermediateShaped.new(type: ["boolean"], value: asked, name: pattern.name) if asked.type == ANY_STRUCT || (asked.type in MaybeType)
       refuse_native("an in test of anything but a local", node) unless subject in IdentifierNode
       return IntermediateConstant.new(type: ["boolean"], value: type_at(asked.type, 1) == pattern.name)
     end
     refuse_native("an in test of anything but a local", node) unless subject in IdentifierNode
     tested = lower_value(subject, bindings, inner)
     wanted = native_type_named(pattern.name) or refuse_native("an in test for #{pattern.name}", node)
-    refuse_native("an in test of #{with_article(tested.type)}", node) if tested.type in ["maybe", *]
+    refuse_native("an in test of #{with_article(tested.type)}", node) if tested.type in MaybeType
     matches = wanted == ["array"] ? (tested.type in ["array", *]) : tested.type == wanted
     IntermediateConstant.new(type: ["boolean"], value: matches)
   # `nil` has no type of its own to be held as; what it is bound to, or
@@ -1098,7 +1098,7 @@ def lower_value(node, bindings, context)
     return IntermediateConstant.new(type: ["nil"], value: nil) if found.some? && type_at(found, 1) == ["nil"]
     # A name that may not be there, proved to be a struct, is opened and
     # read as that struct (#572): an `in` test found it there.
-    if found.some? && (type_at(found, 1) in ["maybe", ["struct", *]])
+    if found.some? && (type_at(found, 1) in MaybeType(inner: ["struct", *]))
       proved = bindings.assoc(proved_key(name))
       return IntermediateOpen.new(type: type_at(proved, 1), value: IntermediateLocal.new(type: type_at(found, 1), name: name), name: name) if proved.some?
     end
@@ -1186,7 +1186,7 @@ def lower_value(node, bindings, context)
     refuse_native("an index into #{with_article(held.type)}", node) unless held.type in ["array", *]
     position = lower_value(index, bindings, inner)
     refuse_native("an index that is #{with_article(position.type)}", node) unless position.type == ["integer"]
-    IntermediateIndex.new(type: ["maybe", type_at(held.type, 1)], array: held, index: position)
+    IntermediateIndex.new(type: MaybeType.new(inner: type_at(held.type, 1)), array: held, index: position)
   in CallNode(name:, arguments:)
     # `inspect(value)` (#501), where the program has no def of that name.
     if name == "inspect" && arguments.length == 1 && node.block.nil? && context.arities.none? { it[0] == name }
@@ -1212,13 +1212,13 @@ def lower_value(node, bindings, context)
     # And one that holds a value in this combination is that value: the
     # right side is never reached.
     return first if operator == "||" && first.type != ["boolean"] && native_value?(first.type)
-    if operator == "||" && (first.type in ["maybe", *])
+    if operator == "||" && (first.type in MaybeType)
       # `maybe or panic "…"`: the right side stops the program, so the
       # whole is the value (#534).
       if (right in CallNode) && right.name == "panic" && right.arguments.length == 1 && right.block.nil?
         message = lower_value(right.arguments[0], bindings, inner)
         refuse_native("panic of #{with_article(message.type)}", right) unless message.type == ["string"]
-        plain = type_at(first.type, 1)
+        plain = first.type.inner
         return IntermediateDefault.new(type: plain, value: first, fallback: IntermediateStop.new(type: plain, message: message))
       end
       written = lower_value(right, bindings, inner)
@@ -1277,14 +1277,14 @@ def lower_value(node, bindings, context)
     return IntermediateMethod.new(type: ["boolean"], receiver: asked, name: name) if %w[nil? some?].include?(name)
     if (asked.type in ["array", *]) && %w[first last].include?(name)
       position = IntermediateConstant.new(type: ["integer"], value: name == "first" ? 0 : -1)
-      return IntermediateIndex.new(type: ["maybe", type_at(asked.type, 1)], array: asked, index: position)
+      return IntermediateIndex.new(type: MaybeType.new(inner: type_at(asked.type, 1)), array: asked, index: position)
     end
     # A struct's field is read by its name (#532), a maybe opened for it.
     if plain_of(asked.type) in ["struct", *]
       made = context.structs.find { it.name == type_at(plain_of(asked.type), 1) }
       fields = made.nil? ? [] : struct_fields(made, context)
       place = fields.find_index { it[0] == name }
-      holder = (asked.type in ["maybe", *]) ? IntermediateOpen.new(type: plain_of(asked.type), value: asked, name: name) : asked
+      holder = (asked.type in MaybeType) ? IntermediateOpen.new(type: plain_of(asked.type), value: asked, name: name) : asked
       # Asked of one of several structs, the field is found by its name
       # in whichever the struct is (#572).
       shared = holder.type == ANY_STRUCT ? shared_field(name, context.answers) : nil
@@ -1416,7 +1416,7 @@ end
 # array of any of those or of such arrays (#497, #499), and a maybe of
 # any of them (#503). An array holds no maybe.
 def native_type?(type)
-  return native_value?(type_at(type, 1)) if type in ["maybe", *]
+  return native_value?(type.inner) if type in MaybeType
   native_value?(type)
 end
 
@@ -1440,7 +1440,7 @@ end
 
 # A value with a maybe opened for a method of this name.
 def opened_for(value, name)
-  return value unless value.type in ["maybe", *]
+  return value unless value.type in MaybeType
   IntermediateOpen.new(type: plain_of(value.type), value: value, name: name)
 end
 
@@ -1451,7 +1451,7 @@ def placed_locals(bindings) = bindings.reject { type_at(it, 1) == ["nil"] || pro
 
 # A type with a maybe opened: what an operation that needs the value
 # works on.
-def plain_of(type) = (type in ["maybe", *]) ? type_at(type, 1) : type
+def plain_of(type) = (type in MaybeType) ? type.inner : type
 
 # A call handed a block that can leave is written where nothing else is
 # being held (#523): as a statement, or as all of what is bound or
@@ -1568,8 +1568,8 @@ end
 def returned_as(value, answer)
   held = fitted(value, answer)
   return held if held.some?
-  return nil unless (value.type in ["maybe", *]) && answer.some? && held_as?(type_at(value.type, 1), answer)
-  IntermediateOpen.new(type: type_at(value.type, 1), value: value, name: "return")
+  return nil unless (value.type in MaybeType) && answer.some? && held_as?(value.type.inner, answer)
+  IntermediateOpen.new(type: value.type.inner, value: value, name: "return")
 end
 
 # Whether a `return` is written inside a block somewhere in a def's
@@ -1606,7 +1606,7 @@ end
 # itself, and an Integer, a Boolean, or an array is written out.
 def written_out(value, node)
   # A maybe is opened first, and nil refuses as the seed's `to_s` does.
-  return written_out(IntermediateOpen.new(type: type_at(value.type, 1), value: value, name: "to_s"), node) if value.type in ["maybe", *]
+  return written_out(IntermediateOpen.new(type: value.type.inner, value: value, name: "to_s"), node) if value.type in MaybeType
   return value if value.type == ["string"]
   # A name that is nil in this combination of its def's types refuses
   # when the line runs, in the seed's words, and builds: the line may

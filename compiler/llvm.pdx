@@ -416,7 +416,7 @@ end
 # Whether a value of this type holds a counted block: a String, an
 # array, or a maybe of either.
 def llvm_counted?(type)
-  return llvm_counted?(type_at(type, 1)) if type in ["maybe", *]
+  return llvm_counted?(type.inner) if type in MaybeType
   type == ["string"] || (type in ["array", *]) || (type in ["struct", *])
 end
 
@@ -424,9 +424,9 @@ end
 # counted, by the runtime function for what it is.
 def llvm_drop(emitter, type, operand)
   return emitter unless llvm_counted?(type)
-  if type in ["maybe", *]
+  if type in MaybeType
     held = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
-    return llvm_drop(held.emitter, type_at(type, 1), held.operand)
+    return llvm_drop(held.emitter, type.inner, held.operand)
   end
   return llvm_line(emitter, "call void @portland_release(ptr #{operand})") if type == ["string"]
   return llvm_line(emitter, "call void @portland_struct_release(ptr #{operand})") if type in ["struct", *]
@@ -470,7 +470,7 @@ def llvm_field_kind(type)
   # A field that is only ever nil is a maybe that is not there (#572):
   # two words the runtime reads as nothing, whatever it would have held.
   return 16 if type == ["nil"]
-  return 16 + llvm_array_kind(type_at(type, 1)) if type in ["maybe", *]
+  return 16 + llvm_array_kind(type.inner) if type in MaybeType
   llvm_array_kind(type)
 end
 
@@ -518,8 +518,8 @@ end
 # Integer, and anything else as its own type.
 def llvm_library_answer(type)
   return "zeroext i1" if type == ["boolean"]
-  return "i64" if type == ["maybe", ["integer"]]
-  return "ptr" if type in ["maybe", *]
+  return "i64" if type == MaybeType.new(inner: ["integer"])
+  return "ptr" if type in MaybeType
   llvm_type(type)
 end
 
@@ -531,7 +531,7 @@ def llvm_library_declarations
   declared = NATIVE_LIBRARY.map do |entry|
     taken = type_at(entry, 2).map { (it == ["integer"] || it == ["element"]) ? "i64" : "ptr" }
     answer = type_at(entry, 3)
-    answered = answer == ["boolean"] ? "zeroext i1" : ((answer == ["integer"] || answer == ["maybe", ["integer"]]) ? "i64" : "ptr")
+    answered = answer == ["boolean"] ? "zeroext i1" : ((answer == ["integer"] || answer == MaybeType.new(inner: ["integer"])) ? "i64" : "ptr")
     asked = type_at(entry, 0) == ["integer"] ? "i64" : "ptr"
     "declare #{answered} @#{type_at(entry, 4)}(#{([asked] + taken).join(", ")})"
   end
@@ -598,7 +598,7 @@ end
 # A maybe opened (#503): its value where there is one. Where there is
 # none, the block writes the refusal, which does not come back.
 def llvm_opened(emitter, type, operand)
-  return LLVMValue.new(emitter: emitter, operand: operand) unless type in ["maybe", *]
+  return LLVMValue.new(emitter: emitter, operand: operand) unless type in MaybeType
   flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
   number = flag.emitter.counter
   branched = llvm_line(flag.emitter, "br i1 #{flag.operand}, label %open#{number}.some, label %open#{number}.none")
@@ -625,12 +625,12 @@ def llvm_operands(emitter, operator, left_type, left, right_type, right)
 end
 
 # A maybe's type with the maybe taken off; any other type is itself.
-def llvm_plain(type) = (type in ["maybe", *]) ? type_at(type, 1) : type
+def llvm_plain(type) = (type in MaybeType) ? type.inner : type
 
 # Whether there is a value: a maybe's flag, and always so for anything
 # else. What was asked is released once it has answered.
 def llvm_presence(emitter, type, name, operand)
-  unless type in ["maybe", *]
+  unless type in MaybeType
     return LLVMValue.new(emitter: llvm_drop(emitter, type, operand), operand: name == "some?" ? "true" : "false")
   end
   flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
@@ -660,9 +660,9 @@ end
 # value, which is nothing where there is none.
 def llvm_retain(emitter, type, operand)
   return emitter unless llvm_counted?(type)
-  if type in ["maybe", *]
+  if type in MaybeType
     held = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
-    return llvm_retain(held.emitter, type_at(type, 1), held.operand)
+    return llvm_retain(held.emitter, type.inner, held.operand)
   end
   llvm_line(emitter, "call void @portland_retain(ptr #{operand})")
 end
@@ -777,7 +777,7 @@ end
 # A side of `==` as a flag and a value: a maybe's own, and for anything
 # else, there and itself.
 def llvm_sides(emitter, type, operand)
-  return LLVMPair.new(emitter: emitter, left: "true", right: operand) unless type in ["maybe", *]
+  return LLVMPair.new(emitter: emitter, left: "true", right: operand) unless type in MaybeType
   flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
   held = llvm_named(flag.emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
   LLVMPair.new(emitter: held.emitter, left: flag.operand, right: held.operand)
@@ -793,10 +793,10 @@ def llvm_source(emitter, type, operand)
   in ["integer"] then llvm_named(emitter, "call ptr @portland_string_from_integer(i64 #{operand})")
   in ["boolean"] then llvm_named(emitter, "call ptr @portland_string_from_boolean(i1 zeroext #{operand})")
   in ["string"] then llvm_named(emitter, "call ptr @portland_string_inspect(ptr #{operand})")
-  in ["maybe", *]
+  in MaybeType
     flag = llvm_named(emitter, "extractvalue #{llvm_type(type)} #{operand}, 0")
     held = llvm_named(flag.emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
-    written = llvm_source(held.emitter, type_at(type, 1), held.operand)
+    written = llvm_source(held.emitter, type.inner, held.operand)
     llvm_named(written.emitter, "select i1 #{flag.operand}, ptr #{written.operand}, ptr null")
   in ["struct", *] then llvm_named(emitter, "call ptr @portland_struct_to_string(ptr #{operand})")
   else llvm_named(emitter, "call ptr @portland_array_to_string(ptr #{operand})")
@@ -927,7 +927,7 @@ def llvm_type(type)
   in ["string"] then "ptr"
   in ["array", *] then "ptr"
   in ["struct", *] then "ptr"
-  in ["maybe", *] then "{ i1, #{llvm_type(type_at(type, 1))} }"
+  in MaybeType then "{ i1, #{llvm_type(type.inner)} }"
   in ["nothing"] then "void"
   else panic("llvm.pdx: no machine type for #{render_type(type)}")
   end
@@ -938,7 +938,7 @@ def llvm_value(emitter, value)
   in IntermediateConstant(type: ["string"], value: text) then llvm_literal(emitter, text)
   # nil, held as a maybe, is the maybe that is not there; a bare `nil`
   # no one holds is nothing at all.
-  in IntermediateConstant(type: ["maybe", *]) then LLVMValue.new(emitter: emitter, operand: "zeroinitializer")
+  in IntermediateConstant(type: MaybeType) then LLVMValue.new(emitter: emitter, operand: "zeroinitializer")
   in IntermediateConstant(type: ["nil"]) then LLVMValue.new(emitter: emitter, operand: "null")
   in IntermediateConstant(value: literal) then LLVMValue.new(emitter: emitter, operand: literal.to_s)
   in IntermediateLocal(type:, name:)
@@ -963,7 +963,7 @@ def llvm_value(emitter, value)
     LLVMValue.new(emitter: llvm_drop(made.emitter, shown.type, written.operand), operand: made.operand)
   in IntermediateInspect(value: shown)
     written = llvm_value(emitter, shown)
-    made = if shown.type in ["maybe", *]
+    made = if shown.type in MaybeType
       llvm_shown_maybe(written.emitter, shown.type, written.operand)
     else
       llvm_named(written.emitter, "call ptr @portland_string_inspect(ptr #{written.operand})")
@@ -979,7 +979,7 @@ def llvm_value(emitter, value)
     second = llvm_value(first.emitter, right)
     # `==` and `!=` compare a maybe as it is; every other comparison, and
     # these between plain values, work on the values.
-    if %w[== !=].include?(operator) && ((left.type in ["maybe", *]) || (right.type in ["maybe", *]))
+    if %w[== !=].include?(operator) && ((left.type in MaybeType) || (right.type in MaybeType))
       equal = llvm_equal_maybes(second.emitter, left.type, first.operand, right.type, second.operand)
       return equal if operator == "=="
       return llvm_named(equal.emitter, "xor i1 #{equal.operand}, true")
@@ -1060,9 +1060,9 @@ def llvm_value(emitter, value)
     passed.each do |given|
       done = llvm_drop(done, type_at(given, 0), type_at(given, 1))
     end
-    return LLVMValue.new(emitter: done, operand: answered.operand) unless type in ["maybe", *]
+    return LLVMValue.new(emitter: done, operand: answered.operand) unless type in MaybeType
     # A String or an array that may not be there comes back as nothing.
-    unless type == ["maybe", ["integer"]]
+    unless type == MaybeType.new(inner: ["integer"])
       shape = llvm_type(type)
       there = llvm_named(done, "icmp ne ptr #{answered.operand}, null")
       half = llvm_named(there.emitter, "insertvalue #{shape} undef, i1 #{there.operand}, 0")
@@ -1092,7 +1092,7 @@ def llvm_value(emitter, value)
     number = flag.emitter.counter
     branched = llvm_line(flag.emitter, "br i1 #{flag.operand}, label %default#{number}.some, label %default#{number}.none")
     there = llvm_label(branched, "default#{number}.some")
-    kept = (type in ["maybe", *]) ? LLVMValue.new(emitter: there, operand: written.operand) : llvm_named(there, "extractvalue #{llvm_type(held.type)} #{written.operand}, 1")
+    kept = (type in MaybeType) ? LLVMValue.new(emitter: there, operand: written.operand) : llvm_named(there, "extractvalue #{llvm_type(held.type)} #{written.operand}, 1")
     other = llvm_value(llvm_label(llvm_line(kept.emitter, "br label %default#{number}.done"), "default#{number}.none"), fallback)
     other_block = other.emitter.block
     joined = llvm_label(llvm_line(other.emitter, "br label %default#{number}.done"), "default#{number}.done")
@@ -1247,8 +1247,8 @@ def llvm_value(emitter, value)
       mutable storing = written.emitter
       mutable stored = written.operand
       mutable stored_type = field.type
-      if field.type in ["maybe", *]
-        stored_type = type_at(field.type, 1)
+      if field.type in MaybeType
+        stored_type = field.type.inner
         field_flag = llvm_named(storing, "extractvalue #{llvm_type(field.type)} #{written.operand}, 0")
         field_there = llvm_word(field_flag.emitter, ["boolean"], field_flag.operand)
         flag_slot = llvm_named(field_there.emitter, "getelementptr i64, ptr #{record}, i64 #{place + 2}")
@@ -1272,12 +1272,12 @@ def llvm_value(emitter, value)
     return LLVMValue.new(emitter: llvm_drop(asked.emitter, record.type, asked.operand), operand: "null") if type == ["nil"]
     slot = llvm_named(asked.emitter, "getelementptr i64, ptr #{asked.operand}, i64 #{index + 2}")
     mutable read = nil
-    if type in ["maybe", *]
+    if type in MaybeType
       maybe_shape = llvm_type(type)
-      inner_shape = llvm_type(type_at(type, 1))
+      inner_shape = llvm_type(type.inner)
       field_flag = llvm_element(slot.emitter, ["boolean"], slot.operand)
       value_slot = llvm_named(field_flag.emitter, "getelementptr i64, ptr #{asked.operand}, i64 #{index + 3}")
-      field_value = llvm_element(value_slot.emitter, type_at(type, 1), value_slot.operand)
+      field_value = llvm_element(value_slot.emitter, type.inner, value_slot.operand)
       half_made = llvm_named(field_value.emitter, "insertvalue #{maybe_shape} undef, i1 #{field_flag.operand}, 0")
       read = llvm_named(half_made.emitter, "insertvalue #{maybe_shape} #{half_made.operand}, #{inner_shape} #{field_value.operand}, 1")
     else
@@ -1292,12 +1292,12 @@ def llvm_value(emitter, value)
     label = llvm_literal(asked.emitter, name)
     slot = llvm_named(label.emitter, "call ptr @portland_struct_slot(ptr #{asked.operand}, ptr #{label.operand})")
     mutable read = nil
-    if type in ["maybe", *]
+    if type in MaybeType
       maybe_shape = llvm_type(type)
-      inner_shape = llvm_type(type_at(type, 1))
+      inner_shape = llvm_type(type.inner)
       field_flag = llvm_element(slot.emitter, ["boolean"], slot.operand)
       value_slot = llvm_named(field_flag.emitter, "getelementptr i64, ptr #{slot.operand}, i64 1")
-      field_value = llvm_element(value_slot.emitter, type_at(type, 1), value_slot.operand)
+      field_value = llvm_element(value_slot.emitter, type.inner, value_slot.operand)
       half_made = llvm_named(field_value.emitter, "insertvalue #{maybe_shape} undef, i1 #{field_flag.operand}, 0")
       read = llvm_named(half_made.emitter, "insertvalue #{maybe_shape} #{half_made.operand}, #{inner_shape} #{field_value.operand}, 1")
     else
@@ -1310,7 +1310,7 @@ def llvm_value(emitter, value)
     asked = llvm_value(emitter, tested)
     # A maybe is the struct named only where it is there, which the
     # runtime asks of an address that may be nothing.
-    if tested.type in ["maybe", *]
+    if tested.type in MaybeType
       held = llvm_named(asked.emitter, "extractvalue #{llvm_type(tested.type)} #{asked.operand}, 1")
       named = llvm_named(held.emitter, "call zeroext i1 @portland_struct_is(ptr #{held.operand}, ptr #{llvm_shape_name(name)})")
       return LLVMValue.new(emitter: llvm_drop(named.emitter, tested.type, asked.operand), operand: named.operand)
@@ -1366,7 +1366,7 @@ def llvm_zero(type)
   case type
   in ["integer"] then "0"
   in ["boolean"] then "false"
-  in ["maybe", *] then "zeroinitializer"
+  in MaybeType then "zeroinitializer"
   else "null"
   end
 end

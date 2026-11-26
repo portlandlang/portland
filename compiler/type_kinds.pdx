@@ -1,0 +1,16 @@
+# The compiler's types, each kind a struct (#593). Inference reads a type
+# off every expression, and pinning, lowering, and the emitter work with
+# what it reads. A type was a tagged array, `["maybe", ["integer"]]`: a
+# String beside an array, nested to any depth, which a native array cannot
+# be. Each kind moves here as it becomes a struct, and is written by its
+# fields' names.
+#
+# A file of its own, required ahead of everything that names a type, since
+# a file runs its constants before it declares its structs, and the
+# compiler's constants are full of types.
+
+# A maybe of a type (ADR 0040 §3): the wrapper, never a union, holding the
+# type of the value where it is there.
+struct MaybeType
+  inner
+end

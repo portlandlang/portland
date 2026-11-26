@@ -699,11 +699,11 @@ end
 # absent case is named first, being the one people forget.
 def check_maybe_coverage(node, scope, mutable found)
   subject = synthesize(node.subject, known_types(scope))
-  return found unless subject in ["maybe", *]
+  return found unless subject in MaybeType
   return found unless known?(subject)
   patterns = unguarded_arms(node).map { it.pattern }
   found = noted(found, ["coverage", "nil"], locate(node, scope)) unless patterns.any? { covers_nil?(it) }
-  inner = type_at(subject, 1)
+  inner = subject.inner
   return found if patterns.any? { covers_present?(it, inner) }
   # A present Boolean is true or false, so arms that take both between
   # them cover the present case, and arms that provably take one leave
@@ -721,7 +721,7 @@ end
 # `&.` is the other answer and is never this node. The receiver must be
 # spellable, since the hint is written from it.
 def check_maybe_method(node, receiver, scope, found)
-  return found unless receiver in ["maybe", *]
+  return found unless receiver in MaybeType
   return found unless known?(receiver)
   return found if %w[eql? failure? nil? some? to_s].include?(node.name)
   spelling = spell_node(node.receiver)
@@ -887,8 +887,8 @@ def check_operands(node, scope, mutable found)
   return found unless known?(left)
   spelling = spell_node(node.left)
   return found if spelling.nil?
-  return noted(found, ["boolean_maybe_or", spelling], locate(node, scope)) if left == ["maybe", ["boolean"]]
-  return found if (left in ["maybe", *]) || left == ["nil"]
+  return noted(found, ["boolean_maybe_or", spelling], locate(node, scope)) if left == MaybeType.new(inner: ["boolean"])
+  return found if (left in MaybeType) || left == ["nil"]
   noted(found, ["dead_or", spelling, left], locate(node, scope))
 end
 
@@ -1599,7 +1599,7 @@ def known?(type)
   in ["unknown"] then false
   in ["array", element] then known?(element)
   in ["hash", key, entry] then known?(key) && known?(entry)
-  in ["maybe", inner] then known?(inner)
+  in MaybeType(inner:) then known?(inner)
   in ["range", element] then known?(element)
   else
     true
@@ -1709,7 +1709,7 @@ end
 def plain_value?(type)
   return false unless known?(type)
   case type
-  in ["maybe", *] then false
+  in MaybeType then false
   in ["struct", *] then false
   in ["enum", *] then false
   else
