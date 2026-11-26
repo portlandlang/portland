@@ -48,4 +48,4 @@ echo "gems: $(bundle exec mdl --version 2> /dev/null || echo 'mdl missing')"
 # Git hooks live in script/hooks/ so they are version-controlled; .git/hooks
 # is not. Pointing core.hooksPath there installs them for this clone.
 git config core.hooksPath script/hooks
-echo "git hooks: pre-push (fast gate)"
+echo "git hooks: pre-push (the quick steps)"
