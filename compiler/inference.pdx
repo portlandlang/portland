@@ -1048,6 +1048,22 @@ def held_by(node)
   end
 end
 
+# Whether a type is not known, or holds one that is not, anywhere in it
+# (#607): read off what the type is, so a struct of the program's own
+# whose name holds the word, `UnknownBox` or the compiler's `UnknownType`,
+# is a type like any other.
+def holds_unknown?(type)
+  case type
+  in UnknownType then true
+  in ArrayType(element:) then holds_unknown?(element)
+  in MaybeType(inner:) then holds_unknown?(inner)
+  in HashType(key:, value:) then holds_unknown?(key) || holds_unknown?(value)
+  in RangeType(element:) then holds_unknown?(element)
+  in KeywordType(type: held) then holds_unknown?(held)
+  else false
+  end
+end
+
 # Each top-level def's parameters, as [name, entry] pairs — an entry is a
 # type where a default gives one, or ["needs", demands].
 def infer_contracts(nodes)
@@ -1292,7 +1308,7 @@ def native_block_answer(node, arguments, types)
   end
   return NOTHING if native_nothing?(node.block.body, inner)
   found = synthesize_body(node.block.body, inner)
-  return NOTHING if found == NilType.new || render_type(found).include?("Unknown")
+  return NOTHING if found == NilType.new || holds_unknown?(found)
   found
 end
 
@@ -1867,8 +1883,10 @@ end
 # Whether a `case/in` arm is one the native build reads as an `if`
 # (#572): no guard, and a struct's name with each field bound to a name.
 def struct_arm?(branch)
-  return false unless branch.guard.nil? && (branch.pattern in StructPatternNode)
-  branch.pattern.fields.all? { it.pattern in IdentifierNode }
+  # The pattern as a local, so the `in` test proves it below (#607).
+  pattern = branch.pattern
+  return false unless branch.guard.nil? && (pattern in StructPatternNode)
+  pattern.fields.all? { it.pattern in IdentifierNode }
 end
 
 # Read a type off an expression. Synthesis mode only (ADR 0040's ladder —
@@ -1902,8 +1920,11 @@ def synthesize(node, types)
   # `sprintf` (ADR 0067) answer a string.
   in CallNode then synthesize_bare_call(node, types)
   in IfNode then synthesize_if(node, types)
-  # The one encoding a String has (ADR 0069) is its name, a String.
-  in PathNode(parts: ["Encoding", "UTF_8"]) then StringType.new
+  # The one encoding a String has (ADR 0069) is its name, a String. Said
+  # in the arm, not in its pattern, every arm here is a struct's, so the
+  # native build passes over the arms a node of one struct cannot take
+  # (#607).
+  in PathNode(parts:) then parts == ["Encoding", "UTF_8"] ? StringType.new : UnknownType.new
   in CaseNode then synthesize_case(node, types)
   in CaseInNode then synthesize_case_in(node, types)
   in AppendNode then synthesize_append(node, types)
