@@ -1667,8 +1667,8 @@ fn portland_intermediate_refuses_what_the_native_slice_does_not_hold() {
             format!("{compiles} — a float on line 1 is unbuilt (#443)"),
         ),
         (
-            "table = {}\n",
-            format!("{compiles} — an empty hash on line 1 is unbuilt (#443)"),
+            "table = {1 => 2}\n",
+            format!("{compiles} — a hash keyed by anything but Strings on line 1 is unbuilt (#443)"),
         ),
         (
             "puts 2 <=> 3\n",

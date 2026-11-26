@@ -46,6 +46,13 @@ unsafe fn place_of(keys: *mut ArrayBlock, key: *const StringBlock) -> Option<usi
     }
 }
 
+/// `{}`: a new Hash with no pairs, held once, whose values will be of
+/// this kind.
+#[unsafe(no_mangle)]
+pub extern "C" fn portland_hash_empty(kind: i64) -> *mut HashBlock {
+    Pairs::with_room(kind, 0).into_hash()
+}
+
 /// A new Hash from its keys and values, pair by pair in order, held once.
 /// A key written twice keeps its first place and its last value, as
 /// Ruby's literal does. Takes the caller's hold on both arrays.

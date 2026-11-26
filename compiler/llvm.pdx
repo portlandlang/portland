@@ -141,6 +141,7 @@ LLVM_PRELUDE = [
   "declare ptr @portland_array_new(i64, i64)",
   "declare ptr @portland_array_append(ptr, i64, i64)",
   "declare void @portland_array_release(ptr)",
+  "declare ptr @portland_hash_empty(i64)",
   "declare ptr @portland_hash_new(ptr, ptr)",
   "declare void @portland_hash_release(ptr)",
   "declare void @portland_panic(ptr)",
@@ -1161,7 +1162,12 @@ def llvm_value(emitter, value)
     made
   # A Hash literal (#607): its keys and its values made as arrays are,
   # which the runtime takes both holds on and makes one Hash of.
-  in IntermediateHash(keys:, values:)
+  # The empty one is made with the kind its values will be, which the
+  # Hash it was held as says.
+  in IntermediateHash(type:, keys:, values:)
+    if keys.elements.empty?
+      return llvm_named(emitter, "call ptr @portland_hash_empty(i64 #{llvm_array_kind(type.value)})")
+    end
     written_keys = llvm_value(emitter, keys)
     written_values = llvm_value(written_keys.emitter, values)
     llvm_named(written_values.emitter, "call ptr @portland_hash_new(ptr #{written_keys.operand}, ptr #{written_values.operand})")

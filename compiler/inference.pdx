@@ -869,6 +869,10 @@ def element_type(receiver)
 end
 
 # Whether a statement is a loop left only from inside: `while true`.
+# Whether a type is an empty literal's, which says nothing of what it
+# holds (#607): the empty array, or the empty Hash.
+def empty_literal?(type) = type == ArrayType.new(element: UnknownType.new) || type == HashType.new(key: UnknownType.new, value: UnknownType.new)
+
 def endless_loop?(node) = (node in WhileNode) && (node.condition in BooleanNode) && node.condition.value == "true"
 
 def entry_name(entry) = entry.split("/").first
@@ -901,21 +905,20 @@ end
 # native build settled for it (#532).
 def field_key(owner, field) = "#{owner}.#{field}"
 
-# What a call hands a def, with each empty array among it as the array
-# the def's other calls hand it in that place (#572): an empty literal
-# says nothing of what it holds, and the def it is handed to does. One
-# no other call names stays as it is.
+# What a call hands a def, with each empty array or Hash among it as the
+# one the def's other calls hand it in that place (#572, #607): an empty
+# literal says nothing of what it holds, and the def it is handed to
+# does. One no other call names stays as it is.
 def filled_arguments(name, arguments, types)
-  empty = ArrayType.new(element: UnknownType.new)
-  return arguments unless arguments.any? { it == empty || ((it in KeywordType) && it.type == empty) }
+  return arguments unless arguments.any? { empty_literal?(it) || ((it in KeywordType) && empty_literal?(it.type)) }
   mutable place = 0
   mutable filled = []
   arguments.each do |argument|
     if argument in KeywordType
-      known = argument.type == empty ? types.assoc(handed_array_key(name, argument.label)) : nil
+      known = empty_literal?(argument.type) ? types.assoc(handed_array_key(name, argument.label)) : nil
       filled << (known.nil? ? argument : KeywordType.new(label: argument.label, type: type_at(known, 1)))
     else
-      known = argument == empty ? types.assoc(handed_array_key(name, place.to_s)) : nil
+      known = empty_literal?(argument) ? types.assoc(handed_array_key(name, place.to_s)) : nil
       filled << (known.nil? ? argument : type_at(known, 1))
       place += 1
     end
@@ -1025,6 +1028,12 @@ end
 def joined_plain(first, second)
   return first if first == second
   return ANY_STRUCT if (first in StructType) && (second in StructType)
+  # A Hash given no pair is the other Hash (#607).
+  if (first in HashType) && (second in HashType)
+    return second if first == HashType.new(key: UnknownType.new, value: UnknownType.new)
+    return first if second == HashType.new(key: UnknownType.new, value: UnknownType.new)
+    return nil
+  end
   return nil unless (first in ArrayType) && (second in ArrayType)
   return second if first == ArrayType.new(element: UnknownType.new)
   return first if second == ArrayType.new(element: UnknownType.new)
@@ -2046,6 +2055,10 @@ def synthesize_call(node, types)
     # A method the library holds answers what its row says (#560).
     if node.block.nil?
       handed = node.arguments.map { opened_natively(synthesize(it, types), types) }
+      # A merge where either side is an empty Hash is the other (#607).
+      if node.name == "merge" && (holder in HashType) && handed.length == 1 && (handed[0] in HashType) && (empty_literal?(holder) || empty_literal?(handed[0]))
+        return (joined_plain(holder, handed[0]) or UnknownType.new)
+      end
       library = native_library_entry(holder, node.name, handed)
       return library_type(type_at(library, 3), holder) if library.some?
     end

@@ -40,6 +40,10 @@ COMBINATION_LIMIT = 48
 # are: an empty literal, named by its first append.
 EMPTY_ARRAY = ArrayType.new(element: UnknownType.new)
 
+# A Hash whose keys and values are not known yet (#607): an empty
+# literal, which is the Hash it grows into, as an empty array is.
+EMPTY_HASH = HashType.new(key: UnknownType.new, value: UnknownType.new)
+
 # The name a struct being made is gathered under (#532), with the struct
 # and the type of each field it was handed.
 MAKING = "new"
@@ -196,11 +200,12 @@ end
 # after. A body reads either only by making that call.
 def answer_key?(key) = key.include?("(")
 
-# The array a def's pinned combinations answer, as what they make
-# together, or nil where none answers an array (#572).
-def answered_array(name, answers)
+# The array, or the Hash (#607), a def's pinned combinations answer that
+# fills this empty one, as what they make together, or nil where none
+# answers one (#572).
+def answered_array(name, answers, empty)
   opening = "#{name}("
-  arrays = answers.select { it[0].start_with?(opening) && (type_at(it, 1) in ArrayType) && concrete?(type_at(it, 1)) }.map { type_at(it, 1) }
+  arrays = answers.select { it[0].start_with?(opening) && fills_empty?(empty, type_at(it, 1)) && concrete?(type_at(it, 1)) }.map { type_at(it, 1) }
   arrays.empty? ? nil : joined_types(arrays)
 end
 
@@ -421,15 +426,19 @@ def field_prelude(fields, method)
   end
 end
 
-# Bindings with each array that holds nothing bound to the array a walk
-# left it as, and every other binding as it was.
+# Bindings with each empty array or Hash bound to the one a walk left it
+# as, and every other binding as it was.
 def filled_arrays(before, after)
-  return before unless before.any? { type_at(it, 1) == EMPTY_ARRAY }
+  return before unless before.any? { empty_literal?(type_at(it, 1)) }
   before.map do |binding|
-    left = type_at(binding, 1) == EMPTY_ARRAY ? after.assoc(binding[0]) : nil
+    left = empty_literal?(type_at(binding, 1)) ? after.assoc(binding[0]) : nil
     left.nil? || !concrete?(type_at(left, 1)) ? binding : left
   end
 end
+
+# Whether an empty literal's type is filled by this one: the empty array
+# by any array, and the empty Hash by any Hash (#607).
+def fills_empty?(empty, type) = (empty == EMPTY_ARRAY && (type in ArrayType)) || (empty == EMPTY_HASH && (type in HashType))
 
 # The calls every body reached names: the top level's, and those of each
 # combination pinned so far, read with its own parameters.
@@ -471,7 +480,7 @@ def handed_arrays(pinned)
       label = named ? argument.label : place.to_s
       type = named ? argument.type : argument
       place += 1 unless named
-      next unless (type in ArrayType) && concrete?(type)
+      next unless ((type in ArrayType) || (type in HashType)) && concrete?(type)
       key = handed_array_key(combination.name, label)
       held = found.assoc(key)
       if held.nil?
@@ -729,7 +738,7 @@ def pin_combination(definition, arguments, handed, leaves, answers, names, stric
   # One whose every way out is an empty array answers the array its
   # other combinations do (#572): an empty literal says nothing of what
   # it holds, and the def's other answers do.
-  borrowed = solved == EMPTY_ARRAY ? answered_array(definition.name, answers) : nil
+  borrowed = empty_literal?(solved) ? answered_array(definition.name, answers, solved) : nil
   answer = solved == NilType.new ? NOTHING : (borrowed or solved)
   reason = concrete?(answer) ? nil : "its answer is #{render_type(answer)}"
   PinnedDef.new(name: definition.name, key: key, arguments: arguments, definition: called, parameters: parameters, answer: answer, reason: reason, block: block)
@@ -1025,8 +1034,9 @@ def pinned_block(definition, parameters, handed, leaves, answers, names, strict)
   PinnedBlock.new(parameters: types, answer: answer, reason: reason, leaves: leaves)
 end
 
-# Whether an argument is an empty array, or one handed by name (#591).
-def pinned_empty?(argument) = argument == EMPTY_ARRAY || ((argument in KeywordType) && argument.type == EMPTY_ARRAY)
+# Whether an argument is an empty array or Hash, or one handed by name
+# (#591, #607).
+def pinned_empty?(argument) = empty_literal?(argument) || ((argument in KeywordType) && empty_literal?(argument.type))
 
 # The combinations a program can reach (#572): the ones its top level
 # calls, read with each local at the one type it holds, and the ones
@@ -1067,8 +1077,8 @@ def rebound(bindings, name, type)
     return rebound(bindings.reject { it[0] == proved_key(name) }, name, type)
   end
   return bindings if type_at(found, 1) == type
-  return bindings if type == EMPTY_ARRAY && (type_at(found, 1) in ArrayType)
-  return bindings.map { it[0] == name ? [name, type] : it } if type_at(found, 1) == EMPTY_ARRAY && (type in ArrayType)
+  return bindings if fills_empty?(type, type_at(found, 1))
+  return bindings.map { it[0] == name ? [name, type] : it } if fills_empty?(type_at(found, 1), type)
   # A name that holds nil at one binding and a value at another holds a
   # maybe of that value (#505), whichever came first, and one that holds
   # one struct and then another holds one of several (#572).
@@ -1285,7 +1295,7 @@ def solved_answer(definition, key, parameters, answers, names, strict)
   return plain if concrete?(plain)
   # Every way out an empty array: said as it is, for the combination to
   # take the array the def's others answer (#572).
-  return plain if plain == EMPTY_ARRAY
+  return plain if empty_literal?(plain)
   known = unique_types(answer_candidates(definition.body, parameters, answers, names).select { concrete?(it) })
   # The ways out that are known answer one type, or types that join.
   found = joined_types(known) or return UnknownType.new
