@@ -1081,7 +1081,7 @@ def lower_value(node, bindings, context)
       # A maybe is the struct named only where it is there.
       return IntermediateShaped.new(type: BooleanType.new, value: asked, name: pattern.name) if asked.type == ANY_STRUCT || (asked.type in MaybeType)
       refuse_native("an in test of anything but a local", node) unless subject in IdentifierNode
-      return IntermediateConstant.new(type: BooleanType.new, value: type_at(asked.type, 1) == pattern.name)
+      return IntermediateConstant.new(type: BooleanType.new, value: asked.type.name == pattern.name)
     end
     refuse_native("an in test of anything but a local", node) unless subject in IdentifierNode
     tested = lower_value(subject, bindings, inner)
@@ -1223,10 +1223,10 @@ def lower_value(node, bindings, context)
       end
       written = lower_value(right, bindings, inner)
       # An empty array standing in for an array is that array.
-      fallback = written.type == EMPTY_ARRAY && (type_at(first.type, 1) in ArrayType) ? written.with(type: type_at(first.type, 1)) : written
-      fits = fallback.type == first.type || fallback.type == type_at(first.type, 1)
+      fallback = written.type == EMPTY_ARRAY && (first.type.inner in ArrayType) ? written.with(type: first.type.inner) : written
+      fits = fallback.type == first.type || fallback.type == first.type.inner
       # One struct standing in for one of several is one of them (#572).
-      return IntermediateDefault.new(type: type_at(first.type, 1), value: first, fallback: fallback) if !fits && held_as?(fallback.type, type_at(first.type, 1))
+      return IntermediateDefault.new(type: first.type.inner, value: first, fallback: fallback) if !fits && held_as?(fallback.type, first.type.inner)
       refuse_native("'||' between #{with_article(first.type)} and #{with_article(fallback.type)}", node) unless fits
       return IntermediateDefault.new(type: fallback.type, value: first, fallback: fallback)
     end
@@ -1281,7 +1281,7 @@ def lower_value(node, bindings, context)
     end
     # A struct's field is read by its name (#532), a maybe opened for it.
     if plain_of(asked.type) in StructType
-      made = context.structs.find { it.name == type_at(plain_of(asked.type), 1) }
+      made = context.structs.find { it.name == plain_of(asked.type).name }
       fields = made.nil? ? [] : struct_fields(made, context)
       place = fields.find_index { it[0] == name }
       holder = (asked.type in MaybeType) ? IntermediateOpen.new(type: plain_of(asked.type), value: asked, name: name) : asked
@@ -1539,7 +1539,7 @@ def render_value(value)
   in IntermediateArray(elements:) then "(array#{elements.map { " #{render_value(it)}" }.join("")})"
   in IntermediateSystem(name:, arguments:) then "(System #{([name] + arguments.map { render_value(it) }).join(" ")})"
   in IntermediateStop(message:) then "(panic #{render_value(message)})"
-  in IntermediateRecord(type:, fields:) then "(new #{type_at(type, 1)}#{fields.map { " #{render_value(it)}" }.join("")})"
+  in IntermediateRecord(type:, fields:) then "(new #{type.name}#{fields.map { " #{render_value(it)}" }.join("")})"
   in IntermediateField(record:, index:) then "(field #{render_value(record)} #{index})"
   in IntermediateSought(record:, name:) then "(field #{render_value(record)} #{name})"
   in IntermediateMissing(record:, name:) then "(missing #{render_value(record)} #{name})"

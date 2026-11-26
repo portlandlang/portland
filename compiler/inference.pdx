@@ -71,25 +71,6 @@ require_relative "type_kinds"
 # and the struct it holds says which it is.
 ANY_STRUCT = StructType.new(name: "*")
 
-# What an array's place before its element's type read as, while a read
-# by place is still written (#593).
-ARRAY_KIND = "array"
-
-# And a type's name as a value's, before the name.
-CLASS_KIND = "type"
-
-# And an enum's, before its name.
-ENUM_KIND = "enum"
-
-# And a hash's, before the types of its keys and values.
-HASH_KIND = "hash"
-
-# And what a call hands by name, before the label and the type.
-KEYWORD_KIND = "keyword"
-
-# And a maybe's, before its inner type.
-MAYBE_KIND = "maybe"
-
 # The methods of a String and of an array the native build holds by name
 # (#560), each as what it is asked of, its name, what it takes, what it
 # answers, and the runtime function that does it. `element` stands for
@@ -148,12 +129,6 @@ NATIVE_READING = "native&"
 # under the native reading: the checker has no word for it, and a program
 # cannot hold one.
 NOTHING = NothingType.new
-
-# And a range's, before the type of its ends.
-RANGE_KIND = "range"
-
-# And a struct's, before the struct's name.
-STRUCT_KIND = "struct"
 
 # The name a `yield` is read under: a keyword, so no local has it.
 YIELD = "yield"
@@ -942,7 +917,7 @@ end
 # An array of arrays flattened all the way: an array of the innermost
 # element type.
 def flattened_type(receiver)
-  element = type_at(receiver, 1)
+  element = receiver.element
   return flattened_type(element) if element in ArrayType
   ArrayType.new(element: element)
 end
@@ -1075,6 +1050,7 @@ def kind_word(type)
   in BooleanType then "boolean"
   in ClassType then "type"
   in ComplexType then "complex"
+  in ElementType then "element"
   in EnumType then "enum"
   in FloatType then "float"
   in HashType then "hash"
@@ -1088,19 +1064,20 @@ def kind_word(type)
   in RangeType then "range"
   in RationalType then "rational"
   in RegexpType then "regexp"
+  in SelfType then "self"
   in SetType then "set"
   in StringType then "string"
   in StructType then "struct"
   in SymbolType then "symbol"
   in UnknownType then "unknown"
-  else type_at(type, 0)
+  else panic("kind_word: #{inspect(type)} is not one of the compiler's types")
   end
 end
 
 # A type the library's table writes, as it is for the value asked (#560):
 # `element` is what the array asked holds, and `self` the array itself.
 def library_type(written, receiver)
-  return type_at(receiver, 1) if written == ElementType.new
+  return receiver.element if written == ElementType.new
   return receiver if written == SelfType.new
   return MaybeType.new(inner: library_type(written.inner, receiver)) if written in MaybeType
   return ArrayType.new(element: library_type(written.element, receiver)) if (written in ArrayType) && written.element == ElementType.new
@@ -2319,17 +2296,6 @@ end
 # Raw positional read: host indexing lifts nil, and a type cell can hold
 # ["nil"] legitimately.
 def type_at(list, target_index)
-  # A type that is a struct (#593) is read by place as the array it was:
-  # its kind first, then what it holds. A read of this kind goes once
-  # every one is written by the field's name.
-  return [MAYBE_KIND, list.inner].slice(target_index, 1).first if list in MaybeType
-  return [ARRAY_KIND, list.element].slice(target_index, 1).first if list in ArrayType
-  return [STRUCT_KIND, list.name].slice(target_index, 1).first if list in StructType
-  return [CLASS_KIND, list.name].slice(target_index, 1).first if list in ClassType
-  return [RANGE_KIND, list.element].slice(target_index, 1).first if list in RangeType
-  return [ENUM_KIND, list.name].slice(target_index, 1).first if list in EnumType
-  return [HASH_KIND, list.key, list.value].slice(target_index, 1).first if list in HashType
-  return [KEYWORD_KIND, list.label, list.type].slice(target_index, 1).first if list in KeywordType
   # Read through a run of one, so the walk is one step however long the
   # list is (#537). An index answers a maybe, and a nil that is there
   # comes back wrapped; a block's parameter is the element itself.
