@@ -147,6 +147,7 @@ LLVM_PRELUDE = [
   "declare void @portland_refuse_nil_operand(ptr, ptr, ptr)",
   "declare void @portland_start(i32, ptr)",
   "declare ptr @portland_system_arguments()",
+  "declare ptr @portland_system_core_source(ptr)",
   "declare ptr @portland_system_read_file(ptr)",
   "declare ptr @portland_struct_new(ptr)",
   "declare void @portland_struct_release(ptr)",
@@ -1207,9 +1208,15 @@ def llvm_value(emitter, value)
   # `System.arguments` is the runtime's to make. `System.read_file` hands
   # back the text or nothing, which is a maybe: there where it is not
   # nothing. The path asked with is let go of once it has answered.
+  # `System.core_source` hands back a core file's text, which the runtime
+  # carries; the name asked with is let go of the same way.
   in IntermediateSystem(type:, name:, arguments:)
     return llvm_named(emitter, "call ptr @portland_system_arguments()") if name == "arguments"
     named = llvm_value(emitter, arguments[0])
+    if name == "core_source"
+      carried = llvm_named(named.emitter, "call ptr @portland_system_core_source(ptr #{named.operand})")
+      return LLVMValue.new(emitter: llvm_drop(carried.emitter, StringType.new, named.operand), operand: carried.operand)
+    end
     read = llvm_named(named.emitter, "call ptr @portland_system_read_file(ptr #{named.operand})")
     released = llvm_drop(read.emitter, StringType.new, named.operand)
     there = llvm_named(released, "icmp ne ptr #{read.operand}, null")

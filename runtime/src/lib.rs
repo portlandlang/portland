@@ -999,6 +999,26 @@ pub unsafe extern "C" fn portland_system_read_file(path: *const StringBlock) -> 
     }
 }
 
+// The core's files, baked in at build by `build.rs` (#591).
+include!(concat!(env!("OUT_DIR"), "/core_files.rs"));
+
+/// `System.core_source(name)` (ADR 0093): one core file's text as a new
+/// String, held once, from the core this binary carries. A name the core
+/// has no file of stops the program with the seed's sentence.
+///
+/// # Safety
+/// `name` points at a live String, whose bytes are UTF-8.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_system_core_source(name: *const StringBlock) -> *mut StringBlock {
+    let name = unsafe { std::str::from_utf8_unchecked(bytes_of(name)) };
+    match CORE_FILES.iter().find(|(file, _)| *file == name) {
+        Some((_, text)) => string_from(&[text.as_bytes()]),
+        None => refuse_program(&format!(
+            "System.core_source: the core has no file named {name:?}"
+        )),
+    }
+}
+
 /// What a refusal calls a value: its source form, or `nil` where there
 /// is none.
 ///
