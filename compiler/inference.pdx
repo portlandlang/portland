@@ -2563,9 +2563,12 @@ def unnarrowed(before, after)
   layer_of(kept)
 end
 
-def when_false(proof) = type_at(proof, 1)
+# What a proof binds where its condition is false, and where it is true:
+# a proof is the two, and each is there, read through `or` so what answers
+# is bindings and never bindings that may not be there (#607).
+def when_false(proof) = (type_at(proof, 1) or no_bindings)
 
-def when_true(proof) = type_at(proof, 0)
+def when_true(proof) = (type_at(proof, 0) or no_bindings)
 
 # These bindings with newer ones laid over them (#607): where both bind a
 # name, the newer is read.
