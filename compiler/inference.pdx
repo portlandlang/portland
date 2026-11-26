@@ -2435,6 +2435,12 @@ def with_bindings(types, newer) = newer + types
 # the name (#607).
 def with_bound(types, name, type) = [[name, type]] + types
 
+# These bindings with every binding of a name gone (#607).
+def without_bound(types, name)
+  return types if binding_type(types, name).nil?
+  types.reject { it[0] == name }
+end
+
 # What a combination yields, one type for each value, as pinning bound it
 # under its yields key, or nil where it bound none (#607).
 def yielded_types(types, key)
