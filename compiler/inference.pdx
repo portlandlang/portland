@@ -2142,8 +2142,10 @@ def synthesize_call(node, types)
     # A method the library holds answers what its row says (#560).
     if node.block.nil?
       handed = node.arguments.map { opened_natively(synthesize(it, types), types) }
-      # A merge where either side is an empty Hash is the other (#607).
-      if node.name == "merge" && (holder in HashType) && handed.length == 1 && (handed[0] in HashType) && (empty_literal?(holder) || empty_literal?(handed[0]))
+      # A merge of two Hashes is what they make together (#607): the other
+      # where either is empty, and a Hash of one of several structs where
+      # each holds a struct of its own.
+      if node.name == "merge" && (holder in HashType) && handed.length == 1 && (handed[0] in HashType)
         return (joined_plain(holder, handed[0]) or UnknownType.new)
       end
       library = native_library_entry(holder, node.name, handed)

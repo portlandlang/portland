@@ -793,8 +793,17 @@ end
 def lower_library(node, bindings, context)
   # The library takes nothing by name.
   return nil if node.arguments.any? { it in KeywordArgumentNode }
-  asked = lower_value(node.receiver, bindings, context)
-  handed = node.arguments.map { lower_value(it, bindings, context) }
+  mutable asked = lower_value(node.receiver, bindings, context)
+  mutable handed = node.arguments.map { lower_value(it, bindings, context) }
+  # Two Hashes merged are each held as the Hash they make together
+  # (#607): a Hash of one struct is a Hash of one of several as it is.
+  if node.name == "merge" && (plain_of(asked.type) in HashType) && handed.length == 1 && (handed[0].type in HashType)
+    joined = joined_plain(plain_of(asked.type), handed[0].type)
+    if joined.some? && held_as?(plain_of(asked.type), joined) && held_as?(handed[0].type, joined)
+      asked = (asked.type in MaybeType) ? asked : asked.with(type: joined)
+      handed = [handed[0].with(type: joined)]
+    end
+  end
   entry = native_library_entry(plain_of(asked.type), node.name, handed.map { plain_of(it.type) })
   return nil if entry.nil?
   holder = opened_for(asked, node.name)

@@ -18,3 +18,11 @@ twigs = Shelf.new(table: {"ash" => Twig.new(length: 3)})
 p(leaves.table.length + twigs.table.length)
 p(leaves.table.key?("oak"))
 p(twigs.table.key?("oak"))
+
+# A merge of two such Hashes is the Hash they make together.
+def added(table, name, value) = table.merge({name => value})
+
+mutable shelf = {"oak" => Leaf.new(name: "oak")}
+shelf = added(shelf, "ash", Twig.new(length: 3))
+p(shelf.length)
+p(shelf["ash"])
