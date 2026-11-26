@@ -222,7 +222,7 @@ def arm_case_name(pattern)
 end
 
 def bind_local(scope, name, type)
-  scope.with(locals: [[name, type]] + scope.locals)
+  scope.with(locals: with_bound(scope.locals, name, type))
 end
 
 # The bindings a statement leaves for the statements after it — inference's
@@ -298,11 +298,11 @@ end
 def calls_in_block(node, receiver, locals, globals, found)
   block = node.block
   return found if block.nil?
-  argument_types = node.arguments.map { synthesize(it, locals + globals) }
+  argument_types = node.arguments.map { synthesize(it, with_bindings(globals, locals)) }
   mutable inner = locals
   block.parameters.each_with_index do |parameter, index|
     bound_type = block_parameter_type(receiver, index, node.name, argument_types, parameter_count: block.parameters.length)
-    inner = [[parameter, bound_type]] + inner
+    inner = with_bound(inner, parameter, bound_type)
   end
   calls_in(block.body, forget_types(inner, assigned_names_in_body(block.body)), globals, found)
 end
@@ -313,7 +313,7 @@ def calls_in_node(node, locals, globals, mutable found)
   in DefNode
     mutable inner = []
     node.parameters.each do |parameter|
-      inner = [[parameter.name, parameter_type(parameter, globals)]] + inner
+      inner = with_bound(inner, parameter.name, parameter_type(parameter, globals))
     end
     calls_in(node.body, inner, globals, found)
   in StructDefNode | TraitDefNode | ModuleDefNode then found
@@ -345,9 +345,9 @@ def calls_in_node(node, locals, globals, mutable found)
     arguments.each do |argument|
       found = calls_in_node(argument, locals, globals, found)
       if argument in KeywordArgumentNode
-        keywords << [argument.label, synthesize(argument.value, locals + globals)]
+        keywords << [argument.label, synthesize(argument.value, with_bindings(globals, locals))]
       else
-        positional << synthesize(argument, locals + globals)
+        positional << synthesize(argument, with_bindings(globals, locals))
       end
     end
     found << [name, positional, keywords]
@@ -356,14 +356,14 @@ def calls_in_node(node, locals, globals, mutable found)
   # parses as a name and not as a call (#585). A local of that name is
   # the local, and only a name the file can see declared is counted.
   in IdentifierNode(name:)
-    return found if locals.assoc(name).some? || globals.assoc(name).nil?
+    return found if binding_type(locals, name).some? || binding_type(globals, name).nil?
     found + [[name, [], []]]
   in MethodCallNode | SafeMethodCallNode
     found = calls_in_node(node.receiver, locals, globals, found)
     node.arguments.each do |argument|
       found = calls_in_node(argument, locals, globals, found)
     end
-    calls_in_block(node, synthesize(node.receiver, locals + globals), locals, globals, found)
+    calls_in_block(node, synthesize(node.receiver, with_bindings(globals, locals)), locals, globals, found)
   else
     children_of(node).each do |child|
       found = calls_in_node(child, locals, globals, found)
@@ -1420,20 +1420,20 @@ def declared_globals(nodes)
   mutable globals = []
   nodes.each do |node|
     globals = register_struct(node, globals) if node in StructDefNode
-    globals = [[node.name, EnumType.new(name: node.name)]] + globals if node in EnumDefNode
+    globals = with_bound(globals, node.name, EnumType.new(name: node.name)) if node in EnumDefNode
     # A module's name is a name a bare reference may use as a receiver
     # (`Stats.mean`); its type is nobody's, so its methods answer unknown.
-    globals = [[module_name(node), ["module", module_name(node)]]] + globals if node in ModuleDefNode
+    globals = with_bound(globals, module_name(node), ["module", module_name(node)]) if node in ModuleDefNode
   end
   nodes.each do |node|
-    globals = [[node.name, synthesize_def_return(node, globals)]] + globals if node in DefNode
+    globals = with_bound(globals, node.name, synthesize_def_return(node, globals)) if node in DefNode
     # A top-level SCREAMING_CASE binding is a constant (ADR 0053): a def's
     # reach, so every def in the program reads it at its value's type.
-    globals = [[node.name, synthesize(node.value, globals)]] + globals if constant_declaration?(node)
+    globals = with_bound(globals, node.name, synthesize(node.value, globals)) if constant_declaration?(node)
     # A top-level `alias new old` (ADR 0039) is a second name for the def,
     # answering what the def answers — found by the corpus, where a tour
     # fixture's alias read as a name nothing defined (#98).
-    globals = [[node.new_name, synthesize_name(node.old_name, globals)]] + globals if node in AliasNode
+    globals = with_bound(globals, node.new_name, synthesize_name(node.old_name, globals)) if node in AliasNode
   end
   globals
 end
@@ -1524,7 +1524,7 @@ def def_scope(node, scope)
   node.parameters.each do |parameter|
     sharpened = agreed_pairs.find { it[0] == parameter.name }
     type = if sharpened.nil? then parameter_type(parameter, scope.globals) else value_at_checked(sharpened, 1) end
-    locals = [[parameter.name, type]] + locals
+    locals = with_bound(locals, parameter.name, type)
   end
   scope.with(locals: locals)
 end
@@ -1608,7 +1608,7 @@ end
 
 # What inference may read at this point: the body's own bindings, then
 # the program's. The no-shadow rule keeps the two from ever overlapping.
-def known_types(scope) = scope.locals + scope.globals
+def known_types(scope) = with_bindings(scope.globals, scope.locals)
 
 # Every node kind carries its line (the ruling of 2026-09-24: the first
 # token that begins the node, #362). It is nil only on a node a desugar
@@ -1963,5 +1963,5 @@ end
 
 # A branch's scope: the pairs a condition proved, before the locals.
 def with_proof(scope, pairs)
-  scope.with(locals: pairs + scope.locals)
+  scope.with(locals: with_bindings(scope.locals, pairs))
 end
