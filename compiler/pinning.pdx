@@ -752,7 +752,11 @@ def pin_combinations(definitions, calls, answers, names, strict, changed, mentio
     met.each do |combination|
       arguments = type_at(combination, 0)
       handed = type_at(combination, 1)
-      next unless arguments.all? { concrete?(it) } && (handed.nil? || concrete?(handed))
+      # An empty array handed over is pinned as it is (#591): a def that
+      # answers what it was handed, grown, says through its answer what
+      # the array holds, and the call that hands it back is then pinned
+      # with that. Only what the program reaches is built.
+      next unless arguments.all? { concrete?(it) || pinned_empty?(it) } && (handed.nil? || concrete?(handed))
       leaves = type_at(combination, 2)
       key = combination_key(definition.name, arguments, handed, leaves)
       # Kept as the round before pinned it where nothing its body read
@@ -1012,6 +1016,9 @@ def pinned_block(definition, parameters, handed, leaves, answers, names, strict)
   end
   PinnedBlock.new(parameters: types, answer: answer, reason: reason, leaves: leaves)
 end
+
+# Whether an argument is an empty array, or one handed by name (#591).
+def pinned_empty?(argument) = argument == EMPTY_ARRAY || ((argument in KeywordType) && argument.type == EMPTY_ARRAY)
 
 # The combinations a program can reach (#572): the ones its top level
 # calls, read with each local at the one type it holds, and the ones
