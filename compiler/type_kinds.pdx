@@ -15,6 +15,12 @@ struct ArrayType
   element
 end
 
+# A type's name as a value (ADR 0074): what `Name.new` and a type function
+# are called on, and what `value.class` answers, by the name.
+struct ClassType
+  name
+end
+
 # A maybe of a type (ADR 0040 §3): the wrapper, never a union, holding the
 # type of the value where it is there.
 struct MaybeType

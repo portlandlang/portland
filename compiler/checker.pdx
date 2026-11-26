@@ -1646,7 +1646,7 @@ end
 # def returns either — a bare call inside a struct may reach the struct's
 # own methods before the program's, which this increment does not model.
 def method_scope(node, scope)
-  type_names = scope.globals.select { (it[1] in ["type", *]) || (it[1] in ["enum", *]) }
+  type_names = scope.globals.select { (it[1] in ClassType) || (it[1] in ["enum", *]) }
   def_scope(node, scope.with(arities: [], contracts: [], globals: type_names, judging: false))
 end
 

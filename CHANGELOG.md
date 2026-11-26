@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **The compiler's type of a type's name is a struct** ([#593](https://github.com/portlandlang/portland/issues/593)) — `["type", "Token"]`, what `Token.new` is called on and what `value.class` answers, is `ClassType.new(name: "Token")`.
 - **The compiler's struct type is a struct** ([#593](https://github.com/portlandlang/portland/issues/593)) — `["struct", "Token"]` is `StructType.new(name: "Token")`, and one of several structs is `StructType.new(name: "*")`.
 - **The compiler's array type is a struct** ([#593](https://github.com/portlandlang/portland/issues/593)) — `["array", ["string"]]` is `ArrayType.new(element: ["string"])`, in the compiler and in the hosted evaluator's own reading of a value. The seed and `script/check_builtin_table` read the builtin method table out of `inference.pdx` by its lines, and read a kind that is a struct, `in ArrayType then %w[...]`, as they read the others.
 - **The compiler's maybe type is a struct** ([#593](https://github.com/portlandlang/portland/issues/593)) — `["maybe", ["integer"]]` is `MaybeType.new(inner: ["integer"])`: the first of the compiler's types to become a struct, in a file of their own, `compiler/type_kinds.pdx`. A type was a tagged array, a String beside another array, which a native array cannot be. What a dump or a refusal writes is as it was.

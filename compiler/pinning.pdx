@@ -810,9 +810,9 @@ def pin_expression(node, walk, answers, names)
   if (node in MethodCallNode) && node.name == "new"
     reading = current.bindings + answers
     made = synthesize(node.receiver, reading)
-    if made in ["type", *]
+    if made in ClassType
       handed = node.arguments.select { it in KeywordArgumentNode }.map { [it.label, synthesize(it.value, reading)] }
-      current = current.with(calls: current.calls + [[MAKING, [type_at(made, 1), handed], nil, false]])
+      current = current.with(calls: current.calls + [[MAKING, [made.name, handed], nil, false]])
     end
   end
   # `with` hands a field its value as `new` does (#576), so what it hands
@@ -856,7 +856,7 @@ def pin_program(written, core: nil, progress: nil)
   names = definitions.map { it.name }
   # What every scope reads beside the answers: the shapes of call the
   # methods answer, and each struct's name as the type it is.
-  fixed = methods.shapes + method_owners(methods.shapes, structs.map { it.name }) + structs.map { [it.name, ["type", it.name]] }
+  fixed = methods.shapes + method_owners(methods.shapes, structs.map { it.name }) + structs.map { [it.name, ClassType.new(name: it.name)] }
   # Two passes. The first pins from the arguments whose types are known,
   # since `double(double(3))` cannot say its outer argument until `double`
   # itself is pinned, and takes a def that calls itself at the answer its
