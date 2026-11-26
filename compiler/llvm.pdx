@@ -535,11 +535,11 @@ def llvm_library_declarations
   # One declaration for each function, which more than one row may name:
   # `join` is the same function for an array of Strings and of Integers.
   declared = NATIVE_LIBRARY.map do |entry|
-    taken = type_at(entry, 2).map { (it == IntegerType.new || it == ElementType.new) ? "i64" : "ptr" }
-    answer = type_at(entry, 3)
+    taken = entry.taking.map { (it == IntegerType.new || it == ElementType.new) ? "i64" : "ptr" }
+    answer = entry.answer
     answered = answer == BooleanType.new ? "zeroext i1" : ((answer == IntegerType.new || answer == MaybeType.new(inner: IntegerType.new)) ? "i64" : "ptr")
-    asked = type_at(entry, 0) == IntegerType.new ? "i64" : "ptr"
-    "declare #{answered} @#{type_at(entry, 4)}(#{([asked] + taken).join(", ")})"
+    asked = entry.receiver == IntegerType.new ? "i64" : "ptr"
+    "declare #{answered} @#{entry.symbol}(#{([asked] + taken).join(", ")})"
   end
   declared.uniq
 end

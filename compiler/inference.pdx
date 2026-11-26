@@ -62,6 +62,7 @@
 # nil` rebound inside an `each` read as Nil, and the first refusal built
 # on that read fired on the evaluator's own source.
 
+require_relative "library_row"
 require_relative "parser"
 require_relative "type_kinds"
 
@@ -76,55 +77,55 @@ ANY_STRUCT = StructType.new(name: "*")
 # answers, and the runtime function that does it. `element` stands for
 # what the array asked holds, and `self` for the array asked.
 NATIVE_LIBRARY = [
-  [ArrayType.new(element: ElementType.new), "+", [SelfType.new], SelfType.new, "portland_array_concat"],
-  [ArrayType.new(element: ElementType.new), "drop", [IntegerType.new], SelfType.new, "portland_array_drop"],
-  [ArrayType.new(element: ElementType.new), "include?", [ElementType.new], BooleanType.new, "portland_array_include"],
-  [ArrayType.new(element: IntegerType.new), "join", [], StringType.new, "portland_array_join"],
-  [ArrayType.new(element: IntegerType.new), "join", [StringType.new], StringType.new, "portland_array_join_with"],
-  [ArrayType.new(element: StringType.new), "join", [], StringType.new, "portland_array_join"],
-  [ArrayType.new(element: StringType.new), "join", [StringType.new], StringType.new, "portland_array_join_with"],
-  [ArrayType.new(element: ElementType.new), "slice", [IntegerType.new, IntegerType.new], SelfType.new, "portland_array_slice"],
+  LibraryRow.new(receiver: ArrayType.new(element: ElementType.new), name: "+", taking: [SelfType.new], answer: SelfType.new, symbol: "portland_array_concat"),
+  LibraryRow.new(receiver: ArrayType.new(element: ElementType.new), name: "drop", taking: [IntegerType.new], answer: SelfType.new, symbol: "portland_array_drop"),
+  LibraryRow.new(receiver: ArrayType.new(element: ElementType.new), name: "include?", taking: [ElementType.new], answer: BooleanType.new, symbol: "portland_array_include"),
+  LibraryRow.new(receiver: ArrayType.new(element: IntegerType.new), name: "join", taking: [], answer: StringType.new, symbol: "portland_array_join"),
+  LibraryRow.new(receiver: ArrayType.new(element: IntegerType.new), name: "join", taking: [StringType.new], answer: StringType.new, symbol: "portland_array_join_with"),
+  LibraryRow.new(receiver: ArrayType.new(element: StringType.new), name: "join", taking: [], answer: StringType.new, symbol: "portland_array_join"),
+  LibraryRow.new(receiver: ArrayType.new(element: StringType.new), name: "join", taking: [StringType.new], answer: StringType.new, symbol: "portland_array_join_with"),
+  LibraryRow.new(receiver: ArrayType.new(element: ElementType.new), name: "slice", taking: [IntegerType.new, IntegerType.new], answer: SelfType.new, symbol: "portland_array_slice"),
   # A Hash keyed by Strings (#607). Its element is its value.
-  [HashType.new(key: StringType.new, value: ElementType.new), "has_key?", [StringType.new], BooleanType.new, "portland_hash_key"],
-  [HashType.new(key: StringType.new, value: ElementType.new), "include?", [StringType.new], BooleanType.new, "portland_hash_key"],
-  [HashType.new(key: StringType.new, value: ElementType.new), "key?", [StringType.new], BooleanType.new, "portland_hash_key"],
+  LibraryRow.new(receiver: HashType.new(key: StringType.new, value: ElementType.new), name: "has_key?", taking: [StringType.new], answer: BooleanType.new, symbol: "portland_hash_key"),
+  LibraryRow.new(receiver: HashType.new(key: StringType.new, value: ElementType.new), name: "include?", taking: [StringType.new], answer: BooleanType.new, symbol: "portland_hash_key"),
+  LibraryRow.new(receiver: HashType.new(key: StringType.new, value: ElementType.new), name: "key?", taking: [StringType.new], answer: BooleanType.new, symbol: "portland_hash_key"),
   # The pair at a place, which the native core's walks over a Hash read
   # by; no program names them.
-  [HashType.new(key: StringType.new, value: ElementType.new), "key_at", [IntegerType.new], StringType.new, "portland_hash_key_at"],
-  [HashType.new(key: StringType.new, value: ElementType.new), "length", [], IntegerType.new, "portland_hash_length"],
-  [HashType.new(key: StringType.new, value: ElementType.new), "member?", [StringType.new], BooleanType.new, "portland_hash_key"],
-  [HashType.new(key: StringType.new, value: ElementType.new), "merge", [SelfType.new], SelfType.new, "portland_hash_merge"],
-  [HashType.new(key: StringType.new, value: ElementType.new), "size", [], IntegerType.new, "portland_hash_length"],
-  [HashType.new(key: StringType.new, value: ElementType.new), "value_at", [IntegerType.new], ElementType.new, "portland_hash_value_at"],
-  [IntegerType.new, "chr", [], StringType.new, "portland_integer_chr"],
-  [IntegerType.new, "chr", [StringType.new], StringType.new, "portland_integer_chr_encoded"],
-  [IntegerType.new, "gcd", [IntegerType.new], IntegerType.new, "portland_integer_gcd"],
-  [IntegerType.new, "**", [IntegerType.new], IntegerType.new, "portland_integer_power"],
-  [IntegerType.new, "to_s", [IntegerType.new], StringType.new, "portland_integer_to_s_base"],
-  [StringType.new, "bytesize", [], IntegerType.new, "portland_string_bytesize"],
-  [StringType.new, "chars", [], ArrayType.new(element: StringType.new), "portland_string_chars"],
-  [StringType.new, "chop", [], StringType.new, "portland_string_chop"],
-  [StringType.new, "chr", [], StringType.new, "portland_string_chr"],
-  [StringType.new, "codepoints", [], ArrayType.new(element: IntegerType.new), "portland_string_codepoints"],
-  [StringType.new, "count", [StringType.new], IntegerType.new, "portland_string_count"],
-  [StringType.new, "downcase", [], StringType.new, "portland_string_downcase"],
-  [StringType.new, "end_with?", [StringType.new], BooleanType.new, "portland_string_end_with"],
-  [StringType.new, "include?", [StringType.new], BooleanType.new, "portland_string_include"],
-  [StringType.new, "index", [StringType.new], MaybeType.new(inner: IntegerType.new), "portland_string_index"],
-  [StringType.new, "rjust", [IntegerType.new, StringType.new], StringType.new, "portland_string_rjust"],
-  [StringType.new, "slice", [IntegerType.new, IntegerType.new], StringType.new, "portland_string_slice"],
-  [StringType.new, "split", [StringType.new], ArrayType.new(element: StringType.new), "portland_string_split"],
-  [StringType.new, "split", [StringType.new, IntegerType.new], ArrayType.new(element: StringType.new), "portland_string_split_limit"],
-  [StringType.new, "start_with?", [StringType.new], BooleanType.new, "portland_string_start_with"],
-  [StringType.new, "strip", [], StringType.new, "portland_string_strip"],
-  [StringType.new, "to_i", [], IntegerType.new, "portland_string_to_i"],
-  [StringType.new, "upcase", [], StringType.new, "portland_string_upcase"],
+  LibraryRow.new(receiver: HashType.new(key: StringType.new, value: ElementType.new), name: "key_at", taking: [IntegerType.new], answer: StringType.new, symbol: "portland_hash_key_at"),
+  LibraryRow.new(receiver: HashType.new(key: StringType.new, value: ElementType.new), name: "length", taking: [], answer: IntegerType.new, symbol: "portland_hash_length"),
+  LibraryRow.new(receiver: HashType.new(key: StringType.new, value: ElementType.new), name: "member?", taking: [StringType.new], answer: BooleanType.new, symbol: "portland_hash_key"),
+  LibraryRow.new(receiver: HashType.new(key: StringType.new, value: ElementType.new), name: "merge", taking: [SelfType.new], answer: SelfType.new, symbol: "portland_hash_merge"),
+  LibraryRow.new(receiver: HashType.new(key: StringType.new, value: ElementType.new), name: "size", taking: [], answer: IntegerType.new, symbol: "portland_hash_length"),
+  LibraryRow.new(receiver: HashType.new(key: StringType.new, value: ElementType.new), name: "value_at", taking: [IntegerType.new], answer: ElementType.new, symbol: "portland_hash_value_at"),
+  LibraryRow.new(receiver: IntegerType.new, name: "chr", taking: [], answer: StringType.new, symbol: "portland_integer_chr"),
+  LibraryRow.new(receiver: IntegerType.new, name: "chr", taking: [StringType.new], answer: StringType.new, symbol: "portland_integer_chr_encoded"),
+  LibraryRow.new(receiver: IntegerType.new, name: "gcd", taking: [IntegerType.new], answer: IntegerType.new, symbol: "portland_integer_gcd"),
+  LibraryRow.new(receiver: IntegerType.new, name: "**", taking: [IntegerType.new], answer: IntegerType.new, symbol: "portland_integer_power"),
+  LibraryRow.new(receiver: IntegerType.new, name: "to_s", taking: [IntegerType.new], answer: StringType.new, symbol: "portland_integer_to_s_base"),
+  LibraryRow.new(receiver: StringType.new, name: "bytesize", taking: [], answer: IntegerType.new, symbol: "portland_string_bytesize"),
+  LibraryRow.new(receiver: StringType.new, name: "chars", taking: [], answer: ArrayType.new(element: StringType.new), symbol: "portland_string_chars"),
+  LibraryRow.new(receiver: StringType.new, name: "chop", taking: [], answer: StringType.new, symbol: "portland_string_chop"),
+  LibraryRow.new(receiver: StringType.new, name: "chr", taking: [], answer: StringType.new, symbol: "portland_string_chr"),
+  LibraryRow.new(receiver: StringType.new, name: "codepoints", taking: [], answer: ArrayType.new(element: IntegerType.new), symbol: "portland_string_codepoints"),
+  LibraryRow.new(receiver: StringType.new, name: "count", taking: [StringType.new], answer: IntegerType.new, symbol: "portland_string_count"),
+  LibraryRow.new(receiver: StringType.new, name: "downcase", taking: [], answer: StringType.new, symbol: "portland_string_downcase"),
+  LibraryRow.new(receiver: StringType.new, name: "end_with?", taking: [StringType.new], answer: BooleanType.new, symbol: "portland_string_end_with"),
+  LibraryRow.new(receiver: StringType.new, name: "include?", taking: [StringType.new], answer: BooleanType.new, symbol: "portland_string_include"),
+  LibraryRow.new(receiver: StringType.new, name: "index", taking: [StringType.new], answer: MaybeType.new(inner: IntegerType.new), symbol: "portland_string_index"),
+  LibraryRow.new(receiver: StringType.new, name: "rjust", taking: [IntegerType.new, StringType.new], answer: StringType.new, symbol: "portland_string_rjust"),
+  LibraryRow.new(receiver: StringType.new, name: "slice", taking: [IntegerType.new, IntegerType.new], answer: StringType.new, symbol: "portland_string_slice"),
+  LibraryRow.new(receiver: StringType.new, name: "split", taking: [StringType.new], answer: ArrayType.new(element: StringType.new), symbol: "portland_string_split"),
+  LibraryRow.new(receiver: StringType.new, name: "split", taking: [StringType.new, IntegerType.new], answer: ArrayType.new(element: StringType.new), symbol: "portland_string_split_limit"),
+  LibraryRow.new(receiver: StringType.new, name: "start_with?", taking: [StringType.new], answer: BooleanType.new, symbol: "portland_string_start_with"),
+  LibraryRow.new(receiver: StringType.new, name: "strip", taking: [], answer: StringType.new, symbol: "portland_string_strip"),
+  LibraryRow.new(receiver: StringType.new, name: "to_i", taking: [], answer: IntegerType.new, symbol: "portland_string_to_i"),
+  LibraryRow.new(receiver: StringType.new, name: "upcase", taking: [], answer: StringType.new, symbol: "portland_string_upcase"),
   # `text[index]`, and `text[from..to]` and an array's, which are written
   # with brackets and reach the library under these names.
-  [StringType.new, "[]", [IntegerType.new], MaybeType.new(inner: StringType.new), "portland_string_character"],
-  [StringType.new, "[..]", [IntegerType.new, IntegerType.new, IntegerType.new], StringType.new, "portland_string_range"],
-  [ArrayType.new(element: ElementType.new), "[..]", [IntegerType.new, IntegerType.new, IntegerType.new], SelfType.new, "portland_array_range"],
-  [HashType.new(key: StringType.new, value: ElementType.new), "[]", [StringType.new], MaybeType.new(inner: ElementType.new), "portland_hash_get"]
+  LibraryRow.new(receiver: StringType.new, name: "[]", taking: [IntegerType.new], answer: MaybeType.new(inner: StringType.new), symbol: "portland_string_character"),
+  LibraryRow.new(receiver: StringType.new, name: "[..]", taking: [IntegerType.new, IntegerType.new, IntegerType.new], answer: StringType.new, symbol: "portland_string_range"),
+  LibraryRow.new(receiver: ArrayType.new(element: ElementType.new), name: "[..]", taking: [IntegerType.new, IntegerType.new, IntegerType.new], answer: SelfType.new, symbol: "portland_array_range"),
+  LibraryRow.new(receiver: HashType.new(key: StringType.new, value: ElementType.new), name: "[]", taking: [StringType.new], answer: MaybeType.new(inner: ElementType.new), symbol: "portland_hash_get")
 ]
 
 # The name the native build's pinning reads under (#503): bound by it and
@@ -1335,10 +1336,10 @@ end
 # (#560), or nil where it holds none.
 def native_library_entry(receiver, name, arguments)
   NATIVE_LIBRARY.find do |entry|
-    asked = type_at(entry, 0)
-    taken = type_at(entry, 2)
+    asked = entry.receiver
+    taken = entry.taking
     fits = asked == receiver || (asked == ArrayType.new(element: ElementType.new) && (receiver in ArrayType)) || ((asked in HashType) && (receiver in HashType) && asked.key == receiver.key && asked.value == ElementType.new)
-    fits && type_at(entry, 1) == name && taken.length == arguments.length && taken.map { library_type(it, receiver) } == arguments
+    fits && entry.name == name && taken.length == arguments.length && taken.map { library_type(it, receiver) } == arguments
   end
 end
 
@@ -2153,7 +2154,7 @@ def synthesize_call(node, types)
         return (joined_plain(holder, handed[0]) or UnknownType.new)
       end
       library = native_library_entry(holder, node.name, handed)
-      return library_type(type_at(library, 3), holder) if library.some?
+      return library_type(library.answer, holder) if library.some?
     end
   end
   # `nil?` and `some?` are asked of the maybe itself; every other method

@@ -560,7 +560,7 @@ end
 # opened and handed values already lowered (#563).
 def library_call(name, holder, handed, node)
   entry = native_library_entry(holder.type, name, handed.map { it.type }) or refuse_native("#{name} asked of #{with_article(holder.type)}", node)
-  IntermediateLibrary.new(type: library_type(type_at(entry, 3), holder.type), symbol: type_at(entry, 4), receiver: holder, arguments: handed, words: type_at(entry, 2).map { it == ElementType.new })
+  IntermediateLibrary.new(type: library_type(entry.answer, holder.type), symbol: entry.symbol, receiver: holder, arguments: handed, words: entry.taking.map { it == ElementType.new })
 end
 
 # `name << value` (#497). The parser writes it as a binding of the name
@@ -811,8 +811,8 @@ def lower_library(node, bindings, context)
     held = holder.type.element
     refuse_native("include? asked of an array of #{render_type(held)}", node) unless held == IntegerType.new || held == BooleanType.new || held == StringType.new
   end
-  words = type_at(entry, 2).map { it == ElementType.new }
-  IntermediateLibrary.new(type: library_type(type_at(entry, 3), holder.type), symbol: type_at(entry, 4), receiver: holder, arguments: handed.map { opened_for(it, node.name) }, words: words)
+  words = entry.taking.map { it == ElementType.new }
+  IntermediateLibrary.new(type: library_type(entry.answer, holder.type), symbol: entry.symbol, receiver: holder, arguments: handed.map { opened_for(it, node.name) }, words: words)
 end
 
 def lower_program(written, core: nil, progress: nil)
