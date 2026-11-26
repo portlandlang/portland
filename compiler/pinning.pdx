@@ -608,7 +608,7 @@ def method_owners(shapes, structs)
   end
   mutable bound = []
   names.each_with_index do |name, place|
-    bound << [any_method_key(name), (owners[place] or [])]
+    bound << [any_method_key(name), MethodOwners.new(names: (owners[place] or []))]
   end
   bound
 end
@@ -689,7 +689,7 @@ end
 def parameters_shape(parameters, yielding)
   by_place = parameters.reject { it in KeywordParameterNode }
   required = by_place.reject { (it in AssignmentNode) && it.value.some? }
-  [required.length, by_place.length, yielding, parameters.select { it in KeywordParameterNode }.map { it.name }]
+  MethodShape.new(least: required.length, most: by_place.length, yields: yielding, labels: parameters.select { it in KeywordParameterNode }.map { it.name })
 end
 
 # A call that hands one of the program's defs a block (#493). The block's
@@ -1009,7 +1009,7 @@ end
 def pinned_answers(pinned)
   answers = pinned.select { it.pinned? }.map { [it.key, it.answer] }
   yielding = pinned.reject { it.block.nil? }
-  yielded = yielding.map { |found| [yields_key(found.name, found.arguments), found.block.parameters] }
+  yielded = yielding.map { |found| [yields_key(found.name, found.arguments), YieldedTypes.new(types: found.block.parameters)] }
   # Everything pinning reads, it reads the way the native build runs it
   # (#503): the name that says so rides with the answers into every scope,
   # and is kept last, which is where inference looks for it.

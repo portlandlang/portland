@@ -62,6 +62,7 @@
 # nil` rebound inside an `each` read as Nil, and the first refusal built
 # on that read fired on the evaluator's own source.
 
+require_relative "binding_entries"
 require_relative "library_row"
 require_relative "parser"
 require_relative "type_kinds"
@@ -1252,11 +1253,17 @@ def method_def_name(owner, name) = "#{owner}##{name}"
 # The structs that write a method of this name, as pinning bound them
 # (#572), or nil where none does. Read through here, as the bindings'
 # types are read through `binding_type` (#607).
-def method_owners_bound(types, name) = binding_type(types, any_method_key(name))
+def method_owners_bound(types, name)
+  found = binding_type(types, any_method_key(name))
+  (found in MethodOwners) ? found.names : nil
+end
 
 # A method's shape as pinning bound it, or nil where the owner writes no
 # method of the name (#607).
-def method_shape_bound(types, owner, name) = binding_type(types, method_shape_key(owner, name))
+def method_shape_bound(types, owner, name)
+  found = binding_type(types, method_shape_key(owner, name))
+  (found in MethodShape) ? found : nil
+end
 
 # The name a method's shape is bound under: the calls it answers. A
 # method answers only the calls it was written for, and anything else is
@@ -1774,16 +1781,16 @@ def settled_panics?(body, types)
   settled.some? && settled_panics?(settled, types)
 end
 
-# Whether a method answers a call (ADR 0093, #536), by its shape: [the
+# Whether a method answers a call (ADR 0093, #536), by its shape: the
 # fewest it takes by place, the most, whether it yields, the names it
-# takes]. The count by place fits, a block is handed exactly when the
+# takes. The count by place fits, a block is handed exactly when the
 # method yields, and every name handed is one it takes.
 def shape_answers?(shape, node)
   placed = node.arguments.reject { it in KeywordArgumentNode }.length
   named = node.arguments.select { it in KeywordArgumentNode }.map { it.label }
-  return false unless placed >= type_at(shape, 0) && placed <= type_at(shape, 1)
-  return false unless node.block.some? == type_at(shape, 2)
-  named.all? { type_at(shape, 3).include?(it) }
+  return false unless placed >= shape.least && placed <= shape.most
+  return false unless node.block.some? == shape.yields
+  named.all? { shape.labels.include?(it) }
 end
 
 # What stays proved below an `if` whose one branch always leaves (#572).
@@ -2583,7 +2590,10 @@ end
 
 # What a combination yields, one type for each value, as pinning bound it
 # under its yields key, or nil where it bound none (#607).
-def yielded_types(types, key) = binding_type(types, key)
+def yielded_types(types, key)
+  found = binding_type(types, key)
+  (found in YieldedTypes) ? found.types : nil
+end
 
 # Whether a body yields anywhere, the blocks written in it included: a
 # `yield` inside one reaches the def's own block.
