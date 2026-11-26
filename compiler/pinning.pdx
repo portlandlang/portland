@@ -485,6 +485,9 @@ def handed_arrays(pinned)
   found
 end
 
+# Whether what a call hands is nothing, by place or by name (#591).
+def handed_nothing?(type) = type == NOTHING || ((type in KeywordType) && type.type == NOTHING)
+
 # The one type a field made with these holds (#553), or nil where they do
 # not join: the same type throughout; a value and nil or a maybe of it,
 # which is a maybe of it, as a local bound both ways is (#505); or one
@@ -811,12 +814,16 @@ def pin_expression(node, walk, answers, names)
   mutable current = walk
   # A struct being made is gathered with what each field is handed
   # (#532): a field has one type, read off every place the struct is made.
+  # Nothing is handed to a field or a def, since what produces no value
+  # cannot be used as one (#591); a call read as handing one is read
+  # before what it hands settled, and is not gathered, or the stale
+  # reading feeds itself from round to round.
   if (node in MethodCallNode) && node.name == "new"
     reading = current.bindings + answers
     made = synthesize(node.receiver, reading)
     if made in ClassType
       handed = node.arguments.select { it in KeywordArgumentNode }.map { [it.label, synthesize(it.value, reading)] }
-      current = current.with(calls: current.calls + [[MAKING, [made.name, handed], nil, false]])
+      current = current.with(calls: current.calls + [[MAKING, [made.name, handed], nil, false]]) unless handed.any? { type_at(it, 1) == NOTHING }
     end
   end
   # `with` hands a field its value as `new` does (#576), so what it hands
@@ -826,12 +833,13 @@ def pin_expression(node, walk, answers, names)
     asked = synthesize(node.receiver, reading)
     if asked in StructType
       handed = node.arguments.select { it in KeywordArgumentNode }.map { [it.label, synthesize(it.value, reading)] }
-      current = current.with(calls: current.calls + [[MAKING, [asked.name, handed], nil, false]])
+      current = current.with(calls: current.calls + [[MAKING, [asked.name, handed], nil, false]]) unless handed.any? { type_at(it, 1) == NOTHING }
     end
   end
   if (node in CallNode) && names.include?(node.name)
     scope = current.bindings + answers
-    current = current.with(calls: current.calls + [[node.name, filled_arguments(node.name, native_argument_types(node.arguments, scope), scope), nil, false]])
+    handed = native_argument_types(node.arguments, scope)
+    current = current.with(calls: current.calls + [[node.name, filled_arguments(node.name, handed, scope), nil, false]]) unless handed.any? { handed_nothing?(it) }
   end
   if node in YieldNode
     scope = current.bindings + answers
