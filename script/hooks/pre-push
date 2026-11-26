@@ -1,10 +1,10 @@
 #!/bin/sh
-# The fast gate — everything except the whole suites, about twenty seconds —
-# once before anything becomes public. The whole suites and the builtin
-# method table are CI's (.github/workflows/ci.yml): the suites run on every
-# push to main and every pull request, the table whenever the seed, the
-# table, or the probe changed. `script/test --fast` owns what the fast gate
-# is, so this hook cannot drift from it.
+# The quick steps — format, clippy, lint, docs, and the seed's unit tests —
+# once before anything becomes public (#606): the ones that catch the
+# common mistakes. CI runs every step, these among them, each as a check
+# of its own (.github/workflows/ci.yml), and a pull request does not merge
+# with one failing. `script/test --quick` owns what the quick steps are,
+# so this hook cannot drift from it.
 #
 # Escape hatch: `git push --no-verify`.
 #
@@ -13,4 +13,4 @@
 # tree, and git has exported the worktree's index (#376).
 set -e
 cd "$(git rev-parse --show-toplevel)"
-script/test --fast
+script/test --quick
