@@ -1420,7 +1420,7 @@ def declared_globals(nodes)
   mutable globals = []
   nodes.each do |node|
     globals = register_struct(node, globals) if node in StructDefNode
-    globals = [[node.name, ["enum", node.name]]] + globals if node in EnumDefNode
+    globals = [[node.name, EnumType.new(name: node.name)]] + globals if node in EnumDefNode
     # A module's name is a name a bare reference may use as a receiver
     # (`Stats.mean`); its type is nobody's, so its methods answer unknown.
     globals = [[module_name(node), ["module", module_name(node)]]] + globals if node in ModuleDefNode
@@ -1600,7 +1600,7 @@ def known?(type)
   in ArrayType(element:) then known?(element)
   in ["hash", key, entry] then known?(key) && known?(entry)
   in MaybeType(inner:) then known?(inner)
-  in ["range", element] then known?(element)
+  in RangeType(element:) then known?(element)
   else
     true
   end
@@ -1646,7 +1646,7 @@ end
 # def returns either — a bare call inside a struct may reach the struct's
 # own methods before the program's, which this increment does not model.
 def method_scope(node, scope)
-  type_names = scope.globals.select { (it[1] in ClassType) || (it[1] in ["enum", *]) }
+  type_names = scope.globals.select { (it[1] in ClassType) || (it[1] in EnumType) }
   def_scope(node, scope.with(arities: [], contracts: [], globals: type_names, judging: false))
 end
 
@@ -1711,7 +1711,7 @@ def plain_value?(type)
   case type
   in MaybeType then false
   in StructType then false
-  in ["enum", *] then false
+  in EnumType then false
   else
     true
   end
@@ -1823,7 +1823,7 @@ end
 
 # The types a set's algebra takes on the right (ADR 0082): a set, an array,
 # a range, or a hash.
-def set_operand_type?(type) = type == ["set"] || (type in ["range", *]) || (type in ArrayType) || (type in ["hash", *])
+def set_operand_type?(type) = type == ["set"] || (type in RangeType) || (type in ArrayType) || (type in ["hash", *])
 
 def shape_methods(declaration, traits)
   mutable methods = %w[each each_pair eql? failure? filter length members nil? select size some? to_a to_h to_s values with] + declaration.fields

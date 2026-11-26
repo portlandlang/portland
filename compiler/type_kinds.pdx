@@ -21,10 +21,21 @@ struct ClassType
   name
 end
 
+# A value of one of the program's enums, by the enum's name.
+struct EnumType
+  name
+end
+
 # A maybe of a type (ADR 0040 §3): the wrapper, never a union, holding the
 # type of the value where it is there.
 struct MaybeType
   inner
+end
+
+# A range (ADR 0081), by the type of its ends, or unknown where they are
+# not known.
+struct RangeType
+  element
 end
 
 # An instance of one of the program's structs, by the struct's name, or

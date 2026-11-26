@@ -14,7 +14,7 @@
 # uses for values:
 #
 #   ["integer"] ["float"] ["string"] ["boolean"] ["symbol"] ["nil"]
-#   ["range", element]         — element is the ends' type (ADR 0081), or ["unknown"]
+#   RangeType(element)         — element is the ends' type (ADR 0081), or ["unknown"]
 #   ArrayType(element)         — element is a type, or ["unknown"]
 #   ["hash", key, value]
 #   MaybeType(inner)           — the wrapper, never a union (ADR 0040 §3)
@@ -23,7 +23,7 @@
 #                                whichever (#572): only the native build's
 #                                pinning makes it
 #   ClassType(name)            — the struct's name itself, what `new` is called on
-#   ["enum", "Name"]
+#   EnumType(name)
 #   ["unknown"]                — the honest answer, and the default
 #
 # ["unknown"] is principle 4 wearing a type: anything this increment cannot
@@ -77,6 +77,9 @@ ARRAY_KIND = "array"
 
 # And a type's name as a value's, before the name.
 CLASS_KIND = "type"
+
+# And an enum's, before its name.
+ENUM_KIND = "enum"
 
 # And a maybe's, before its inner type.
 MAYBE_KIND = "maybe"
@@ -139,6 +142,9 @@ NATIVE_READING = "native&"
 # under the native reading: the checker has no word for it, and a program
 # cannot hold one.
 NOTHING = ["nothing"]
+
+# And a range's, before the type of its ends.
+RANGE_KIND = "range"
 
 # And a struct's, before the struct's name.
 STRUCT_KIND = "struct"
@@ -501,7 +507,7 @@ def builtin_table(type)
   in ArrayType then %w[all?/0-1& any?/0-1& assoc/1 at/1 bsearch/0& bsearch_index/0& chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& combination/1& compact/0 count/0-1& cycle/1& detect/0& difference/0+ dig/1+ drop/1 drop_while/0& each/0& each_cons/1 each_index/0& each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& include?/1 index/0-1& inject/1& intersect?/1 intersection/0+ join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& permutation/0-1& product/0+& rassoc/1 reduce/1& reject/0& repeated_combination/1& repeated_permutation/1& reverse/0 reverse_each/0& rfind/0& rindex/0-1& rotate/0-1 sample/0-1 select/0& shuffle/0 size/0 slice/2 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transpose/0 union/0+ uniq/0 values_at/0+ zip/1]
   in ["hash", *] then %w[all?/0-1& any?/0-1& assoc/1 chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& detect/0& dig/1+ drop/1 drop_while/0& each/0& each_key/0& each_pair/0& each_value/0& each_with_index/0& empty?/0 entries/0 eql?/1 except/0+ failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& has_key?/1 has_value?/1 include?/1 inject/1& invert/0 key/1 key?/1 keys/0 length/0 map/0& max/0& max_by/0& member?/1 merge/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& rassoc/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice/0+ slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transform_keys/0& transform_values/0& uniq/0 value?/1 values/0 values_at/0+ zip/1]
   in ["random"] then %w[class/0 eql?/1 failure?/0 nil?/0 rand/0-1 seed/0 some?/0 to_s/0]
-  in ["range", *] then %w[all?/0-1& any?/0-1& begin/0 bsearch/0& chunk/0& chunk_while/0& clamp/1-2 class/0 collect/0& collect_concat/0& count/0-1& cover?/1& cycle/1& detect/0& drop_while/0& each/0& each_with_index/0& end/0 entries/0& eql?/1 exclude_end?/0 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& grep/1& grep_v/1& group_by/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& member?/1& min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& overlap?/1 partition/0& reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& step/0-1& sum/0-1& take_while/0& to_a/0& to_h/0& to_s/0 to_set/0&]
+  in RangeType then %w[all?/0-1& any?/0-1& begin/0 bsearch/0& chunk/0& chunk_while/0& clamp/1-2 class/0 collect/0& collect_concat/0& count/0-1& cover?/1& cycle/1& detect/0& drop_while/0& each/0& each_with_index/0& end/0 entries/0& eql?/1 exclude_end?/0 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& grep/1& grep_v/1& group_by/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& member?/1& min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& overlap?/1 partition/0& reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& step/0-1& sum/0-1& take_while/0& to_a/0& to_h/0& to_s/0 to_set/0&]
   in ["set"] then %w[add/1 all?/0-1& any?/0-1& chunk/0& chunk_while/0& class/0 classify/0& collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& delete/1 detect/0& difference/1 disjoint?/1 drop/1 drop_while/0& each/0& each_cons/1 each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0 grep/1& grep_v/1& group_by/0& include?/1 inject/1& intersect?/1 intersection/1 join/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& proper_subset?/1 proper_superset?/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& subset?/1 sum/0-1& superset?/1 take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& union/1 uniq/0 zip/1]
   in ["rational"] then %w[abs/0 abs2/0 angle/0 arg/0 between?/2 ceil/0 clamp/1-2 class/0 conj/0 conjugate/0 denominator/0 div/1 divmod/1 eql?/1 failure?/0 fdiv/1 finite?/0 floor/0 i/0 imag/0 imaginary/0 infinite?/0 integer?/0 magnitude/0 modulo/1 negative?/0 nil?/0 numerator/0 phase/0 polar/0 positive?/0 pow/1 quo/1 rationalize/0-1 real/0 real?/0 rect/0 rectangular/0 remainder/1 round/0 some?/0 to_c/0 to_f/0 to_i/0 to_r/0 to_s/0 truncate/0 zero?/0]
   in ["complex"] then %w[abs/0 abs2/0 angle/0 arg/0 class/0 conj/0 conjugate/0 denominator/0 eql?/1 failure?/0 fdiv/1 finite?/0 imag/0 imaginary/0 infinite?/0 integer?/0 magnitude/0 nil?/0 numerator/0 phase/0 polar/0 pow/1 quo/1 rationalize/0-1 real/0 real?/0 rect/0 rectangular/0 some?/0 to_c/0 to_f/0 to_i/0 to_r/0 to_s/0 zero?/0]
@@ -608,7 +614,7 @@ def call_answer(receiver, node, types)
     ArrayType.new(element: ["unknown"])
   # A range's ends (#111), each a maybe where the range is open.
   when "begin", "end"
-    return MaybeType.new(inner: type_at(receiver, 1)) if receiver in ["range", *]
+    return MaybeType.new(inner: receiver.element) if receiver in RangeType
     ["unknown"]
   # A hash's own answers (#105).
   when "invert"
@@ -626,7 +632,7 @@ def call_answer(receiver, node, types)
     # ADR 0047 shape 3 found this arm calling one an Integer?.
     return ["unknown"] unless node.arguments.empty?
     return MaybeType.new(inner: receiver.element) if receiver in ArrayType
-    return MaybeType.new(inner: type_at(receiver, 1)) if receiver in ["range", *]
+    return MaybeType.new(inner: receiver.element) if receiver in RangeType
     return MaybeType.new(inner: ["unknown"]) if receiver == ["set"]
     ["unknown"]
   # The arrangements of an array are arrays of its elements (#104).
@@ -756,7 +762,7 @@ def class_answer(receiver)
   in ["symbol"]    then ClassType.new(name: "Symbol")
   in ArrayType  then ClassType.new(name: "Array")
   in ["hash", *]   then ClassType.new(name: "Hash")
-  in ["range", *]  then ClassType.new(name: "Range")
+  in RangeType  then ClassType.new(name: "Range")
   in ["random"]    then ClassType.new(name: "Random")
   in ["set"]       then ClassType.new(name: "Set")
   in ["rational"]  then ClassType.new(name: "Rational")
@@ -855,7 +861,7 @@ end
 
 def element_type(receiver)
   return receiver.element if receiver in ArrayType
-  return type_at(receiver, 1) if receiver in ["range", *]
+  return receiver.element if receiver in RangeType
   ["unknown"]
 end
 
@@ -1451,7 +1457,7 @@ def render_type(type)
   in StructType(name: "*") then "Struct"
   in StructType(name:) then name
   in ClassType(name:) then name
-  in ["enum", name] then name
+  in EnumType(name:) then name
   # Ruby's own capitals (ADR 0086).
   in ["matchdata"] then "MatchData"
   else
@@ -1538,7 +1544,7 @@ def scan_program(nodes)
     elsif node in EnumDefNode
       # Recorded so a later increment can hang membership and
       # exhaustiveness off the name; nothing reads it yet.
-      types = [[node.name, ["enum", node.name]]] + types
+      types = [[node.name, EnumType.new(name: node.name)]] + types
     else
       types = bind_after(node, types, [])
     end
@@ -1858,7 +1864,7 @@ def synthesize_block_call(node, receiver, types)
   when "count", "index", "find_index", "rindex" then synthesize_numeric_answer(receiver, node.name)
   # Binary search answers a maybe of the element, or of its position (#104).
   when "bsearch"
-    return MaybeType.new(inner: element_type(receiver)) if (receiver in ArrayType) || (receiver in ["range", *])
+    return MaybeType.new(inner: element_type(receiver)) if (receiver in ArrayType) || (receiver in RangeType)
     ["unknown"]
   when "bsearch_index" then MaybeType.new(inner: ["integer"])
   # The arrangements handed to a block answer the array; cycle answers nil.
@@ -2154,8 +2160,8 @@ end
 # a beginless range — which is what its extremes and its walk answer.
 def synthesize_range(node, types)
   side = node.start.nil? ? node.finish : node.start
-  return ["range", ["unknown"]] if side.nil?
-  ["range", synthesize(side, types)]
+  return RangeType.new(element: ["unknown"]) if side.nil?
+  RangeType.new(element: synthesize(side, types))
 end
 
 # `x&.y` — a maybe of what `y` answers on the plain receiver (the seventh
@@ -2189,7 +2195,7 @@ def synthesize_shape_answer(receiver, name)
   when "to_a", "entries"
     return receiver if receiver in ArrayType
     # A range walks its integers (ADR 0081), so only one over them lists.
-    return ArrayType.new(element: ["integer"]) if receiver == ["range", ["integer"]]
+    return ArrayType.new(element: ["integer"]) if receiver == RangeType.new(element: ["integer"])
     return ArrayType.new(element: ["unknown"]) if receiver == ["set"]
     ["unknown"]
   else
@@ -2238,6 +2244,8 @@ def type_at(list, target_index)
   return [ARRAY_KIND, list.element].slice(target_index, 1).first if list in ArrayType
   return [STRUCT_KIND, list.name].slice(target_index, 1).first if list in StructType
   return [CLASS_KIND, list.name].slice(target_index, 1).first if list in ClassType
+  return [RANGE_KIND, list.element].slice(target_index, 1).first if list in RangeType
+  return [ENUM_KIND, list.name].slice(target_index, 1).first if list in EnumType
   # Read through a run of one, so the walk is one step however long the
   # list is (#537). An index answers a maybe, and a nil that is there
   # comes back wrapped; a block's parameter is the element itself.
@@ -2285,7 +2293,7 @@ def type_function_answer_for(type_name, name)
     when "Hash"   then ["hash", ["unknown"], ["unknown"]]
     when "Random" then ["random"]
     when "Regexp" then ["regexp"]
-    when "Range"  then ["range", ["unknown"]]
+    when "Range"  then RangeType.new(element: ["unknown"])
     when "Set"    then ["set"]
     else ArrayType.new(element: ["unknown"])
     end

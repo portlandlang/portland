@@ -336,7 +336,7 @@ def builtin_type_of(value)
   return ["set"] if value in ["__set__", *]
   # A range has a row in the table too, so a wrong count on one refuses
   # here as it does on the seed, and is never dropped (#332).
-  return ["range", ["unknown"]] if value in Range
+  return RangeType.new(element: ["unknown"]) if value in Range
   return ["rational"] if value in Rational
   return ["complex"] if value in Complex
   nil
