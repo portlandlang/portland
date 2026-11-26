@@ -1,0 +1,20 @@
+# Two Hashes keyed alike whose values are different structs are a Hash of
+# one of several structs (#607), as two such arrays are an array of one:
+# a field made with each holds the one Hash they make together.
+struct Leaf
+  name
+end
+
+struct Twig
+  length
+end
+
+struct Shelf
+  table
+end
+
+leaves = Shelf.new(table: {"oak" => Leaf.new(name: "oak")})
+twigs = Shelf.new(table: {"ash" => Twig.new(length: 3)})
+p(leaves.table.length + twigs.table.length)
+p(leaves.table.key?("oak"))
+p(twigs.table.key?("oak"))

@@ -1101,11 +1101,14 @@ end
 def joined_plain(first, second)
   return first if first == second
   return ANY_STRUCT if (first in StructType) && (second in StructType)
-  # A Hash given no pair is the other Hash (#607).
+  # A Hash given no pair is the other Hash (#607), and two keyed alike are
+  # a Hash of what their values make together, as two arrays are.
   if (first in HashType) && (second in HashType)
     return second if first == HashType.new(key: UnknownType.new, value: UnknownType.new)
     return first if second == HashType.new(key: UnknownType.new, value: UnknownType.new)
-    return nil
+    return nil unless first.key == second.key
+    value = joined_plain(first.value, second.value) or return nil
+    return HashType.new(key: first.key, value: value)
   end
   return nil unless (first in ArrayType) && (second in ArrayType)
   return second if first == ArrayType.new(element: UnknownType.new)

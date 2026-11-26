@@ -512,6 +512,8 @@ end
 # it: the same type, or a struct held as one of several (#572).
 def held_as?(type, holding)
   return true if type == holding || (holding == ANY_STRUCT && (type in StructType))
+  # A Hash's values as an array's elements are (#607).
+  return type.key == holding.key && held_as?(type.value, holding.value) if (type in HashType) && (holding in HashType)
   (type in ArrayType) && (holding in ArrayType) && held_as?(type.element, holding.element)
 end
 
