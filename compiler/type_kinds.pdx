@@ -68,6 +68,12 @@ struct MaybeType
   inner
 end
 
+# A module's name, read as a receiver (`Stats.mean`): its type is
+# nobody's, so what its methods answer is unknown.
+struct ModuleType
+  name
+end
+
 struct NilType
 end
 
