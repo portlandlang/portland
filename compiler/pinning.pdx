@@ -429,12 +429,13 @@ end
 # Bindings with each empty array or Hash bound to the one a walk left it
 # as, and every other binding as it was.
 def filled_arrays(before, after)
-  held = bindings_hash(before)
-  return held unless held.any? { |name, type| empty_literal?(type) }
-  held.map do |name, type|
-    left = empty_literal?(type) ? binding_type(after, name) : nil
-    [name, (left.nil? || !concrete?(left) ? type : left)]
-  end.to_h
+  mutable held = bindings_hash(before)
+  held.each do |name, type|
+    next unless empty_literal?(type)
+    left = binding_type(after, name)
+    held = held.merge({name => left}) if left.some? && concrete?(left)
+  end
+  layer_of(held)
 end
 
 # Whether an empty literal's type is filled by this one: the empty array
@@ -454,7 +455,7 @@ end
 # of them, makes the calls it made then. With `changed` nil every body is
 # walked.
 def gathered_round(statements, names, answers, pinned, changed, mentions, read_before)
-  walk = pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names)
+  walk = pin_statements(statements, PinWalk.new(bindings: no_bindings, calls: []), answers, names)
   mutable calls = twice_read_calls(statements, [], answers, names)
   mutable read = []
   mutable again = 0
@@ -662,12 +663,12 @@ end
 
 # The bindings a block leaves that its writer had going in (#607): what
 # the block bound of its own goes with the block.
-def outer_bindings(before, after) = bindings_hash(after).select { |name, type| binding_type(before, name).some? }
+def outer_bindings(before, after) = layer_of(bindings_hash(after).select { |name, type| binding_type(before, name).some? })
 
 # Each name once, at the type it holds: where a guard's proof is bound
 # ahead of a name's own binding, the binding beneath it.
 def own_bindings(bindings)
-  bindings_hash(bindings).reject { |name, type| proved_key?(name) }
+  layer_of(bindings_hash(bindings).reject { |name, type| proved_key?(name) })
 end
 
 # A method's shape, for a call to be held to (ADR 0093, #536): the
@@ -885,7 +886,7 @@ def pin_program(written, core: nil, progress: nil)
   pinned = settled.pinned
   answers = as_bindings(fixed + settled.fields + pinned_answers(pinned))
   walk = gathered_calls(definitions, statements, names, answers, pinned)
-  top = own_bindings(pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names).bindings)
+  top = own_bindings(pin_statements(statements, PinWalk.new(bindings: no_bindings, calls: []), answers, names).bindings)
   # A def with no combination is one nothing calls, or one called only
   # with a value whose type is not known. Of those, the program's own are
   # listed; the core's are most of the core.
@@ -1234,7 +1235,7 @@ def settled_bindings(parameters, bindings)
     next if start.key?(name) || proved_key?(name)
     start = start.merge({name => type}) if concrete?(type)
   end
-  start
+  layer_of(start)
 end
 
 # The calls a body makes, read with each local at the one type it holds.
@@ -1405,7 +1406,7 @@ end
 def walked_block(body, start, answers, names)
   first = pin_statements(body, start, answers, names)
   settled = settled_bindings(start.bindings, first.bindings)
-  return first if settled == bindings_hash(start.bindings)
+  return first if bindings_hash(settled) == bindings_hash(start.bindings)
   second = pin_statements(body, start.with(bindings: settled), answers, names)
   second.with(calls: first.calls + second.calls.slice(start.calls.length, second.calls.length - start.calls.length))
 end
