@@ -54,19 +54,22 @@ jobs:
     runs-on: xcode-27
     strategy:
       fail-fast: false
+      # Longest first: GitHub runs only so many macOS jobs at once, and the
+      # rest wait for a runner in this order, so a long check left to the
+      # end makes the whole run as long as the wait plus itself.
       matrix:
         step:
-          - unit
-          - runtime
-          - source-form
-          - ruby-rules
+          - native-tools
+          - whole-suites
           - integration
           - regex-corpus
+          - runtime
           - regex-fuzz
-          - lint
           - docs
-          - whole-suites
-          - native-tools
+          - lint
+          - unit
+          - ruby-rules
+          - source-form
     name: ${{ matrix.step }}
     steps:
       - uses: actions/checkout@v7
