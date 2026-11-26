@@ -1,0 +1,20 @@
+# An empty Hash literal says nothing of what it holds (#607): bound to a
+# name, it is the Hash the name grows into; handed to a def, it is the
+# Hash the def is handed elsewhere.
+mutable lengths = {}
+["fern", "moss", "fern"].each do |word|
+  lengths = lengths.merge({word => word.length})
+end
+p(lengths.length)
+p(lengths["moss"])
+
+def counted(table, word)
+  return table if table.key?(word)
+  table.merge({word => 1})
+end
+
+mutable seen = {}
+seen = counted(seen, "oak")
+seen = counted(seen, "ash")
+seen = counted(seen, "oak")
+p(seen.length)

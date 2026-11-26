@@ -141,6 +141,9 @@ LLVM_PRELUDE = [
   "declare ptr @portland_array_new(i64, i64)",
   "declare ptr @portland_array_append(ptr, i64, i64)",
   "declare void @portland_array_release(ptr)",
+  "declare ptr @portland_hash_empty(i64)",
+  "declare ptr @portland_hash_new(ptr, ptr)",
+  "declare void @portland_hash_release(ptr)",
   "declare void @portland_panic(ptr)",
   "declare void @portland_refuse_nil_method(ptr)",
   "declare void @portland_refuse_nil_puts()",
@@ -415,10 +418,10 @@ def llvm_comparison(operator)
 end
 
 # Whether a value of this type holds a counted block: a String, an
-# array, or a maybe of either.
+# array, a Hash, a struct, or a maybe of one.
 def llvm_counted?(type)
   return llvm_counted?(type.inner) if type in MaybeType
-  type == StringType.new || (type in ArrayType) || (type in StructType)
+  type == StringType.new || (type in ArrayType) || (type in HashType) || (type in StructType)
 end
 
 # A value that was handed over and is done with: released if it is
@@ -431,6 +434,7 @@ def llvm_drop(emitter, type, operand)
   end
   return llvm_line(emitter, "call void @portland_release(ptr #{operand})") if type == StringType.new
   return llvm_line(emitter, "call void @portland_struct_release(ptr #{operand})") if type in StructType
+  return llvm_line(emitter, "call void @portland_hash_release(ptr #{operand})") if type in HashType
   llvm_line(emitter, "call void @portland_array_release(ptr #{operand})")
 end
 
@@ -927,6 +931,7 @@ def llvm_type(type)
   in BooleanType then "i1"
   in StringType then "ptr"
   in ArrayType then "ptr"
+  in HashType then "ptr"
   in StructType then "ptr"
   in MaybeType then "{ i1, #{llvm_type(type.inner)} }"
   in NothingType then "void"
@@ -1155,6 +1160,17 @@ def llvm_value(emitter, value)
       made = llvm_append(written.emitter, made.operand, held, written.operand)
     end
     made
+  # A Hash literal (#607): its keys and its values made as arrays are,
+  # which the runtime takes both holds on and makes one Hash of.
+  # The empty one is made with the kind its values will be, which the
+  # Hash it was held as says.
+  in IntermediateHash(type:, keys:, values:)
+    if keys.elements.empty?
+      return llvm_named(emitter, "call ptr @portland_hash_empty(i64 #{llvm_array_kind(type.value)})")
+    end
+    written_keys = llvm_value(emitter, keys)
+    written_values = llvm_value(written_keys.emitter, values)
+    llvm_named(written_values.emitter, "call ptr @portland_hash_new(ptr #{written_keys.operand}, ptr #{written_values.operand})")
   # `each`: the length is read once, since the array cannot change under
   # the walk, and the block's function is called for each element in
   # turn. The place the walk keeps its index is made at the top of the
