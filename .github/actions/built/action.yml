@@ -1,0 +1,20 @@
+name: built
+description: What the build job compiled, put back where cargo left it, so a check runs its step without building again.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@v8
+      with:
+        name: built
+    # A tar, because an artifact keeps neither a file's mode nor its time:
+    # the test binaries have to stay executable, and cargo reads the times.
+    - shell: sh
+      run: tar -xf built.tar && rm built.tar
+    # Cargo rebuilds a crate whose sources are newer than what it built,
+    # and a fresh checkout makes every source newer than the build. Every
+    # file and directory outside target/ is set back to a fixed time well
+    # before any build, directories too, since a build script can ask to
+    # rerun when a directory changes.
+    - shell: sh
+      run: find . \( -path ./target -o -path ./.git \) -prune -o -exec touch -h -t 200001010000 {} +

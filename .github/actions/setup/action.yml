@@ -1,0 +1,47 @@
+name: setup
+description: The Ruby, the caches, and the toolchain every check runs with, then script/bootstrap.
+
+inputs:
+  target:
+    description: Whether to restore target/ from the cache. A check that runs on what the build job compiled has no use for it.
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    # Reads .ruby-version. The runner ships an older Ruby than the doc
+    # checks require, and `mdl` has to come from the lockfile rather than
+    # whatever happens to be installed.
+    - uses: ruby/setup-ruby@v1
+      with:
+        bundler-cache: true
+    # The crates cargo downloads, and the build of them: the build job
+    # compiles on top of it, and a check that builds for itself, clippy,
+    # does too.
+    - if: inputs.target == 'true'
+      uses: actions/cache@v6
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+        restore-keys: cargo-${{ runner.os }}-
+    # Without target/, the crates' sources alone, which cargo reads to know
+    # what was built from them.
+    - if: inputs.target != 'true'
+      uses: actions/cache@v6
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: cargo-registry-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+    # The Rust toolchain rust-toolchain.toml pins would otherwise download
+    # through rustup on every run; the key is the pin file, so bumping the
+    # version is what refreshes the cache.
+    - uses: actions/cache@v6
+      with:
+        path: ~/.rustup
+        key: rustup-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}
+    - shell: sh
+      run: script/bootstrap

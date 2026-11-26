@@ -6,37 +6,80 @@ on:
   pull_request:
   workflow_dispatch:
 
+# One check per thing a change is held to (#603), each running one step of
+# script/test, so a red check names what failed and the others still run.
+# The build job compiles once and hands what it built to every check that
+# runs tests; format needs no build and starts at once.
+#
+# Apple-silicon language, Apple-silicon runners. macOS 27+ only. GitHub's
+# macOS 27 image is labelled for its Xcode, `xcode-27`, while in preview.
+
 jobs:
-  cibuild:
-    # Apple-silicon language, Apple-silicon runner. macOS 27+ only. GitHub's
-    # macOS 27 image is labelled for its Xcode, `xcode-27`, while in preview.
+  format:
     runs-on: xcode-27
     steps:
       - uses: actions/checkout@v7
-      # Reads .ruby-version. The runner ships an older Ruby than the doc
-      # checks require, and `mdl` has to come from the lockfile rather than
-      # whatever happens to be installed.
-      - uses: ruby/setup-ruby@v1
+      - uses: ./.github/actions/setup
         with:
-          bundler-cache: true
-      - uses: actions/cache@v6
+          target: "false"
+      - run: script/test format
+
+  # Clippy builds in its own way, checking rather than compiling, so it
+  # gains nothing from the build job and runs beside it.
+  clippy:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: script/test clippy
+
+  build:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - run: script/test build
+      # What the checks run, kept as a tar so the binaries stay executable
+      # and cargo's times hold. Incremental state is for rebuilding, which
+      # no check does.
+      - run: tar -cf built.tar --exclude target/debug/incremental target/debug target/release/libportland_runtime.a
+      - uses: actions/upload-artifact@v7
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: cargo-${{ runner.os }}-
-      # The Rust toolchain rust-toolchain.toml pins would otherwise download
-      # through rustup on every run; the key is the pin file, so bumping the
-      # version is what refreshes the cache.
-      - uses: actions/cache@v6
+          name: built
+          path: built.tar
+          retention-days: 1
+
+  check:
+    needs: build
+    runs-on: xcode-27
+    strategy:
+      fail-fast: false
+      # Longest first: GitHub runs only so many macOS jobs at once, and the
+      # rest wait for a runner in this order, so a long check left to the
+      # end makes the whole run as long as the wait plus itself.
+      matrix:
+        step:
+          - native-tools
+          - whole-suites
+          - integration
+          - regex-corpus
+          - runtime
+          - regex-fuzz
+          - docs
+          - lint
+          - unit
+          - ruby-rules
+          - source-form
+    name: ${{ matrix.step }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
         with:
-          path: ~/.rustup
-          key: rustup-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}
+          target: "false"
+      - uses: ./.github/actions/built
       # `script/docs/check closed_issue_claims` asks GitHub which issues are
       # closed, through `gh`, which reads this token.
-      - run: script/cibuild
+      - run: script/test ${{ matrix.step }}
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -44,8 +87,8 @@ jobs:
   # the seed's behavior: re-derive it and diff, about four minutes, only when
   # the seed, the table, the probe, or this workflow changed against the
   # base. A manual run, or a base this checkout cannot see, always checks.
-  # It uses nothing cibuild produces, so it is its own job and runs beside
-  # cibuild rather than after it (#259).
+  # It uses nothing the build job produces, so it is its own job and runs
+  # beside the others rather than after them (#259).
   builtin-method-table:
     runs-on: xcode-27
     steps:
@@ -70,28 +113,10 @@ jobs:
           else
             echo "check=true" >> "$GITHUB_OUTPUT"
           fi
-      # The same Ruby, caches, and toolchain as cibuild, set up only when the
-      # table is to be checked, so a skipped run finishes in seconds.
+      # The same Ruby, caches, and toolchain as every check, set up only when
+      # the table is to be checked, so a skipped run finishes in seconds.
       - if: steps.gate.outputs.check == 'true'
-        uses: ruby/setup-ruby@v1
-        with:
-          bundler-cache: true
-      - if: steps.gate.outputs.check == 'true'
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: cargo-${{ runner.os }}-
-      - if: steps.gate.outputs.check == 'true'
-        uses: actions/cache@v6
-        with:
-          path: ~/.rustup
-          key: rustup-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}
-      - if: steps.gate.outputs.check == 'true'
-        run: script/bootstrap
+        uses: ./.github/actions/setup
       - name: builtin method table
         if: steps.gate.outputs.check == 'true'
         run: |
