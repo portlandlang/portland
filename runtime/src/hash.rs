@@ -59,30 +59,106 @@ pub unsafe extern "C" fn portland_hash_new(
     values: *mut ArrayBlock,
 ) -> *mut HashBlock {
     unsafe {
-        let kind = (*values).kind;
-        let length = (*keys).length as usize;
-        let mut kept_keys = array_with(STRINGS, length.max(1));
-        let mut kept_values = array_with(kind, length.max(1));
-        for index in 0..length {
-            let key = elements_of(keys).add(index).read();
-            let value = elements_of(values).add(index).read();
-            hold_word(kind, value, true);
-            match place_of(kept_keys, key as *const StringBlock) {
+        let mut kept = Pairs::with_room((*values).kind, (*keys).length as usize);
+        kept.put_all(keys, values);
+        portland_array_release(keys);
+        portland_array_release(values);
+        kept.into_hash()
+    }
+}
+
+/// `hash.merge(other)`: a new Hash, held once, with the receiver's pairs
+/// and then the other's, the other's value where both have a key, as the
+/// seed's merge answers. Neither Hash changes.
+///
+/// # Safety
+/// `hash` and `other` point at live Hashes whose values are of one kind.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_hash_merge(
+    hash: *const HashBlock,
+    other: *const HashBlock,
+) -> *mut HashBlock {
+    unsafe {
+        let room = (*(*hash).keys).length + (*(*other).keys).length;
+        let mut kept = Pairs::with_room((*(*hash).values).kind, room as usize);
+        kept.put_all((*hash).keys, (*hash).values);
+        kept.put_all((*other).keys, (*other).values);
+        kept.into_hash()
+    }
+}
+
+/// `hash.key?(key)`, and its other names: whether the key is there.
+///
+/// # Safety
+/// `hash` points at a live Hash, and `key` at a live String.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_hash_key(
+    hash: *const HashBlock,
+    key: *const StringBlock,
+) -> bool {
+    unsafe { place_of((*hash).keys, key).is_some() }
+}
+
+/// The keys and values of a Hash being made, each array held once.
+struct Pairs {
+    keys: *mut ArrayBlock,
+    values: *mut ArrayBlock,
+    kind: i64,
+}
+
+impl Pairs {
+    /// None yet, with room for this many.
+    fn with_room(kind: i64, room: usize) -> Pairs {
+        Pairs {
+            keys: array_with(STRINGS, room.max(1)),
+            values: array_with(kind, room.max(1)),
+            kind,
+        }
+    }
+
+    /// One pair put in: where the key is there already, its value is
+    /// replaced in its place; otherwise the pair goes at the end. Each
+    /// kept word gains a holder, and a replaced value loses one.
+    ///
+    /// # Safety
+    /// `key` is a live String, and `value` a word of the pairs' kind.
+    unsafe fn put(&mut self, key: i64, value: i64) {
+        unsafe {
+            hold_word(self.kind, value, true);
+            match place_of(self.keys, key as *const StringBlock) {
                 Some(place) => {
-                    let slot = elements_of(kept_values).add(place);
-                    hold_word(kind, slot.read(), false);
+                    let slot = elements_of(self.values).add(place);
+                    hold_word(self.kind, slot.read(), false);
                     slot.write(value);
                 }
                 None => {
                     hold_word(STRINGS, key, true);
-                    kept_keys = portland_array_append(kept_keys, key, STRINGS);
-                    kept_values = portland_array_append(kept_values, value, kind);
+                    self.keys = portland_array_append(self.keys, key, STRINGS);
+                    self.values = portland_array_append(self.values, value, self.kind);
                 }
             }
         }
-        portland_array_release(keys);
-        portland_array_release(values);
-        hash_of(kept_keys, kept_values)
+    }
+
+    /// Every pair of these two arrays put in, in order. Borrows both.
+    ///
+    /// # Safety
+    /// `keys` is a live array of Strings, and `values` a live array of the
+    /// pairs' kind and the same length.
+    unsafe fn put_all(&mut self, keys: *mut ArrayBlock, values: *mut ArrayBlock) {
+        unsafe {
+            for index in 0..(*keys).length as usize {
+                self.put(
+                    elements_of(keys).add(index).read(),
+                    elements_of(values).add(index).read(),
+                );
+            }
+        }
+    }
+
+    /// The Hash these pairs make, which takes both holds.
+    fn into_hash(self) -> *mut HashBlock {
+        hash_of(self.keys, self.values)
     }
 }
 

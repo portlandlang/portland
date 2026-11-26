@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Native: `merge` and `key?` on a Hash** ([#607](https://github.com/portlandlang/portland/issues/607)) — `merge` answers a new Hash with the receiver's pairs and then the other's, the other's value where both have a key, and neither side changes. `key?` answers whether a key is there, under its other names too: `has_key?`, `include?`, and `member?`. The literal and `merge` put their pairs in by one rule in the runtime.
+
 - **Native: a Hash keyed by Strings** ([#607](https://github.com/portlandlang/portland/issues/607)) — a literal, `hash[key]` answering the value or nothing, and `length` and `size`, held to the seed by a fixture. The runtime holds a Hash as its keys and its values side by side, two arrays in the order the keys went in, so a value is held and let go of as an array's element is. A key written twice keeps its first place and its last value, as Ruby's literal does. The values are of one type, and an array could hold them; a Boolean, a Hash, and an empty literal are refused by name.
 - **CI runs each step as a check of its own** ([#603](https://github.com/portlandlang/portland/issues/603)) — one job ran every step in turn, so a failure was one red check, a log to read to find which, and every step after it unrun. Each step of `script/test` is now its own check, run by `script/test STEP`, so a check and a person run a step by the same command. A build job compiles once and hands what it built to every check that runs tests; format and clippy run beside it. `script/cibuild` runs the same steps in one process.
 
