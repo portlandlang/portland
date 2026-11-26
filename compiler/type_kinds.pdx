@@ -1,0 +1,116 @@
+# The compiler's types, each kind a struct (#593). Inference reads a type
+# off every expression, and pinning, lowering, and the emitter work with
+# what it reads. A type was a tagged array, `["maybe", ["integer"]]`: a
+# String beside an array, nested to any depth, which a native array cannot
+# be. Each kind moves here as it becomes a struct, and is written by its
+# fields' names.
+#
+# A file of its own, required ahead of everything that names a type, since
+# a file runs its constants before it declares its structs, and the
+# compiler's constants are full of types.
+
+# An array, by the type of what it holds: the element's type, or unknown
+# where nothing has said.
+struct ArrayType
+  element
+end
+
+# The plain types: each a kind that holds nothing, so a type is told by
+# the struct alone.
+struct BooleanType
+end
+
+# A type's name as a value (ADR 0074): what `Name.new` and a type function
+# are called on, and what `value.class` answers, by the name.
+struct ClassType
+  name
+end
+
+struct ComplexType
+end
+
+# In the native library's table (#560), what an array holds and the
+# array itself, as a row writes them.
+struct ElementType
+end
+
+# A value of one of the program's enums, by the enum's name.
+struct EnumType
+  name
+end
+
+struct FloatType
+end
+
+# A hash, by the types of its keys and of their values.
+struct HashType
+  key
+  value
+end
+
+struct IntegerType
+end
+
+# What a call hands a def by name (#536): the label, and the type of what
+# is handed. A call's arguments are its placed types and then these, and
+# the combination of a def's types is named by them.
+struct KeywordType
+  label
+  type
+end
+
+struct MatchDataType
+end
+
+# A maybe of a type (ADR 0040 §3): the wrapper, never a union, holding the
+# type of the value where it is there.
+struct MaybeType
+  inner
+end
+
+struct NilType
+end
+
+# What a def answers that produces no value: `puts`, a loop, a def whose
+# every way out answers nil (#561). Only the native build's pinning makes
+# it.
+struct NothingType
+end
+
+struct RandomType
+end
+
+# A range (ADR 0081), by the type of its ends, or unknown where they are
+# not known.
+struct RangeType
+  element
+end
+
+struct RationalType
+end
+
+struct RegexpType
+end
+
+struct SelfType
+end
+
+struct SetType
+end
+
+struct StringType
+end
+
+# An instance of one of the program's structs, by the struct's name, or
+# of whichever of them it is, by `*` (#572).
+struct StructType
+  name
+end
+
+struct SymbolType
+end
+
+# What inference cannot tell (principle 4): the absence of an opinion,
+# never an error.
+struct UnknownType
+end

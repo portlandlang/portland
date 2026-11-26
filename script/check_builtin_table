@@ -14,13 +14,16 @@
 repo = File.expand_path("..", __dir__)
 table_source = File.read(File.join(repo, "compiler", "inference.pdx"))
 
-# `  in ["array", *] then %w[...]` — the table's own lines, inside
-# builtin_methods. The receiver tag is the type's first element.
+# `  in ["string"] then %w[...]` and `  in ArrayType then %w[...]` — the
+# table's own lines, inside builtin_methods. The receiver tag is the
+# type's first element, or the struct's name less `Type`, lowercased, for
+# a kind of type that is a struct (#593).
 tabled = {}
 table_source.each_line do |line|
-  match = line.match(/\A\s+in \["(\w+)"(?:, \*)?\] then %w\[(.*)\]\s*\z/)
+  match = line.match(/\A\s+in (?:\["(\w+)"(?:, \*)?\]|([A-Z]\w*)Type) then %w\[(.*)\]\s*\z/)
   next if match.nil?
-  tabled[match[1]] = match[2].split.sort
+  tag = match[1] || match[2].downcase
+  tabled[tag] = match[3].split.sort
 end
 abort "check_builtin_table: found no table in compiler/inference.pdx" if tabled.empty?
 

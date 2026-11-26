@@ -27,12 +27,24 @@ fn table() -> &'static Vec<Signature> {
     TABLE.get_or_init(|| {
         let mut signatures = Vec::new();
         for line in INFERENCE_SOURCE.lines() {
-            // `  in ["array", *] then %w[all?/0& compact/0 …]`
+            // `  in ["string"] then %w[all?/0& compact/0 …]`, or for a kind
+            // of type that is a struct (#593), `  in ArrayType then %w[…]`,
+            // whose tag is the struct's name less `Type`, lowercased.
             let trimmed = line.trim_start();
-            let Some(rest) = trimmed.strip_prefix("in [\"") else {
-                continue;
-            };
-            let Some((type_tag, rest)) = rest.split_once('"') else {
+            let (type_tag, rest) = if let Some(rest) = trimmed.strip_prefix("in [\"") {
+                let Some((type_tag, rest)) = rest.split_once('"') else {
+                    continue;
+                };
+                (type_tag.to_string(), rest)
+            } else if let Some(rest) = trimmed.strip_prefix("in ") {
+                let Some((name, rest)) = rest.split_once("Type ") else {
+                    continue;
+                };
+                if name.is_empty() || !name.chars().all(char::is_alphanumeric) {
+                    continue;
+                }
+                (name.to_lowercase(), rest)
+            } else {
                 continue;
             };
             let Some((_, entries)) = rest.split_once("then %w[") else {

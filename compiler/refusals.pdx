@@ -78,7 +78,7 @@ end
 # hint — and only when the checker could spell the receiver to write it.
 def render_condition(construct, type, spelling)
   fact = "#{spelled(construct)} condition must be true or false, got #{render_type(type)}"
-  return fact unless type in ["maybe", *]
+  return fact unless type in MaybeType
   return fact if spelling.nil?
   sentence(fact, "write #{spelled(spelling + ".some?")}")
 end
