@@ -1,0 +1,20 @@
+# The walks over a Hash's pairs (#607), each block handed the key and
+# the value, in the order the keys went in.
+lengths = {"fern" => 4, "moss" => 4, "oak" => 3}
+
+lengths.each do |word, length|
+  puts "#{word} #{length}"
+end
+
+p(lengths.any? { |word, length| length == 3 })
+p(lengths.none? { |word, length| word == "ash" })
+
+short = lengths.select { |word, length| length < 4 }
+p(short.length)
+p(short["oak"])
+
+long = lengths.reject { |word, length| length < 4 }
+p(long.length)
+p(long["oak"])
+
+p(lengths.map { |word, length| "#{word}=#{length}" })

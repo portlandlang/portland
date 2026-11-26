@@ -1,0 +1,20 @@
+# A Hash held in a struct's field (#607), as a checker's scope holds its
+# bindings: made with one, grown by `with`, and read back.
+struct Scope
+  bindings
+  depth
+end
+
+def bound(scope, name, type) = scope.with(bindings: scope.bindings.merge({name => type}))
+
+mutable scope = Scope.new(bindings: {}, depth: 0)
+scope = bound(scope, "count", "Integer")
+scope = bound(scope, "name", "String")
+scope = bound(scope, "count", "Float")
+p(scope.bindings.length)
+p(scope.bindings["count"])
+p(scope.bindings["missing"])
+p(scope.depth)
+
+# A struct holding a Hash, written out.
+p(scope)

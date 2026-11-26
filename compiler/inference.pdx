@@ -88,10 +88,14 @@ NATIVE_LIBRARY = [
   [HashType.new(key: StringType.new, value: ElementType.new), "has_key?", [StringType.new], BooleanType.new, "portland_hash_key"],
   [HashType.new(key: StringType.new, value: ElementType.new), "include?", [StringType.new], BooleanType.new, "portland_hash_key"],
   [HashType.new(key: StringType.new, value: ElementType.new), "key?", [StringType.new], BooleanType.new, "portland_hash_key"],
+  # The pair at a place, which the native core's walks over a Hash read
+  # by; no program names them.
+  [HashType.new(key: StringType.new, value: ElementType.new), "key_at", [IntegerType.new], StringType.new, "portland_hash_key_at"],
   [HashType.new(key: StringType.new, value: ElementType.new), "length", [], IntegerType.new, "portland_hash_length"],
   [HashType.new(key: StringType.new, value: ElementType.new), "member?", [StringType.new], BooleanType.new, "portland_hash_key"],
   [HashType.new(key: StringType.new, value: ElementType.new), "merge", [SelfType.new], SelfType.new, "portland_hash_merge"],
   [HashType.new(key: StringType.new, value: ElementType.new), "size", [], IntegerType.new, "portland_hash_length"],
+  [HashType.new(key: StringType.new, value: ElementType.new), "value_at", [IntegerType.new], ElementType.new, "portland_hash_value_at"],
   [IntegerType.new, "chr", [], StringType.new, "portland_integer_chr"],
   [IntegerType.new, "chr", [StringType.new], StringType.new, "portland_integer_chr_encoded"],
   [IntegerType.new, "gcd", [IntegerType.new], IntegerType.new, "portland_integer_gcd"],
@@ -1283,6 +1287,7 @@ end
 # native build compiles no methods for the type.
 def native_owner(type)
   return "Array" if type in ArrayType
+  return "Hash" if type in HashType
   return type.name if type in StructType
   nil
 end
