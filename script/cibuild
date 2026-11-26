@@ -1,7 +1,9 @@
 #!/bin/sh
-# What CI runs: bootstrap the toolchain, then the full test suite and
-# linters, then the native tool builds (#600), which the default suite
-# leaves out and a pull request must pass.
+# What CI runs, in one process: bootstrap the toolchain, then the full test
+# suite and linters, then the native tool builds (#600), which the default
+# suite leaves out and a pull request must pass. CI itself runs each step
+# of script/test as a check of its own (#603, .github/workflows/ci.yml);
+# this runs the same steps on one machine.
 set -e
 cd "$(dirname "$0")/.."
 
