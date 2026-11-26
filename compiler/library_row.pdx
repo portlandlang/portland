@@ -1,0 +1,15 @@
+# A row of the native build's library (#560, #593): one method the
+# runtime does, as what it is asked of, its name, what it takes, what it
+# answers, and the runtime function that does it. A row was a mixed
+# array, a type beside Strings and a list of types, which a native array
+# cannot hold; each is a struct here, and read by its fields' names.
+#
+# A file of its own because a file runs its constants before its structs,
+# and `NATIVE_LIBRARY` in inference.pdx is a constant made of rows.
+struct LibraryRow
+  receiver
+  name
+  taking
+  answer
+  symbol
+end

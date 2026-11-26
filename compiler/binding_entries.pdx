@@ -1,0 +1,27 @@
+# What the native build's bindings hold beside types (#593, #607). Pinning
+# binds each under a key of its own, in the same layers as the types, so
+# each is a struct, and a layer is a Hash of structs. Each was a mixed
+# array or a list, which a native array, and a Hash of one kind of value,
+# cannot hold.
+
+# Which of the program's structs write a method of a name (#572), bound
+# under `any_method_key`.
+struct MethodOwners
+  names
+end
+
+# How a method may be called (ADR 0093, #536), bound under
+# `method_shape_key`: the fewest values it takes by place and the most,
+# whether it yields, and the names it takes.
+struct MethodShape
+  least
+  most
+  yields
+  labels
+end
+
+# What a combination hands its block, one type for each value, bound
+# under `yields_key` (#493).
+struct YieldedTypes
+  types
+end
