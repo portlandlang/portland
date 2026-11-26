@@ -1,5 +1,6 @@
 # The walks an array answers that the native build compiles from Portland
-# source of its own (#567). The core writes a few of an array's methods
+# source of its own (#567), and the walks over a Hash's pairs (#607),
+# which read each pair by its place. The core writes a few of an array's methods
 # in Portland (ADR 0093), and the native build compiles those as defs
 # (#525); every other is the seed's own, in Rust, with nothing for a
 # native build to compile. These are the ones the front end calls.
@@ -135,6 +136,55 @@ NATIVE_CORE_SOURCE = <<~PORTLAND
       mutable kept = []
       self.each do |element|
         kept << element unless kept.include?(element)
+      end
+      kept
+    end
+  end
+
+  class Hash
+    def any?
+      self.each do |key, value|
+        return true if yield(key, value)
+      end
+      false
+    end
+
+    def each
+      mutable place = 0
+      while place < self.length
+        yield(self.key_at(place), self.value_at(place))
+        place += 1
+      end
+      self
+    end
+
+    def map
+      mutable gathered = []
+      self.each do |key, value|
+        gathered << yield(key, value)
+      end
+      gathered
+    end
+
+    def none?
+      self.each do |key, value|
+        return false if yield(key, value)
+      end
+      true
+    end
+
+    def reject
+      mutable kept = {}
+      self.each do |key, value|
+        kept = kept.merge({key => value}) unless yield(key, value)
+      end
+      kept
+    end
+
+    def select
+      mutable kept = {}
+      self.each do |key, value|
+        kept = kept.merge({key => value}) if yield(key, value)
       end
       kept
     end

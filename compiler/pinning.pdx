@@ -1260,6 +1260,11 @@ def settled_fields(calls)
   made_fields(calls).each do |made|
     types = unique_types(type_at(made, 1).select { concrete?(it) })
     bindings << [made[0], (joined_field(types) or types[0])] unless types.empty?
+    # A field made only with an empty literal is that empty literal for
+    # now (#607): read as it, a merge or an append onto the field says
+    # what it holds, and the next round binds the field to that.
+    empty = type_at(made, 1).find { empty_literal?(it) }
+    bindings << [made[0], empty] if types.empty? && empty.some?
   end
   # And each struct the program makes, by a name of its own (#572): an
   # `in` test for one it never makes is never true.

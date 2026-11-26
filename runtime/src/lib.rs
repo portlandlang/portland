@@ -314,6 +314,8 @@ pub const STRINGS: i64 = 2;
 pub const ARRAYS: i64 = 3;
 /// A struct, which is counted too (#532).
 pub const STRUCTS: i64 = 4;
+/// A Hash, counted too (#607): a struct's field may hold one.
+pub const HASHES: i64 = 5;
 
 /// One word, as its kind says to hold it: a holder gained or lost where
 /// it is a counted pointer, and nothing where it is the value itself.
@@ -327,7 +329,10 @@ unsafe fn hold_word(kind: i64, word: i64, held: bool) {
             (STRINGS, false) => portland_release(word as *mut StringBlock),
             (ARRAYS, false) => portland_array_release(word as *mut ArrayBlock),
             (STRUCTS, false) => portland_struct_release(word as *mut StructBlock),
-            (STRINGS | ARRAYS | STRUCTS, true) => portland_retain(word as *mut StringBlock),
+            (HASHES, false) => hash::portland_hash_release(word as *mut hash::HashBlock),
+            (STRINGS | ARRAYS | STRUCTS | HASHES, true) => {
+                portland_retain(word as *mut StringBlock)
+            }
             _ => {}
         }
     }
@@ -347,6 +352,7 @@ unsafe fn word_source(kind: i64, word: i64) -> String {
             ))),
             ARRAYS => array_source(word as *mut ArrayBlock),
             STRUCTS => struct_source(word as *mut StructBlock),
+            HASHES => hash::hash_source(word as *const hash::HashBlock),
             _ => word.to_string(),
         }
     }
@@ -360,7 +366,7 @@ unsafe fn word_source(kind: i64, word: i64) -> String {
 unsafe fn each_counted(array: *mut ArrayBlock, held: bool) {
     unsafe {
         let kind = (*array).kind;
-        if kind != STRINGS && kind != ARRAYS && kind != STRUCTS {
+        if kind != STRINGS && kind != ARRAYS && kind != STRUCTS && kind != HASHES {
             return;
         }
         for index in 0..(*array).length as usize {
