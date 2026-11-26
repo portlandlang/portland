@@ -1,0 +1,25 @@
+# A `case` over one of several structs whose last arms test for structs
+# the program never makes (#607): those arms never match, so the `case`
+# reads as the arms before them, with the `else` that panics, and answers
+# what they answer.
+struct Leaf
+end
+
+struct Twig
+end
+
+struct Root
+end
+
+def word_of(thing)
+  case thing
+  in Leaf then "leaf"
+  in Twig then "twig"
+  in Root then "root"
+  else panic("not a leaf, a twig, or a root: #{inspect(thing)}")
+  end
+end
+
+[Leaf.new, Twig.new].each do |thing|
+  puts word_of(thing)
+end

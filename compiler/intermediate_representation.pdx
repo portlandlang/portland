@@ -1346,8 +1346,11 @@ def lower_value(node, bindings, context)
       refuse_native("an if read for its value whose arms are not one expression each", node) unless settled.length <= 1
       return lower_value((settled.first or nil_node(line: node.line)), bindings, inner)
     end
-    taken = then_body or []
-    other = else_body or []
+    # An arm that is itself an `if` settled to one of its arms is that arm
+    # (#607): a `case` whose last arms test for structs a program never
+    # makes reads as the arms before them and its `else`.
+    taken = settled_body((then_body or []), with_bindings(inner.answers, bindings))
+    other = settled_body((else_body or []), with_bindings(inner.answers, bindings))
     refuse_native("an if read for its value whose arms are not one expression each", node) unless taken.length == 1 && other.length <= 1
     # Each arm is read with what the condition proved for it (#572).
     proof = shape_narrowings(condition, with_bindings(inner.answers, bindings))
@@ -1639,6 +1642,16 @@ def returned_into?(body)
     handed = (node in CallNode) || (node in MethodCallNode) || (node in SafeMethodCallNode) ? node.block : nil
     (handed.some? && block_returns?(handed.body)) || returned_into?(children_of(node))
   end
+end
+
+# A body that is one `if` settled to one of its arms, as that arm, again
+# where the arm is one such `if` itself (#607); any other body as it is.
+def settled_body(body, types)
+  return body unless body.length == 1
+  only = body.first
+  return body unless only in IfNode
+  settled = settled_arm(only, types)
+  settled.nil? ? body : settled_body(settled, types)
 end
 
 # An empty array or Hash literal bound to a name takes the type the name
