@@ -247,7 +247,7 @@ def escape_quotes_outside_interpolation(line)
   mutable modes = ["body"]
   mutable index = 0
   while index < characters.length
-    character = characters[index]
+    character = characters[index] or panic("the lexer read past the end of its source")
     mode = modes.last
     following = index + 1 < characters.length ? characters[index + 1] : ""
     if mode == "body" && character == "\""
@@ -293,7 +293,7 @@ def expand_heredoc_line(lines, line_index)
   mutable consumed = 0
   mutable index = 0
   while index < characters.length
-    character = characters[index]
+    character = characters[index] or panic("the lexer read past the end of its source")
     if character == "#"
       result << line[index..]
       return HeredocLine.new(text: result, consumed: consumed)
@@ -428,7 +428,7 @@ def lex(raw_source, first_line: 1, keep_data: false)
   mutable index = 0
   mutable line = first_line
   while index < characters.length
-    character = characters[index]
+    character = characters[index] or panic("the lexer read past the end of its source")
     # `__END__` alone on a line ends the program text (ADR 0092): nothing
     # after it is lexed.
     if character == "_" && end_marker_at?(characters, index)
@@ -794,10 +794,10 @@ end
 
 # Read a double-quoted lexeme: escapes and interpolation included.
 def read_double_quoted(characters, start)
-  mutable text = characters[start]
+  mutable text = characters[start] or panic("the lexer read past the end of its source")
   mutable index = start + 1
   while index < characters.length
-    character = characters[index]
+    character = characters[index] or panic("the lexer read past the end of its source")
     if character == "\\"
       text << character
       text << characters[index + 1] if index + 1 < characters.length
@@ -844,7 +844,7 @@ def read_interpolation(characters, start)
   mutable index = start + 2
   mutable depth = 1
   while index < characters.length && depth > 0
-    character = characters[index]
+    character = characters[index] or panic("the lexer read past the end of its source")
     if character == "{"
       depth += 1
     elsif character == "}"
@@ -873,7 +873,7 @@ def read_percent_regex(characters, start)
   mutable index = start + 3
   mutable depth = 0
   while index < characters.length
-    character = characters[index]
+    character = characters[index] or panic("the lexer read past the end of its source")
     if character == "\\"
       text << character
       text << characters[index + 1] if index + 1 < characters.length
@@ -904,7 +904,7 @@ def read_regex(characters, start)
   mutable text = "/"
   mutable index = start + 1
   while index < characters.length
-    character = characters[index]
+    character = characters[index] or panic("the lexer read past the end of its source")
     if character == "\\"
       text << character
       text << characters[index + 1] if index + 1 < characters.length
@@ -938,10 +938,10 @@ end
 # Read a plain quoted lexeme (single-quoted, or a string nested inside an
 # interpolation); backslash escapes the next character.
 def read_simple_string(characters, start, quote)
-  mutable text = characters[start]
+  mutable text = characters[start] or panic("the lexer read past the end of its source")
   mutable index = start + 1
   while index < characters.length
-    character = characters[index]
+    character = characters[index] or panic("the lexer read past the end of its source")
     if character == "\\"
       text << character
       text << characters[index + 1] if index + 1 < characters.length
@@ -972,7 +972,7 @@ def read_word_array(characters, start)
   mutable index = start + 3
   mutable depth = 0
   while index < characters.length
-    character = characters[index]
+    character = characters[index] or panic("the lexer read past the end of its source")
     text << character
     index += 1
     if character == "\\"
