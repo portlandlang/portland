@@ -2185,9 +2185,9 @@ def synthesize_call(node, types)
       # Asked of one of several structs, a field is read where every
       # struct that has it holds one type there (#572).
       shared = holder == ANY_STRUCT ? shared_field(node.name, types) : nil
-      return shared if shared.some?
-      field = binding_type(types, field_key(holder.name, node.name))
-      return field if field.some?
+      read = (shared or binding_type(types, field_key(holder.name, node.name)))
+      # Read through `or`, what answers is a type (#607).
+      return (read or UnknownType.new) if read.some?
     end
     # A method the library holds answers what its row says (#560).
     if node.block.nil?
@@ -2263,19 +2263,13 @@ def synthesize_hash(node, types)
 end
 
 def synthesize_identifier(node, types)
-  found = binding_type(types, node.name)
+  # A bound name's type, read through `or` so that what answers is a type
+  # and never one that may not be there (#607).
+  found = binding_type(types, node.name) or return synthesize_unbound(node, types)
   # A name that may not be there, proved to be a struct, is that struct
   # (#572): the proof is bound beside it.
-  if found in MaybeType(inner: StructType)
-    proved = binding_type(types, proved_key(node.name))
-    return proved if proved.some?
-  end
-  return found if found.some?
-  plain = synthesize_name(node.name, types)
-  # A def with no parameters is called by its bare name; under the
-  # native reading it is kept by its combination, which has none.
-  return plain unless plain == UnknownType.new && native_reading?(types)
-  binding_type(types, combination_key(node.name, [], nil, false)) or plain
+  return (binding_type(types, proved_key(node.name)) or found) if found in MaybeType(inner: StructType)
+  found
 end
 
 # An if in value position (the ternary desugars here too, ADR 0046):
@@ -2348,8 +2342,8 @@ def synthesize_logical(node, types)
   # Read as the native build runs it, one struct standing in for one of
   # several is one of them (#572).
   if native_reading?(types) && node.operator == "||"
-    widest = joined_plain(inner, right)
-    return widest if widest.some?
+    # Read through `or`, what answers is a type (#607).
+    return (joined_plain(inner, right) or UnknownType.new)
   end
   UnknownType.new
 end
@@ -2449,6 +2443,16 @@ def synthesize_unary(node, types)
   return BooleanType.new if node.operator == "!"
   return operand if numeric?(operand)
   UnknownType.new
+end
+
+# A name no binding holds: a builtin type's name, or a def with no
+# parameters called by its bare name.
+def synthesize_unbound(node, types)
+  plain = synthesize_name(node.name, types)
+  # A def with no parameters is called by its bare name; under the
+  # native reading it is kept by its combination, which has none.
+  return plain unless plain == UnknownType.new && native_reading?(types)
+  binding_type(types, combination_key(node.name, [], nil, false)) or plain
 end
 
 def task_line_names(lines)
