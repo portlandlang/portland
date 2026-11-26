@@ -177,7 +177,7 @@ end
 # Every way out of a body, each with the type it answers: the early
 # returns, and the last statement — an `if` there counting once per arm.
 def answer_candidates(body, parameters, answers, names)
-  mutable walk = PinWalk.new(bindings: as_bindings(parameters), calls: [])
+  mutable walk = PinWalk.new(bindings: pairs_as_bindings(parameters), calls: [])
   mutable found = []
   mutable last = [NilType.new]
   body.each do |statement|
@@ -220,7 +220,7 @@ def answers_nothing?(body, parameters, answers, names)
   ending = body.last
   closing = (case_as_if(ending) or ending)
   return false unless (closing in CallNode) || (closing in WhileNode) || (closing in IfNode) || (closing in YieldNode)
-  above = pin_statements(body.slice(0, body.length - 1), PinWalk.new(bindings: as_bindings(parameters), calls: []), answers, names)
+  above = pin_statements(body.slice(0, body.length - 1), PinWalk.new(bindings: pairs_as_bindings(parameters), calls: []), answers, names)
   native_nothing?(body, with_bindings(answers, above.bindings))
 end
 
@@ -235,7 +235,7 @@ end
 # What a body answers: its last statement and its early returns, as
 # inference's synthesize_body rules, but with bindings that keep their type.
 def body_answer(body, parameters, answers, names)
-  mutable walk = PinWalk.new(bindings: as_bindings(parameters), calls: [])
+  mutable walk = PinWalk.new(bindings: pairs_as_bindings(parameters), calls: [])
   mutable early = []
   mutable last = NilType.new
   body.each do |statement|
@@ -360,7 +360,9 @@ def changed_between(before, after)
   # longer what it was, which a struct made for the first time, with a
   # `kind` and a `line` like every other, does not make it.
   owners = fields.map { (it.split(".").first or it) }
-  shifted = fields.map { (it.split(".").last or it) }.uniq.select { shared_field(it, before) != shared_field(it, after) }
+  before_layers = pairs_as_bindings(before)
+  after_layers = pairs_as_bindings(after)
+  shifted = fields.map { (it.split(".").last or it) }.uniq.select { shared_field(it, before_layers) != shared_field(it, after_layers) }
   names = (others.flat_map { key_names(it) } + owners + shifted).uniq
   Changed.new(names: names, keys: answers, owners: answers.map { (it.split("(").first or it) }.uniq)
 end
@@ -671,6 +673,16 @@ def own_bindings(bindings)
   layer_of(bindings_hash(bindings).reject { |name, type| proved_key?(name) })
 end
 
+# Bindings in layers, from a list of pairs, the newest first, as pinning
+# and lowering still make a def's parameters and a round's answers (#607),
+# from one Hash, or as they are. Only the hosted compiler pins and lowers,
+# so only they take a list; inference and the checker take layers alone.
+def pairs_as_bindings(types)
+  return types if types in Bindings
+  return layer_of(types) if types in Hash
+  layer_of(types.reverse.to_h)
+end
+
 # A method's shape, for a call to be held to (ADR 0093, #536): the
 # fewest parameters it takes by place and the most, whether it yields,
 # and the names it takes.
@@ -884,7 +896,7 @@ def pin_program(written, core: nil, progress: nil)
   reached = settle_pins(definitions, statements, names, fixed, Settled.new(pinned: [], fields: []), false, progress)
   settled = settle_pins(definitions, statements, names, fixed, reached, true, progress)
   pinned = settled.pinned
-  answers = as_bindings(fixed + settled.fields + pinned_answers(pinned))
+  answers = pairs_as_bindings(fixed + settled.fields + pinned_answers(pinned))
   walk = gathered_calls(definitions, statements, names, answers, pinned)
   top = own_bindings(pin_statements(statements, PinWalk.new(bindings: no_bindings, calls: []), answers, names).bindings)
   # A def with no combination is one nothing calls, or one called only
@@ -1014,7 +1026,7 @@ def pinned_block(definition, parameters, handed, leaves, answers, names, strict)
   mutable reason = nil
   reason = "it yields, and one call hands it no block" if handed.nil?
   answer = handed or UnknownType.new
-  walked = pin_statements(definition.body, PinWalk.new(bindings: as_bindings(parameters), calls: []), with_bindings(answers, yield_bindings(answer, leaves)), names)
+  walked = pin_statements(definition.body, PinWalk.new(bindings: pairs_as_bindings(parameters), calls: []), with_bindings(answers, yield_bindings(answer, leaves)), names)
   yields = walked.calls.select { it[0] == YIELD }.map { type_at(it, 1) }
   counts = unique_types(yields.map { it.length })
   reason = (reason or "it yields #{counts[0]} at one place and #{counts[1]} at another") if counts.length > 1
@@ -1174,7 +1186,7 @@ def settle_pins(definitions, statements, names, fixed, starting, strict, progres
     moving = fields + pinned_answers(pinned)
     # Made layers once a round, and read through by every walk the round
     # makes (#607).
-    answers = as_bindings(fixed + moving)
+    answers = pairs_as_bindings(fixed + moving)
     changed = (reusing && !checking && moving_before.some?) ? changed_between(moving_before, moving) : nil
     gathered = gathered_round(statements, names, answers, pinned, changed, mentions, read_before)
     walk = gathered.walk
@@ -1228,7 +1240,7 @@ end
 # A body's parameters, and each local a walk of the body bound, once, at
 # the type beneath any proof a guard bound ahead of it.
 def settled_bindings(parameters, bindings)
-  mutable start = bindings_hash(parameters)
+  mutable start = bindings_hash(pairs_as_bindings(parameters))
   bindings_hash(bindings).each do |name, type|
     # A proof bound beside a name is no local, and holds only where it
     # was proved.
@@ -1277,7 +1289,7 @@ end
 # be bound where it is written, and one a guard proved more of is taken
 # at the type beneath the proof.
 def settled_start(body, parameters, answers, names)
-  walked = pin_statements(body, PinWalk.new(bindings: as_bindings(parameters), calls: []), answers, names)
+  walked = pin_statements(body, PinWalk.new(bindings: pairs_as_bindings(parameters), calls: []), answers, names)
   settled_bindings(parameters, walked.bindings)
 end
 
@@ -1292,7 +1304,7 @@ def solved_answer(definition, key, parameters, answers, names, strict)
   return NOTHING if answers_nothing?(definition.body, parameters, answers, names)
   # Its own answer read as not known, laid over the rest, which are not
   # copied (#607): not known reads as no answer does.
-  others = with_bindings(answers, {key => UnknownType.new})
+  others = with_bindings(answers, bound_one(key, UnknownType.new))
   plain = body_answer(definition.body, parameters, others, names)
   return plain if concrete?(plain)
   # Every way out an empty array: said as it is, for the combination to
@@ -1302,7 +1314,7 @@ def solved_answer(definition, key, parameters, answers, names, strict)
   # The ways out that are known answer one type, or types that join.
   found = joined_types(known) or return UnknownType.new
   return found unless strict
-  whole = body_answer(definition.body, parameters, with_bindings(others, {key => found}), names)
+  whole = body_answer(definition.body, parameters, with_bindings(others, bound_one(key, found)), names)
   whole == found ? found : UnknownType.new
 end
 
@@ -1313,7 +1325,7 @@ end
 # to that call, is read from the call the first walk names, and dropped,
 # that call would be pinned in one round and gone in the next.
 def twice_read_calls(body, parameters, answers, names)
-  first = pin_statements(body, PinWalk.new(bindings: as_bindings(parameters), calls: []), answers, names)
+  first = pin_statements(body, PinWalk.new(bindings: pairs_as_bindings(parameters), calls: []), answers, names)
   starting = settled_bindings(parameters, first.bindings)
   return first.calls if starting == parameters
   first.calls + pin_statements(body, PinWalk.new(bindings: starting, calls: []), answers, names).calls
@@ -1420,7 +1432,8 @@ end
 # What a def's body reads a `yield` by: what its block answers, and
 # whether that block can leave.
 def yield_bindings(answer, leaves)
-  leaves ? [[YIELD, answer], [YIELD_LEAVES, BooleanType.new]] : [[YIELD, answer]]
+  handed = bound_one(YIELD, answer)
+  leaves ? with_bound(handed, YIELD_LEAVES, BooleanType.new) : handed
 end
 
 # The answers a def's own body is read with: the program's, and what its

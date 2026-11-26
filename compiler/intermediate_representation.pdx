@@ -607,8 +607,8 @@ def lower_block(block, handed, bindings, context)
     parameters << [name, type]
     index += 1
   end
-  captures = bindings_hash(bindings).reject { |name, type| parameters.any? { it[0] == name } }
-  start = with_bindings(captures, parameters.reverse)
+  captures = layer_of(bindings_hash(bindings).reject { |name, type| parameters.any? { it[0] == name } })
+  start = with_bindings(captures, pairs_as_bindings(parameters.reverse))
   # A `yield` inside the block is its writer's, so what the writer was
   # handed stays what a `yield` reaches.
   # A local the block binds holds one type through the block (#572), as
@@ -782,7 +782,7 @@ def lower_function(definition, found, context)
   names = context.arities.map { it[0] }
   settled = settled_start(definition.body, found.parameters, yielding_answers(context.answers, found.block), names)
   inside = context.with(procedure: found.answer == NOTHING, yielding: found.block, answer: found.answer, home: found.answer, pinned: settled)
-  lowered = lower_body(definition.body, definition, "a def", as_bindings(found.parameters), found.answer, inside)
+  lowered = lower_body(definition.body, definition, "a def", pairs_as_bindings(found.parameters), found.answer, inside)
   locals = placed_locals(bindings_hash(lowered.bindings).reject { |name, type| found.parameters.any? { it[0] == name } })
   IntermediateFunction.new(name: definition.name, key: found.key, parameters: placed_locals(found.parameters), answer: found.answer, locals: locals, body: lowered.nodes, block: found.block, returned: returned_into?(definition.body))
 end
@@ -829,7 +829,7 @@ def lower_program(written, core: nil, progress: nil)
   # combination that only its first reading of a body names, so that the
   # types settle; nothing calls it, and it may have no type or not build.
   named = pinned.defs.select { it.key.some? }
-  reached = reached_combinations(named, statements, as_bindings(pinned.shapes + pinned_answers(named.select { it.pinned? })), definitions.map { it.name })
+  reached = reached_combinations(named, statements, pairs_as_bindings(pinned.shapes + pinned_answers(named.select { it.pinned? })), definitions.map { it.name })
   untyped = reached.find { !it.pinned? }
   if untyped.some?
     panic("the native build needs one type for every value — def #{untyped.name} on line #{untyped.definition.line} has none: #{untyped.reason}")
@@ -838,7 +838,7 @@ def lower_program(written, core: nil, progress: nil)
   # Types are still read with every combination pinning settled: what a
   # local holds was worked out with them all.
   typed = named.select { it.pinned? }
-  context = LoweringContext.new(answers: as_bindings(pinned.shapes + pinned_answers(typed)), arities: unique_types(typed.map { [it.name, it.parameters.length] }), procedure: false, looping: false, combinations: called, structs: pinned.structs, yielding: nil, inside_block: false, answer: nil, home: nil, root: nil, pinned: pinned.bindings)
+  context = LoweringContext.new(answers: pairs_as_bindings(pinned.shapes + pinned_answers(typed)), arities: unique_types(typed.map { [it.name, it.parameters.length] }), procedure: false, looping: false, combinations: called, structs: pinned.structs, yielding: nil, inside_block: false, answer: nil, home: nil, root: nil, pinned: pinned.bindings)
   build_note(progress, "lowering: #{called.length} combinations of #{unique_types(called.map { it.name }).length} defs") if progress.some?
   mutable functions = []
   called.each do |found|
@@ -1498,7 +1498,13 @@ end
 def placed_locals(bindings)
   # Bindings held as a Hash are in the order their names were first bound
   # (#607); a def's parameters, a list, are in the order written.
-  listed = (bindings in Array) ? bindings : bindings_hash(bindings).to_a
+  listed = if bindings in Array
+    bindings
+  elsif bindings in Hash
+    bindings.to_a
+  else
+    bindings_hash(bindings).to_a
+  end
   listed.reject { type_at(it, 1) == NilType.new || proved_key?(it[0]) }
 end
 

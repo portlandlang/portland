@@ -269,15 +269,6 @@ def arm_bindings(node, branch, nil_seen, types)
   bind_unknowns(no_bindings, pattern_names(pattern))
 end
 
-# Bindings in layers, from any shape they are held in while the compiler
-# moves to them (#607): layers as they are, one Hash as a layer of its
-# own, and a list of pairs, the newest first, as the Hash it would make.
-def as_bindings(types)
-  return types if types in Bindings
-  return Bindings.new(near: types, far: nil) if types in Hash
-  Bindings.new(near: types.reverse.to_h, far: nil)
-end
-
 # Every name an assignment or append inside this node binds, at any depth
 # short of a def, struct, trait, or module — those bind their own.
 def assigned_names_in(node)
@@ -416,20 +407,18 @@ end
 def binding_type(types, name)
   found = types.near[name]
   return found if found.some?
-  types.far.nil? ? nil : binding_type(types.far, name)
+  beneath = types.far
+  return nil if beneath.nil?
+  binding_type(beneath, name)
 end
 
 # Bindings as one Hash from name to type (#607), every layer flattened,
-# the newest binding of a name kept. While the compiler moves to them, a
-# list of pairs, the newest first, is read as one too. A walk over every
-# binding reads them through here; a read of one name never does.
+# the newest binding of a name kept. A walk over every binding reads them
+# through here; a read of one name never does.
 def bindings_hash(types)
-  if types in Bindings
-    beneath = types.far.nil? ? {} : bindings_hash(types.far)
-    return beneath.merge(types.near)
-  end
-  return types if types in Hash
-  types.reverse.to_h
+  beneath = types.far
+  return types.near if beneath.nil?
+  bindings_hash(beneath).merge(types.near)
 end
 
 def block_body(block)
@@ -1026,7 +1015,7 @@ def guard_proof(node, types)
   else_exits = body_exits?(node.else_body)
   return when_false(proof) if then_exits && !else_exits
   return when_true(proof) if else_exits && !then_exits
-  []
+  no_bindings
 end
 
 # The name the array a def is handed in one place is bound under (#572):
@@ -1576,8 +1565,9 @@ end
 # These layers laid over other bindings (#607): each layer kept as it is,
 # and the last of them, which lay over nothing, now over those.
 def relayered(layers, beneath)
-  under = layers.far.nil? ? beneath : relayered(layers.far, beneath)
-  layers.with(far: under)
+  further = layers.far
+  return layers.with(far: beneath) if further.nil?
+  layers.with(far: relayered(further, beneath))
 end
 
 # A type as a combination's name writes it.
@@ -1748,7 +1738,7 @@ def shape_guard(node, types)
   else_exits = body_exits?(node.else_body)
   return when_false(proof) if then_exits && !else_exits
   return when_true(proof) if else_exits && !then_exits
-  []
+  no_bindings
 end
 
 # Whether a statement is a guard that leaves unless an `in` test of the
@@ -1796,7 +1786,7 @@ end
 # hold types that do not join.
 def shared_field(name, types)
   ending = ".#{name}"
-  held = field_types(as_bindings(types), ending)
+  held = field_types(types, ending)
   return nil if held.empty?
   mutable joined = held.first
   held.each do |type|
@@ -2497,26 +2487,20 @@ def when_true(proof) = type_at(proof, 0)
 # The newer ones are a layer of their own, so the bindings beneath are
 # never copied, however many they are.
 def with_bindings(types, newer)
-  beneath = as_bindings(types)
-  # Layers already are laid as they are, each relinked over the bindings
-  # beneath, with no layer copied.
-  return relayered(newer, beneath) if newer in Bindings
-  layer = bindings_hash(newer)
-  return beneath if layer.empty?
-  Bindings.new(near: layer, far: beneath)
+  # Each of the newer layers is relinked over the bindings beneath, and
+  # none is copied; layers that bind nothing add none.
+  return types if newer.far.nil? && newer.near.empty?
+  relayered(newer, types)
 end
 
 # These bindings with one more, which is read over any older binding of
 # the name (#607). Only the newest layer is copied.
-def with_bound(types, name, type)
-  held = as_bindings(types)
-  held.with(near: held.near.merge({name => type}))
-end
+def with_bound(types, name, type) = types.with(near: types.near.merge({name => type}))
 
 # These bindings with every binding of a name gone (#607).
 def without_bound(types, name)
-  return as_bindings(types) if binding_type(types, name).nil?
-  Bindings.new(near: bindings_hash(types).reject { |key, type| key == name }, far: nil)
+  return types if binding_type(types, name).nil?
+  layer_of(bindings_hash(types).reject { |key, type| key == name })
 end
 
 # What a combination yields, one type for each value, as pinning bound it
