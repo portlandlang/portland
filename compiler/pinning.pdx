@@ -205,7 +205,7 @@ def answer_key?(key) = key.include?("(")
 # answers one (#572).
 def answered_array(name, answers, empty)
   opening = "#{name}("
-  arrays = answers.select { it[0].start_with?(opening) && fills_empty?(empty, type_at(it, 1)) && concrete?(type_at(it, 1)) }.map { type_at(it, 1) }
+  arrays = bindings_hash(answers).select { |key, type| key.start_with?(opening) && fills_empty?(empty, type) && concrete?(type) }.map { |key, type| type }
   arrays.empty? ? nil : joined_types(arrays)
 end
 
@@ -429,11 +429,12 @@ end
 # Bindings with each empty array or Hash bound to the one a walk left it
 # as, and every other binding as it was.
 def filled_arrays(before, after)
-  return before unless before.any? { empty_literal?(type_at(it, 1)) }
-  before.map do |binding|
-    left = empty_literal?(type_at(binding, 1)) ? after.assoc(binding[0]) : nil
-    left.nil? || !concrete?(type_at(left, 1)) ? binding : left
-  end
+  held = bindings_hash(before)
+  return held unless held.any? { |name, type| empty_literal?(type) }
+  held.map do |name, type|
+    left = empty_literal?(type) ? binding_type(after, name) : nil
+    [name, (left.nil? || !concrete?(left) ? type : left)]
+  end.to_h
 end
 
 # Whether an empty literal's type is filled by this one: the empty array
@@ -659,17 +660,14 @@ def on_self(node, own)
   end
 end
 
+# The bindings a block leaves that its writer had going in (#607): what
+# the block bound of its own goes with the block.
+def outer_bindings(before, after) = bindings_hash(after).select { |name, type| binding_type(before, name).some? }
+
 # Each name once, at the type it holds: where a guard's proof is bound
 # ahead of a name's own binding, the binding beneath it.
 def own_bindings(bindings)
-  mutable own = []
-  mutable seen = []
-  bindings.reverse.each do |binding|
-    next if seen.include?(binding[0]) || proved_key?(binding[0])
-    seen << binding[0]
-    own = [binding] + own
-  end
-  own
+  bindings_hash(bindings).reject { |name, type| proved_key?(name) }
 end
 
 # A method's shape, for a call to be held to (ADR 0093, #536): the
@@ -706,8 +704,7 @@ def pin_block_call(node, walk, answers, names)
     index += 1
   end
   walked = walked_block(node.block.body, current.with(bindings: inner), answers, names)
-  outer = current.bindings.length
-  kept = unnarrowed(current.bindings, walked.bindings.slice(walked.bindings.length - outer, outer))
+  kept = unnarrowed(current.bindings, outer_bindings(current.bindings, walked.bindings))
   PinWalk.new(bindings: kept, calls: block_returns(walked.calls, current.calls.length) + [[node.name, arguments, answer, leaves]])
 end
 
@@ -902,7 +899,7 @@ def pin_program(written, core: nil, progress: nil)
       listed += combinations
     end
   end
-  PinnedProgram.new(defs: listed, bindings: top.reverse, definitions: definitions, shapes: fixed + settled.fields, structs: structs, conflicts: field_conflicts(walk.calls))
+  PinnedProgram.new(defs: listed, bindings: top, definitions: definitions, shapes: fixed + settled.fields, structs: structs, conflicts: field_conflicts(walk.calls))
 end
 
 # One statement: the calls inside it are recorded with the bindings above
@@ -988,8 +985,7 @@ def pin_walk(node, walk, answers, names)
     index += 1
   end
   walked = walked_block(node.block.body, current.with(bindings: inner), answers, names)
-  outer = current.bindings.length
-  walked.with(bindings: unnarrowed(current.bindings, walked.bindings.slice(walked.bindings.length - outer, outer)), calls: block_returns(walked.calls, current.calls.length))
+  walked.with(bindings: unnarrowed(current.bindings, outer_bindings(current.bindings, walked.bindings)), calls: block_returns(walked.calls, current.calls.length))
 end
 
 # The pinned combinations' answers as bindings, each under the name its
@@ -1069,20 +1065,19 @@ def reads_name?(body, name)
 end
 
 def rebound(bindings, name, type)
-  found = bindings.assoc(name)
-  return [[name, type]] + bindings if found.nil?
+  held = binding_type(bindings, name)
+  return with_bound(bindings, name, type) if held.nil?
   # What was proved of the name was proved of what it held (#572), and
   # goes when the name is bound again.
-  if (type_at(found, 1) in MaybeType(inner: StructType)) && bindings.assoc(proved_key(name)).some?
-    return rebound(bindings.reject { it[0] == proved_key(name) }, name, type)
+  if (held in MaybeType(inner: StructType)) && binding_type(bindings, proved_key(name)).some?
+    return rebound(without_bound(bindings, proved_key(name)), name, type)
   end
-  return bindings if type_at(found, 1) == type
-  return bindings if fills_empty?(type, type_at(found, 1))
-  return bindings.map { it[0] == name ? [name, type] : it } if fills_empty?(type_at(found, 1), type)
+  return bindings if held == type
+  return bindings if fills_empty?(type, held)
+  return with_bound(bindings, name, type) if fills_empty?(held, type)
   # A name that holds nil at one binding and a value at another holds a
   # maybe of that value (#505), whichever came first, and one that holds
   # one struct and then another holds one of several (#572).
-  held = type_at(found, 1)
   # A value whose type is not known is not another type: the name keeps
   # the one it has, and a later round reads the value once it is known
   # (#572). Unpinned here, the name would starve the call that makes it
@@ -1090,8 +1085,7 @@ def rebound(bindings, name, type)
   return bindings if concrete?(held) && !concrete?(type)
   widened = joined_pair(held, type)
   return bindings if widened == held
-  return bindings.map { it[0] == name ? [name, widened] : it } if widened.some?
-  bindings.map { it[0] == name ? [name, UnknownType.new] : it }
+  with_bound(bindings, name, (widened or UnknownType.new))
 end
 
 # The dump's lines, one per def and then one per top-level binding.
@@ -1107,8 +1101,8 @@ def render_pinned(program)
       lines << "#{signature}: not pinned — #{pinned.reason}"
     end
   end
-  program.bindings.each do |binding|
-    lines << "#{binding[0]}: #{render_type(type_at(binding, 1))}"
+  bindings_hash(program.bindings).each do |name, type|
+    lines << "#{name}: #{render_type(type)}"
   end
   lines
 end
@@ -1231,14 +1225,12 @@ end
 # A body's parameters, and each local a walk of the body bound, once, at
 # the type beneath any proof a guard bound ahead of it.
 def settled_bindings(parameters, bindings)
-  mutable start = parameters
-  mutable seen = parameters.map { it[0] }
-  bindings.reverse.each do |binding|
+  mutable start = bindings_hash(parameters)
+  bindings_hash(bindings).each do |name, type|
     # A proof bound beside a name is no local, and holds only where it
     # was proved.
-    next if seen.include?(binding[0]) || proved_key?(binding[0])
-    seen << binding[0]
-    start = [binding] + start if concrete?(type_at(binding, 1))
+    next if start.key?(name) || proved_key?(name)
+    start = start.merge({name => type}) if concrete?(type)
   end
   start
 end
@@ -1295,7 +1287,7 @@ end
 # is held to the whole body, which must then answer it.
 def solved_answer(definition, key, parameters, answers, names, strict)
   return NOTHING if answers_nothing?(definition.body, parameters, answers, names)
-  others = answers.reject { it[0] == key }
+  others = without_bound(answers, key)
   plain = body_answer(definition.body, parameters, others, names)
   return plain if concrete?(plain)
   # Every way out an empty array: said as it is, for the combination to
@@ -1409,7 +1401,7 @@ end
 def walked_block(body, start, answers, names)
   first = pin_statements(body, start, answers, names)
   settled = settled_bindings(start.bindings, first.bindings)
-  return first if settled == start.bindings
+  return first if settled == bindings_hash(start.bindings)
   second = pin_statements(body, start.with(bindings: settled), answers, names)
   second.with(calls: first.calls + second.calls.slice(start.calls.length, second.calls.length - start.calls.length))
 end

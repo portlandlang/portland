@@ -1566,7 +1566,8 @@ end
 # What a program's requires declare, as [name, kind] pairs for
 # `check_redefinitions`: every global, with the constants among them marked.
 def imported_names(imports)
-  imports.globals.map do |global|
+  # The newest binding first, as the list the globals were held in read.
+  bindings_hash(imports.globals).to_a.reverse.map do |global|
     name = global.first
     kind = if imports.builtins.include?(name) then "builtin" elsif imports.constants.include?(name) then "constant" else "declaration" end
     [name, kind]
@@ -1639,14 +1640,14 @@ def low_of(pair)
 end
 
 def merge_declarations(first, second)
-  Declarations.new(arities: first.arities + second.arities, builtins: first.builtins + second.builtins, constants: first.constants + second.constants, contracts: first.contracts + second.contracts, enums: first.enums + second.enums, globals: first.globals + second.globals, private_constants: first.private_constants + second.private_constants, shapes: first.shapes + second.shapes, traits: first.traits + second.traits, visibilities: first.visibilities + second.visibilities)
+  Declarations.new(arities: first.arities + second.arities, builtins: first.builtins + second.builtins, constants: first.constants + second.constants, contracts: first.contracts + second.contracts, enums: first.enums + second.enums, globals: with_bindings(second.globals, first.globals), private_constants: first.private_constants + second.private_constants, shapes: first.shapes + second.shapes, traits: first.traits + second.traits, visibilities: first.visibilities + second.visibilities)
 end
 
 # A struct's or trait's method body: parameters only, and no top-level
 # def returns either — a bare call inside a struct may reach the struct's
 # own methods before the program's, which this increment does not model.
 def method_scope(node, scope)
-  type_names = scope.globals.select { (it[1] in ClassType) || (it[1] in EnumType) }
+  type_names = bindings_hash(scope.globals).select { |name, type| (type in ClassType) || (type in EnumType) }
   def_scope(node, scope.with(arities: [], contracts: [], globals: type_names, judging: false))
 end
 

@@ -584,7 +584,7 @@ def lower_append(statement, append, bindings, context)
   refuse_native("an array of #{render_type(value.type)}", statement) unless native_type?(type)
   refuse_native("a << of #{with_article(value.type)} onto #{with_article(held)}", statement) unless held == type || held == EMPTY_ARRAY
   # An empty array no append had named yet is named by this one.
-  after = bindings.map { it[0] == append.name ? [append.name, type] : it }
+  after = with_bound(bindings, append.name, type)
   Lowered.new(nodes: [IntermediateAppend.new(name: append.name, type: type, value: value)], bindings: after)
 end
 
@@ -605,8 +605,8 @@ def lower_block(block, handed, bindings, context)
     parameters << [name, type]
     index += 1
   end
-  captures = bindings.reject { |binding| parameters.any? { it[0] == binding[0] } }
-  start = parameters.reverse + captures
+  captures = bindings_hash(bindings).reject { |name, type| parameters.any? { it[0] == name } }
+  start = with_bindings(captures, parameters.reverse)
   # A `yield` inside the block is its writer's, so what the writer was
   # handed stays what a `yield` reaches.
   # A local the block binds holds one type through the block (#572), as
@@ -614,8 +614,8 @@ def lower_block(block, handed, bindings, context)
   settled = settled_start(block.body, start, yielding_answers(context.answers, context.yielding), context.arities.map { it[0] })
   inside = context.with(procedure: handed.answer == NOTHING, looping: false, inside_block: true, answer: handed.answer, pinned: settled)
   lowered = lower_body(block.body, block, "a block", start, handed.answer, inside)
-  locals = placed_locals(lowered.bindings.slice(0, lowered.bindings.length - start.length))
-  IntermediateBlock.new(parameters: parameters, answer: handed.answer, locals: locals.reverse, body: lowered.nodes, captures: placed_locals(captures), onward: yields?(block.body), leaves: handed.leaves, returns: block_returns?(block.body), breaks: block_breaks?(block.body))
+  locals = placed_locals(bindings_hash(lowered.bindings).reject { |name, type| start.key?(name) })
+  IntermediateBlock.new(parameters: parameters, answer: handed.answer, locals: locals, body: lowered.nodes, captures: placed_locals(captures), onward: yields?(block.body), leaves: handed.leaves, returns: block_returns?(block.body), breaks: block_breaks?(block.body))
 end
 
 # A def's body or a block's. One that answers nothing has every statement
@@ -781,8 +781,8 @@ def lower_function(definition, found, context)
   settled = settled_start(definition.body, found.parameters, yielding_answers(context.answers, found.block), names)
   inside = context.with(procedure: found.answer == NOTHING, yielding: found.block, answer: found.answer, home: found.answer, pinned: settled)
   lowered = lower_body(definition.body, definition, "a def", found.parameters, found.answer, inside)
-  locals = placed_locals(lowered.bindings.reject { |binding| found.parameters.any? { it[0] == binding[0] } })
-  IntermediateFunction.new(name: definition.name, key: found.key, parameters: placed_locals(found.parameters), answer: found.answer, locals: locals.reverse, body: lowered.nodes, block: found.block, returned: returned_into?(definition.body))
+  locals = placed_locals(bindings_hash(lowered.bindings).reject { |name, type| found.parameters.any? { it[0] == name } })
+  IntermediateFunction.new(name: definition.name, key: found.key, parameters: placed_locals(found.parameters), answer: found.answer, locals: locals, body: lowered.nodes, block: found.block, returned: returned_into?(definition.body))
 end
 
 # A call of a method the library holds (#560), or nil where it holds none
@@ -1057,11 +1057,11 @@ def lower_value(node, bindings, context)
     called = native_method_call(node, synthesize(node.receiver, scope), scope)
     return lower_value(called, bindings, context) if called.some?
     # `System` is the floor's (ADR 0068), where no local has the name.
-    if (node.receiver in IdentifierNode) && node.receiver.name == "System" && bindings.none? { it[0] == "System" }
+    if (node.receiver in IdentifierNode) && node.receiver.name == "System" && binding_type(bindings, "System").nil?
       return lower_system(node, bindings, inner, context.root)
     end
     # `Name.new(field: value)` makes one of the program's structs (#532).
-    if node.name == "new" && (node.receiver in IdentifierNode) && bindings.none? { it[0] == node.receiver.name }
+    if node.name == "new" && (node.receiver in IdentifierNode) && binding_type(bindings, node.receiver.name).nil?
       made = context.structs.find { it.name == node.receiver.name }
       return lower_record(node, made, bindings, inner) if made.some?
     end
@@ -1484,7 +1484,12 @@ end
 # The locals that are given a place: every one but a name bound only to
 # nil, which is nil wherever it is read (#572), and a proof bound beside
 # a name, which is no local.
-def placed_locals(bindings) = bindings.reject { type_at(it, 1) == NilType.new || proved_key?(it[0]) }
+def placed_locals(bindings)
+  # Bindings held as a Hash are in the order their names were first bound
+  # (#607); a def's parameters, a list, are in the order written.
+  listed = (bindings in Hash) ? bindings.to_a : bindings
+  listed.reject { type_at(it, 1) == NilType.new || proved_key?(it[0]) }
+end
 
 # A type with a maybe opened: what an operation that needs the value
 # works on.

@@ -396,8 +396,17 @@ end
 # bindings by a name goes through here, and every binding through
 # `with_bound` and `with_bindings`, so what holds them is said once.
 def binding_type(types, name)
+  return types[name] if types in Hash
   found = types.assoc(name)
   found.nil? ? nil : type_at(found, 1)
+end
+
+# Bindings as a Hash from name to type (#607). While the compiler moves
+# to Hashes, a list of pairs, the newest first, is read as one: where a
+# name is bound twice, the newest binding is kept.
+def bindings_hash(types)
+  return types if types in Hash
+  types.reverse.to_h
 end
 
 def block_body(block)
@@ -1169,17 +1178,11 @@ def method_def_name(owner, name) = "#{owner}##{name}"
 # The structs that write a method of this name, as pinning bound them
 # (#572), or nil where none does. Read through here, as the bindings'
 # types are read through `binding_type` (#607).
-def method_owners_bound(types, name)
-  found = types.assoc(any_method_key(name))
-  found.nil? ? nil : type_at(found, 1)
-end
+def method_owners_bound(types, name) = binding_type(types, any_method_key(name))
 
 # A method's shape as pinning bound it, or nil where the owner writes no
 # method of the name (#607).
-def method_shape_bound(types, owner, name)
-  found = types.assoc(method_shape_key(owner, name))
-  found.nil? ? nil : type_at(found, 1)
-end
+def method_shape_bound(types, owner, name) = binding_type(types, method_shape_key(owner, name))
 
 # The name a method's shape is bound under: the calls it answers. A
 # method answers only the calls it was written for, and anything else is
@@ -1195,8 +1198,7 @@ def narrowed_bindings(bindings, proved)
   # What was proved of a name that may not be there is bound beside the
   # name, under a key of its own, and is new here unless a proof around
   # this one bound it.
-  fresh = proved.reject { |entry| bindings.assoc(entry[0]).some? }
-  fresh + bindings.map { |binding| (proved.assoc(binding[0]) or binding) }
+  with_bindings(bindings, proved)
 end
 
 def narrowings(condition, types)
@@ -1204,7 +1206,7 @@ def narrowings(condition, types)
   # A match test in a condition — `if x in [head, tail]` — binds its
   # captures on both sides, since the runtime binds them regardless.
   captured = condition_captures(condition).map { [it, UnknownType.new] }
-  [captured + when_true(proof), captured + when_false(proof)]
+  [with_bindings(when_true(proof), captured), with_bindings(when_false(proof), captured)]
 end
 
 # The types a call hands a def under the native reading (#536): what it
@@ -1318,6 +1320,7 @@ end
 # them, where pinning keeps it, so a checker's bindings answer no after
 # one look and are never walked for it.
 def native_reading?(types)
+  return types.key?(NATIVE_READING) if types in Hash
   last = types.last
   last.some? && last[0] == NATIVE_READING
 end
@@ -1706,7 +1709,7 @@ end
 def shape_narrowings(condition, types)
   proof = proof_of(condition, types)
   [when_true(proof), when_false(proof)].map do |proved|
-    proved.select { |entry| proved_key?(entry[0]) || synthesize_name(entry[0], types) == ANY_STRUCT }
+    bindings_hash(proved).select { |name, type| proved_key?(name) || synthesize_name(name, types) == ANY_STRUCT }
   end
 end
 
@@ -1734,11 +1737,11 @@ end
 # hold types that do not join.
 def shared_field(name, types)
   ending = ".#{name}"
-  held = types.select { (it[0].end_with?(ending)) && !it[0].include?("#") && !it[0].include?("(") }
+  held = bindings_hash(types).select { |key, type| key.end_with?(ending) && !key.include?("#") && !key.include?("(") }.map { |key, type| type }
   return nil if held.empty?
-  mutable joined = type_at(held[0], 1)
-  held.each do |entry|
-    joined = joined.nil? ? nil : joined_pair(joined, type_at(entry, 1))
+  mutable joined = held.first
+  held.each do |type|
+    joined = joined.nil? ? nil : joined_pair(joined, type)
   end
   joined
 end
@@ -2417,10 +2420,10 @@ end
 # of a name is proved no further than the body.
 def unnarrowed(before, after)
   # A proof bound beside a name inside the body goes with the body.
-  kept = after.any? { proved_key?(it[0]) } ? after.reject { proved_key?(it[0]) && before.assoc(it[0]).nil? } : after
-  wide = before.select { type_at(it, 1) == ANY_STRUCT }
+  kept = bindings_hash(after).reject { |name, type| proved_key?(name) && binding_type(before, name).nil? }
+  wide = bindings_hash(before).select { |name, type| type == ANY_STRUCT }
   return kept if wide.empty?
-  kept.map { |binding| wide.assoc(binding[0]).nil? ? binding : [binding[0], ANY_STRUCT] }
+  kept.map { |name, type| [name, (wide.key?(name) ? ANY_STRUCT : type)] }.to_h
 end
 
 def when_false(proof) = type_at(proof, 1)
@@ -2429,24 +2432,22 @@ def when_true(proof) = type_at(proof, 0)
 
 # These bindings with newer ones laid over them (#607): where both bind a
 # name, the newer is read.
-def with_bindings(types, newer) = newer + types
+def with_bindings(types, newer) = bindings_hash(types).merge(bindings_hash(newer))
 
 # These bindings with one more, which is read over any older binding of
 # the name (#607).
-def with_bound(types, name, type) = [[name, type]] + types
+def with_bound(types, name, type) = bindings_hash(types).merge({name => type})
 
 # These bindings with every binding of a name gone (#607).
 def without_bound(types, name)
-  return types if binding_type(types, name).nil?
-  types.reject { it[0] == name }
+  held = bindings_hash(types)
+  return held unless held.key?(name)
+  held.reject { |key, type| key == name }
 end
 
 # What a combination yields, one type for each value, as pinning bound it
 # under its yields key, or nil where it bound none (#607).
-def yielded_types(types, key)
-  found = types.assoc(key)
-  found.nil? ? nil : type_at(found, 1)
-end
+def yielded_types(types, key) = binding_type(types, key)
 
 # Whether a body yields anywhere, the blocks written in it included: a
 # `yield` inside one reaches the def's own block.
