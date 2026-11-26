@@ -26,6 +26,20 @@ struct EnumType
   name
 end
 
+# A hash, by the types of its keys and of their values.
+struct HashType
+  key
+  value
+end
+
+# What a call hands a def by name (#536): the label, and the type of what
+# is handed. A call's arguments are its placed types and then these, and
+# the combination of a def's types is named by them.
+struct KeywordType
+  label
+  type
+end
+
 # A maybe of a type (ADR 0040 §3): the wrapper, never a union, holding the
 # type of the value where it is there.
 struct MaybeType

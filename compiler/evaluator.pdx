@@ -328,7 +328,7 @@ def builtin_type_of(value)
   return ["integer"] if value in Integer
   return ["float"] if value in Float
   return ["boolean"] if value in Boolean
-  return ["hash", ["unknown"], ["unknown"]] if value in Hash
+  return HashType.new(key: ["unknown"], value: ["unknown"]) if value in Hash
   return ArrayType.new(element: ["unknown"]) if plain_array?(value)
   return ["random"] if value in Random
   return ["regexp"] if value in Regexp

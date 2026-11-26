@@ -180,7 +180,7 @@ end
 def answers_demand?(type, methods, demand)
   return methods.include?(demand.slice(1, demand.length - 1)) if demand.start_with?(".")
   return true if demand == "==" || demand == "!="
-  return (type == ["string"]) || (type in ArrayType) || (type in ["hash", *]) if demand == "[]"
+  return (type == ["string"]) || (type in ArrayType) || (type in HashType) if demand == "[]"
   !(type in StructType)
 end
 
@@ -1598,7 +1598,7 @@ def known?(type)
   case type
   in ["unknown"] then false
   in ArrayType(element:) then known?(element)
-  in ["hash", key, entry] then known?(key) && known?(entry)
+  in HashType(key:, value: entry) then known?(key) && known?(entry)
   in MaybeType(inner:) then known?(inner)
   in RangeType(element:) then known?(element)
   else
@@ -1670,7 +1670,7 @@ def operator_takes?(operator, left, right)
     # Symbols order by their names (#105).
     return true if left == ["symbol"] && right == ["symbol"]
     # Hashes compare as sets of pairs (#105), under everything but `<=>`.
-    return true if operator != "<=>" && (left in ["hash", *]) && (right in ["hash", *])
+    return true if operator != "<=>" && (left in HashType) && (right in HashType)
     # Sets order by the subset relations (ADR 0082).
     return true if left == ["set"] && right == ["set"]
     # Arrays order element by element, under `<=>` alone.
@@ -1823,7 +1823,7 @@ end
 
 # The types a set's algebra takes on the right (ADR 0082): a set, an array,
 # a range, or a hash.
-def set_operand_type?(type) = type == ["set"] || (type in RangeType) || (type in ArrayType) || (type in ["hash", *])
+def set_operand_type?(type) = type == ["set"] || (type in RangeType) || (type in ArrayType) || (type in HashType)
 
 def shape_methods(declaration, traits)
   mutable methods = %w[each each_pair eql? failure? filter length members nil? select size some? to_a to_h to_s values with] + declaration.fields

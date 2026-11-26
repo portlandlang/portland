@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **The compiler's hash type, and what a call hands by name, are structs** ([#593](https://github.com/portlandlang/portland/issues/593)) — `["hash", key, value]` is `HashType.new(key:, value:)`, and `["keyword", label, type]`, what pinning names a combination by where a call hands a def a value by name, is `KeywordType.new(label:, type:)`. Every kind of type that holds another is a struct.
 - **The compiler's range and enum types are structs** ([#593](https://github.com/portlandlang/portland/issues/593)) — `["range", ["integer"]]` is `RangeType.new(element: ["integer"])`, and `["enum", "Status"]` is `EnumType.new(name: "Status")`.
 - **The compiler's type of a type's name is a struct** ([#593](https://github.com/portlandlang/portland/issues/593)) — `["type", "Token"]`, what `Token.new` is called on and what `value.class` answers, is `ClassType.new(name: "Token")`.
 - **The compiler's struct type is a struct** ([#593](https://github.com/portlandlang/portland/issues/593)) — `["struct", "Token"]` is `StructType.new(name: "Token")`, and one of several structs is `StructType.new(name: "*")`.

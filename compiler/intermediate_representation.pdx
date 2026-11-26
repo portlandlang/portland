@@ -698,7 +698,7 @@ def lower_call(node, name, arguments, bindings, context, root)
   # it in that place (#572), as pinning read it.
   written_placed = arguments.reject { it in KeywordArgumentNode }.map { lower_value(it, bindings, below) }
   written_named = arguments.select { it in KeywordArgumentNode }.sort_by { it.label }.map { [it.label, lower_value(it.value, bindings, below)] }
-  types = filled_arguments(name, written_placed.map { it.type } + written_named.map { ["keyword", it[0], type_at(it, 1).type] }, scope)
+  types = filled_arguments(name, written_placed.map { it.type } + written_named.map { KeywordType.new(label: it[0], type: type_at(it, 1).type) }, scope)
   mutable placed = []
   written_placed.each do |value|
     placed << (value.type == EMPTY_ARRAY ? value.with(type: (type_at(types, placed.length) or EMPTY_ARRAY)) : value)
@@ -706,8 +706,8 @@ def lower_call(node, name, arguments, bindings, context, root)
   mutable named = []
   written_named.each do |pair|
     value = type_at(pair, 1)
-    filled = type_at(types, placed.length + named.length) or ["keyword", pair[0], EMPTY_ARRAY]
-    named << [pair[0], (value.type == EMPTY_ARRAY ? value.with(type: type_at(filled, 2)) : value)]
+    filled = type_at(types, placed.length + named.length) or KeywordType.new(label: pair[0], type: EMPTY_ARRAY)
+    named << [pair[0], (value.type == EMPTY_ARRAY ? value.with(type: filled.type) : value)]
   end
   # A def called by its bare name is a name and not a call, and is
   # handed no block.

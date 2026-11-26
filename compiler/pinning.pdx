@@ -467,9 +467,9 @@ def handed_arrays(pinned)
   pinned.each do |combination|
     mutable place = 0
     combination.arguments.each do |argument|
-      named = argument in ["keyword", *]
-      label = named ? type_at(argument, 1) : place.to_s
-      type = named ? type_at(argument, 2) : argument
+      named = argument in KeywordType
+      label = named ? argument.label : place.to_s
+      type = named ? argument.type : argument
       place += 1 unless named
       next unless (type in ArrayType) && concrete?(type)
       key = handed_array_key(combination.name, label)
@@ -704,15 +704,15 @@ end
 def pin_combination(definition, arguments, handed, leaves, answers, names, strict)
   key = combination_key(definition.name, arguments, handed, leaves)
   unpinned = PinnedDef.new(name: definition.name, key: key, arguments: arguments, definition: definition, parameters: [], answer: ["unknown"], reason: nil, block: nil)
-  placed = arguments.reject { it in ["keyword", *] }
-  named = arguments.select { it in ["keyword", *] }
-  called = called_definition(definition, placed.length, named.map { type_at(it, 1) })
+  placed = arguments.reject { it in KeywordType }
+  named = arguments.select { it in KeywordType }
+  called = called_definition(definition, placed.length, named.map { it.label })
   return unpinned.with(reason: "its parameters do not take what one call hands it") if called.nil?
   mutable parameters = []
   mutable index = 0
   called.parameters.each do |parameter|
-    handed_by_name = named.find { type_at(it, 1) == parameter.name }
-    type = index < placed.length ? type_at(placed, index) : (handed_by_name.nil? ? nil : type_at(handed_by_name, 2))
+    handed_by_name = named.find { it.label == parameter.name }
+    type = index < placed.length ? type_at(placed, index) : (handed_by_name.nil? ? nil : handed_by_name.type)
     parameters << [parameter.name, (type or ["unknown"])]
     index += 1
   end

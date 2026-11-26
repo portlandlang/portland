@@ -16,7 +16,7 @@
 #   ["integer"] ["float"] ["string"] ["boolean"] ["symbol"] ["nil"]
 #   RangeType(element)         — element is the ends' type (ADR 0081), or ["unknown"]
 #   ArrayType(element)         — element is a type, or ["unknown"]
-#   ["hash", key, value]
+#   HashType(key, value)
 #   MaybeType(inner)           — the wrapper, never a union (ADR 0040 §3)
 #   StructType(name)           — an instance
 #   StructType("*")            — an instance of one of the program's structs,
@@ -80,6 +80,12 @@ CLASS_KIND = "type"
 
 # And an enum's, before its name.
 ENUM_KIND = "enum"
+
+# And a hash's, before the types of its keys and values.
+HASH_KIND = "hash"
+
+# And what a call hands by name, before the label and the type.
+KEYWORD_KIND = "keyword"
 
 # And a maybe's, before its inner type.
 MAYBE_KIND = "maybe"
@@ -419,11 +425,11 @@ def block_parameter_type(receiver, index, name, argument_types, parameter_count:
     return ["integer"] if index == 1
     return ["unknown"]
   end
-  if receiver in ["hash", *]
+  if receiver in HashType
     # `each_value` and `transform_values` hand the value alone (#105).
-    return type_at(receiver, 2) if index == 0 && (name == "each_value" || name == "transform_values")
-    return type_at(receiver, 1) if index == 0
-    return type_at(receiver, 2) if index == 1
+    return receiver.value if index == 0 && (name == "each_value" || name == "transform_values")
+    return receiver.key if index == 0
+    return receiver.value if index == 1
     return ["unknown"]
   end
   # An arrangement handed over by the combinatorics (#104) is an array of
@@ -505,7 +511,7 @@ def builtin_table(type)
   in ["boolean"] then %w[class/0 eql?/1 failure?/0 nil?/0 some?/0 to_s/0]
   in ["symbol"] then %w[!~/1 =~/1 capitalize/0 class/0 downcase/0 empty?/0 encoding/0 end_with?/0+ eql?/1 failure?/0 id2name/0 intern/0 length/0 match/1-2& match?/1-2 name/0 next/0 nil?/0 size/0 slice/1-2 some?/0 start_with?/0+ succ/0 swapcase/0 to_s/0 to_sym/0 upcase/0]
   in ArrayType then %w[all?/0-1& any?/0-1& assoc/1 at/1 bsearch/0& bsearch_index/0& chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& combination/1& compact/0 count/0-1& cycle/1& detect/0& difference/0+ dig/1+ drop/1 drop_while/0& each/0& each_cons/1 each_index/0& each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& include?/1 index/0-1& inject/1& intersect?/1 intersection/0+ join/0-1 last/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& permutation/0-1& product/0+& rassoc/1 reduce/1& reject/0& repeated_combination/1& repeated_permutation/1& reverse/0 reverse_each/0& rfind/0& rindex/0-1& rotate/0-1 sample/0-1 select/0& shuffle/0 size/0 slice/2 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transpose/0 union/0+ uniq/0 values_at/0+ zip/1]
-  in ["hash", *] then %w[all?/0-1& any?/0-1& assoc/1 chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& detect/0& dig/1+ drop/1 drop_while/0& each/0& each_key/0& each_pair/0& each_value/0& each_with_index/0& empty?/0 entries/0 eql?/1 except/0+ failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& has_key?/1 has_value?/1 include?/1 inject/1& invert/0 key/1 key?/1 keys/0 length/0 map/0& max/0& max_by/0& member?/1 merge/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& rassoc/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice/0+ slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transform_keys/0& transform_values/0& uniq/0 value?/1 values/0 values_at/0+ zip/1]
+  in HashType then %w[all?/0-1& any?/0-1& assoc/1 chunk/0& chunk_while/0& class/0 collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& detect/0& dig/1+ drop/1 drop_while/0& each/0& each_key/0& each_pair/0& each_value/0& each_with_index/0& empty?/0 entries/0 eql?/1 except/0+ failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& flatten/0-1 grep/1& grep_v/1& group_by/0& has_key?/1 has_value?/1 include?/1 inject/1& invert/0 key/1 key?/1 keys/0 length/0 map/0& max/0& max_by/0& member?/1 merge/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& rassoc/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice/0+ slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& sum/0-1& take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& transform_keys/0& transform_values/0& uniq/0 value?/1 values/0 values_at/0+ zip/1]
   in ["random"] then %w[class/0 eql?/1 failure?/0 nil?/0 rand/0-1 seed/0 some?/0 to_s/0]
   in RangeType then %w[all?/0-1& any?/0-1& begin/0 bsearch/0& chunk/0& chunk_while/0& clamp/1-2 class/0 collect/0& collect_concat/0& count/0-1& cover?/1& cycle/1& detect/0& drop_while/0& each/0& each_with_index/0& end/0 entries/0& eql?/1 exclude_end?/0 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0& first/0-1 flat_map/0& grep/1& grep_v/1& group_by/0& include?/1& inject/1& last/0-1 length/0 map/0& max/0& max_by/0& member?/1& min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& overlap?/1 partition/0& reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& step/0-1& sum/0-1& take_while/0& to_a/0& to_h/0& to_s/0 to_set/0&]
   in ["set"] then %w[add/1 all?/0-1& any?/0-1& chunk/0& chunk_while/0& class/0 classify/0& collect/0& collect_concat/0& compact/0 count/0-1& cycle/1& delete/1 detect/0& difference/1 disjoint?/1 drop/1 drop_while/0& each/0& each_cons/1 each_slice/1 each_with_index/0& empty?/0 entries/0 eql?/1 failure?/0 filter/0& filter_map/0& find/0& find_all/0& find_index/0-1& first/0-1 flat_map/0& flatten/0 grep/1& grep_v/1& group_by/0& include?/1 inject/1& intersect?/1 intersection/1 join/0-1 length/0 map/0& max/0& max_by/0& member?/1 min/0& min_by/0& minmax/0& minmax_by/0& nil?/0 none?/0-1& one?/0-1& partition/0& proper_subset?/1 proper_superset?/1 reduce/1& reject/0& reverse_each/0& select/0& size/0 slice_after/0-1& slice_before/0-1& slice_when/0& some?/0 sort/0& sort_by/0& subset?/1 sum/0-1& superset?/1 take/1 take_while/0& tally/0 to_a/0 to_h/0& to_s/0 to_set/0& union/1 uniq/0 zip/1]
@@ -583,7 +589,7 @@ def call_answer(receiver, node, types)
   when "source", "pre_match", "post_match" then ["string"]
   when "names" then ArrayType.new(element: ["string"])
   when "scan", "captures" then ArrayType.new(element: ["unknown"])
-  when "named_captures" then ["hash", ["string"], ["unknown"]]
+  when "named_captures" then HashType.new(key: ["string"], value: ["unknown"])
   when "options" then ["integer"]
   when "regexp" then ["regexp"]
   when "rindex"
@@ -607,10 +613,10 @@ def call_answer(receiver, node, types)
     ["unknown"]
   when "chars", "grapheme_clusters", "split", "lines" then ArrayType.new(element: ["string"])
   when "keys"
-    return ArrayType.new(element: type_at(receiver, 1)) if receiver in ["hash", *]
+    return ArrayType.new(element: receiver.key) if receiver in HashType
     ArrayType.new(element: ["unknown"])
   when "values"
-    return ArrayType.new(element: type_at(receiver, 2)) if receiver in ["hash", *]
+    return ArrayType.new(element: receiver.value) if receiver in HashType
     ArrayType.new(element: ["unknown"])
   # A range's ends (#111), each a maybe where the range is open.
   when "begin", "end"
@@ -618,14 +624,14 @@ def call_answer(receiver, node, types)
     ["unknown"]
   # A hash's own answers (#105).
   when "invert"
-    return ["hash", type_at(receiver, 2), type_at(receiver, 1)] if receiver in ["hash", *]
+    return HashType.new(key: receiver.value, value: receiver.key) if receiver in HashType
     ["unknown"]
   when "has_value?", "value?" then ["boolean"]
   when "key"
-    return MaybeType.new(inner: type_at(receiver, 1)) if receiver in ["hash", *]
+    return MaybeType.new(inner: receiver.key) if receiver in HashType
     ["unknown"]
   when "values_at", "except", "to_h"
-    return receiver if (receiver in ["hash", *]) && name != "values_at"
+    return receiver if (receiver in HashType) && name != "values_at"
     ["unknown"]
   when "first", "last", "min", "max"
     # With a count, `first(2)` answers a slice, not a maybe; the survey for
@@ -761,7 +767,7 @@ def class_answer(receiver)
   in ["boolean"]   then ClassType.new(name: "Boolean")
   in ["symbol"]    then ClassType.new(name: "Symbol")
   in ArrayType  then ClassType.new(name: "Array")
-  in ["hash", *]   then ClassType.new(name: "Hash")
+  in HashType   then ClassType.new(name: "Hash")
   in RangeType  then ClassType.new(name: "Range")
   in ["random"]    then ClassType.new(name: "Random")
   in ["set"]       then ClassType.new(name: "Set")
@@ -904,13 +910,13 @@ def field_key(owner, field) = "#{owner}.#{field}"
 # no other call names stays as it is.
 def filled_arguments(name, arguments, types)
   empty = ArrayType.new(element: ["unknown"])
-  return arguments unless arguments.any? { it == empty || ((it in ["keyword", *]) && type_at(it, 2) == empty) }
+  return arguments unless arguments.any? { it == empty || ((it in KeywordType) && it.type == empty) }
   mutable place = 0
   mutable filled = []
   arguments.each do |argument|
-    if argument in ["keyword", *]
-      known = type_at(argument, 2) == empty ? types.assoc(handed_array_key(name, type_at(argument, 1))) : nil
-      filled << (known.nil? ? argument : ["keyword", type_at(argument, 1), type_at(known, 1)])
+    if argument in KeywordType
+      known = argument.type == empty ? types.assoc(handed_array_key(name, argument.label)) : nil
+      filled << (known.nil? ? argument : KeywordType.new(label: argument.label, type: type_at(known, 1)))
     else
       known = argument == empty ? types.assoc(handed_array_key(name, place.to_s)) : nil
       filled << (known.nil? ? argument : type_at(known, 1))
@@ -1139,7 +1145,7 @@ end
 def native_argument_types(arguments, types)
   placed = arguments.reject { it in KeywordArgumentNode }.map { synthesize(it, types) }
   named = arguments.select { it in KeywordArgumentNode }.sort_by { it.label }
-  placed + named.map { ["keyword", it.label, synthesize(it.value, types)] }
+  placed + named.map { KeywordType.new(label: it.label, type: synthesize(it.value, types)) }
 end
 
 # What a block handed to one of the program's defs answers, under the
@@ -1442,7 +1448,7 @@ end
 def render_native_type(type)
   return "nothing" if type == NOTHING
   # What a call hands a def by name (#536): the name, and the type.
-  return "#{type_at(type, 1)}: #{render_native_type(type_at(type, 2))}" if type in ["keyword", *]
+  return "#{type.label}: #{render_native_type(type.type)}" if type in KeywordType
   render_type(type)
 end
 
@@ -1452,7 +1458,7 @@ end
 def render_type(type)
   case type
   in ArrayType(element:) then "[" + render_type(element) + "]"
-  in ["hash", key, entry] then "{" + render_type(key) + " => " + render_type(entry) + "}"
+  in HashType(key:, value: entry) then "{" + render_type(key) + " => " + render_type(entry) + "}"
   in MaybeType(inner:) then render_type(inner) + "?"
   in StructType(name: "*") then "Struct"
   in StructType(name:) then name
@@ -1874,23 +1880,23 @@ def synthesize_block_call(node, receiver, types)
   when "cycle" then ["nil"]
   when "all?", "any?", "none?", "one?" then ["boolean"]
   when "select", "filter", "reject", "each", "each_with_index", "reverse_each"
-    return receiver if (receiver in ArrayType) || (receiver in ["hash", *]) || receiver == ["set"]
+    return receiver if (receiver in ArrayType) || (receiver in HashType) || receiver == ["set"]
     ["unknown"]
   # A set's groups (ADR 0082): the block's answers to sets of its members.
   when "classify"
-    return ["hash", body, ["set"]] if receiver == ["set"]
+    return HashType.new(key: body, value: ["set"]) if receiver == ["set"]
     ["unknown"]
   when "to_set" then ["set"]
   # A hash's own walks (#105): the key side or the value side rewritten
   # by the block, or walked and the hash answered.
   when "transform_values"
-    return ["hash", type_at(receiver, 1), body] if receiver in ["hash", *]
+    return HashType.new(key: receiver.key, value: body) if receiver in HashType
     ["unknown"]
   when "transform_keys"
-    return ["hash", body, type_at(receiver, 2)] if receiver in ["hash", *]
+    return HashType.new(key: body, value: receiver.value) if receiver in HashType
     ["unknown"]
   when "each_key", "each_value"
-    return receiver if receiver in ["hash", *]
+    return receiver if receiver in HashType
     ["unknown"]
   # A string's walks answer the string, and `sub` and `gsub` with a block
   # a new one (#106).
@@ -1909,7 +1915,7 @@ def synthesize_block_call(node, receiver, types)
     return ArrayType.new(element: receiver) if receiver in ArrayType
     ["unknown"]
   when "group_by"
-    return ["hash", body, receiver] if receiver in ArrayType
+    return HashType.new(key: body, value: receiver) if receiver in ArrayType
     ["unknown"]
   when "filter_map" then ArrayType.new(element: ["unknown"])
   else
@@ -2020,7 +2026,7 @@ def synthesize_def_return(node, mutable types)
 end
 
 def synthesize_hash(node, types)
-  return ["hash", ["unknown"], ["unknown"]] if node.pairs.empty?
+  return HashType.new(key: ["unknown"], value: ["unknown"]) if node.pairs.empty?
   first = node.pairs.first
   key = synthesize(first.key, types)
   entry = synthesize(first.value, types)
@@ -2029,8 +2035,8 @@ def synthesize_hash(node, types)
     uniform = false unless synthesize(pair.key, types) == key
     uniform = false unless synthesize(pair.value, types) == entry
   end
-  return ["hash", key, entry] if uniform
-  ["hash", ["unknown"], ["unknown"]]
+  return HashType.new(key: key, value: entry) if uniform
+  HashType.new(key: ["unknown"], value: ["unknown"])
 end
 
 def synthesize_identifier(node, types)
@@ -2185,11 +2191,11 @@ def synthesize_shape_answer(receiver, name)
     return receiver if receiver == ["set"] && %w[difference flatten intersection].include?(name)
     return ArrayType.new(element: ["unknown"]) if receiver == ["set"] && %w[compact drop sort take take_while drop_while uniq].include?(name)
     # A hash's compact and slice answer a hash (#105).
-    return receiver if (receiver in ["hash", *]) && (name == "compact" || name == "slice")
+    return receiver if (receiver in HashType) && (name == "compact" || name == "slice")
     return ["string"] if receiver == ["string"] && name == "slice"
     ["unknown"]
   when "merge"
-    return receiver if receiver in ["hash", *]
+    return receiver if receiver in HashType
     ["unknown"]
   when "step" then ArrayType.new(element: ["integer"])
   when "to_a", "entries"
@@ -2246,6 +2252,8 @@ def type_at(list, target_index)
   return [CLASS_KIND, list.name].slice(target_index, 1).first if list in ClassType
   return [RANGE_KIND, list.element].slice(target_index, 1).first if list in RangeType
   return [ENUM_KIND, list.name].slice(target_index, 1).first if list in EnumType
+  return [HASH_KIND, list.key, list.value].slice(target_index, 1).first if list in HashType
+  return [KEYWORD_KIND, list.label, list.type].slice(target_index, 1).first if list in KeywordType
   # Read through a run of one, so the walk is one step however long the
   # list is (#537). An index answers a maybe, and a nil that is there
   # comes back wrapped; a block's parameter is the element itself.
@@ -2279,7 +2287,7 @@ def type_function_answer_for(type_name, name)
     case type_name
     when "Set"   then ["set"]
     when "Array" then ArrayType.new(element: ["unknown"])
-    when "Hash"  then ["hash", ["unknown"], ["unknown"]]
+    when "Hash"  then HashType.new(key: ["unknown"], value: ["unknown"])
     else ["unknown"]
     end
   # `Complex.polar` and `Complex.rectangular` (ADR 0085).
@@ -2290,7 +2298,7 @@ def type_function_answer_for(type_name, name)
   when "linear_time?"                     then if type_name == "Regexp" then ["boolean"] else ["unknown"] end
   when "new"
     case type_name
-    when "Hash"   then ["hash", ["unknown"], ["unknown"]]
+    when "Hash"   then HashType.new(key: ["unknown"], value: ["unknown"])
     when "Random" then ["random"]
     when "Regexp" then ["regexp"]
     when "Range"  then RangeType.new(element: ["unknown"])
