@@ -912,8 +912,9 @@ def dispatched_calls(node, receiver, types)
 end
 
 def element_type(receiver)
-  return receiver.element if receiver in ArrayType
-  return receiver.element if receiver in RangeType
+  # Read through `or`, what answers is a type (#607).
+  return (receiver.element or UnknownType.new) if receiver in ArrayType
+  return (receiver.element or UnknownType.new) if receiver in RangeType
   UnknownType.new
 end
 
@@ -1431,8 +1432,10 @@ end
 
 # A maybe as the native build reads it where its value is needed.
 def opened_natively(type, types)
-  return type unless (type in MaybeType) && native_reading?(types)
-  type.inner
+  # No type at all is one not known (#607).
+  plain = type or return UnknownType.new
+  return plain unless (plain in MaybeType) && native_reading?(types)
+  plain.inner
 end
 
 def ordered_pairs(nodes, types, kind)
@@ -1891,60 +1894,11 @@ end
 
 # Read a type off an expression. Synthesis mode only (ADR 0040's ladder —
 # checking mode is 3b): every arm answers what it can prove from the node
-# alone plus the bindings already typed.
-def synthesize(node, types)
-  case node
-  in IntegerNode then IntegerType.new
-  in FloatNode then FloatType.new
-  in RationalNode then RationalType.new
-  in ImaginaryNode then ComplexType.new
-  # Interpolation needs no arm: it desugared to a `+` chain of strings at
-  # parse, and the binary rule answers string for string + string.
-  in StringNode then StringType.new
-  in BooleanNode then BooleanType.new
-  in SymbolNode then SymbolType.new
-  in NilNode then NilType.new
-  in RangeNode then synthesize_range(node, types)
-  in WordArrayNode then ArrayType.new(element: StringType.new)
-  in SymbolArrayNode then ArrayType.new(element: SymbolType.new)
-  in ArrayNode then synthesize_array(node, types)
-  in HashNode then synthesize_hash(node, types)
-  in IdentifierNode then synthesize_identifier(node, types)
-  in BinaryNode then synthesize_binary(node, types)
-  in LogicalNode then synthesize_logical(node, types)
-  in UnaryNode then synthesize_unary(node, types)
-  in MethodCallNode then synthesize_call(node, types)
-  in SafeMethodCallNode then synthesize_safe_call(node, types)
-  # A bare call reaches a def the scan already typed (3b); its name shares
-  # the list with the locals under the no-shadow rule. `format` and
-  # `sprintf` (ADR 0067) answer a string.
-  in CallNode then synthesize_bare_call(node, types)
-  in IfNode then synthesize_if(node, types)
-  # The one encoding a String has (ADR 0069) is its name, a String. Said
-  # in the arm, not in its pattern, every arm here is a struct's, so the
-  # native build passes over the arms a node of one struct cannot take
-  # (#607).
-  in PathNode(parts:) then parts == ["Encoding", "UTF_8"] ? StringType.new : UnknownType.new
-  in CaseNode then synthesize_case(node, types)
-  in CaseInNode then synthesize_case_in(node, types)
-  in AppendNode then synthesize_append(node, types)
-  # A `yield` is what the block answers, which only the native build's
-  # pinning says (#493), under a name no local can have. The checker
-  # binds none, and reads unknown.
-  in YieldNode then synthesize_name("yield", types)
-  in IndexNode then synthesize_index(node, types)
-  # `self` is the receiver, which only the native build's pinning binds,
-  # as the first parameter of a method (#525).
-  in SelfNode then synthesize_name("self", types)
-  in OpenedNode(value:) then opened_natively(synthesize(value, types), types)
-  in NarrowedNode(name:) then StructType.new(name: name)
-  # Whether a value matches is a Boolean, which the native build reads
-  # (#572). The checker reads no type off a test.
-  in MatchTestNode then native_reading?(types) ? BooleanType.new : UnknownType.new
-  else
-    UnknownType.new
-  end
-end
+# alone plus the bindings already typed. What answers is always a type,
+# read through `or` (#607): the types made from it, and everything read
+# off them, are types too, where a type that may not be there spread
+# through every one of them.
+def synthesize(node, types) = (synthesize_node(node, types) or UnknownType.new)
 
 # `name << value` (3b): the append that first fills an empty literal names
 # its element type — `mutable box = []` then `box << 3` reads as
@@ -2355,6 +2309,61 @@ def synthesize_name(name, types)
   # A builtin type's bare name is the type as a value (ADR 0074).
   return ClassType.new(name: named) if found.nil? && %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(named)
   found or UnknownType.new
+end
+
+# The type of an expression, by what kind of node it is.
+def synthesize_node(node, types)
+  case node
+  in IntegerNode then IntegerType.new
+  in FloatNode then FloatType.new
+  in RationalNode then RationalType.new
+  in ImaginaryNode then ComplexType.new
+  # Interpolation needs no arm: it desugared to a `+` chain of strings at
+  # parse, and the binary rule answers string for string + string.
+  in StringNode then StringType.new
+  in BooleanNode then BooleanType.new
+  in SymbolNode then SymbolType.new
+  in NilNode then NilType.new
+  in RangeNode then synthesize_range(node, types)
+  in WordArrayNode then ArrayType.new(element: StringType.new)
+  in SymbolArrayNode then ArrayType.new(element: SymbolType.new)
+  in ArrayNode then synthesize_array(node, types)
+  in HashNode then synthesize_hash(node, types)
+  in IdentifierNode then synthesize_identifier(node, types)
+  in BinaryNode then synthesize_binary(node, types)
+  in LogicalNode then synthesize_logical(node, types)
+  in UnaryNode then synthesize_unary(node, types)
+  in MethodCallNode then synthesize_call(node, types)
+  in SafeMethodCallNode then synthesize_safe_call(node, types)
+  # A bare call reaches a def the scan already typed (3b); its name shares
+  # the list with the locals under the no-shadow rule. `format` and
+  # `sprintf` (ADR 0067) answer a string.
+  in CallNode then synthesize_bare_call(node, types)
+  in IfNode then synthesize_if(node, types)
+  # The one encoding a String has (ADR 0069) is its name, a String. Said
+  # in the arm, not in its pattern, every arm here is a struct's, so the
+  # native build passes over the arms a node of one struct cannot take
+  # (#607).
+  in PathNode(parts:) then parts == ["Encoding", "UTF_8"] ? StringType.new : UnknownType.new
+  in CaseNode then synthesize_case(node, types)
+  in CaseInNode then synthesize_case_in(node, types)
+  in AppendNode then synthesize_append(node, types)
+  # A `yield` is what the block answers, which only the native build's
+  # pinning says (#493), under a name no local can have. The checker
+  # binds none, and reads unknown.
+  in YieldNode then synthesize_name("yield", types)
+  in IndexNode then synthesize_index(node, types)
+  # `self` is the receiver, which only the native build's pinning binds,
+  # as the first parameter of a method (#525).
+  in SelfNode then synthesize_name("self", types)
+  in OpenedNode(value:) then opened_natively(synthesize(value, types), types)
+  in NarrowedNode(name:) then StructType.new(name: name)
+  # Whether a value matches is a Boolean, which the native build reads
+  # (#572). The checker reads no type off a test.
+  in MatchTestNode then native_reading?(types) ? BooleanType.new : UnknownType.new
+  else
+    UnknownType.new
+  end
 end
 
 def synthesize_numeric_answer(receiver, name, arguments_empty: true)
