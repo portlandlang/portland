@@ -634,8 +634,8 @@ end
 # file with a require the walk could not resolve.
 def check_defined(name, node, scope, found)
   return found unless scope.judging
-  return found if scope.locals.any? { it[0] == name }
-  return found if scope.globals.any? { it[0] == name }
+  return found if binding_type(scope.locals, name).some?
+  return found if binding_type(scope.globals, name).some?
   return found if builtin_function?(name)
   # `DATA` is defined when the file that is run has an `__END__` line (ADR
   # 0092), which a file checked on its own cannot know; the run refuses it

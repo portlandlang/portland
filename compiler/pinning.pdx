@@ -883,7 +883,7 @@ def pin_program(written, core: nil, progress: nil)
   reached = settle_pins(definitions, statements, names, fixed, Settled.new(pinned: [], fields: []), false, progress)
   settled = settle_pins(definitions, statements, names, fixed, reached, true, progress)
   pinned = settled.pinned
-  answers = fixed + settled.fields + pinned_answers(pinned)
+  answers = as_bindings(fixed + settled.fields + pinned_answers(pinned))
   walk = gathered_calls(definitions, statements, names, answers, pinned)
   top = own_bindings(pin_statements(statements, PinWalk.new(bindings: [], calls: []), answers, names).bindings)
   # A def with no combination is one nothing calls, or one called only
@@ -1171,7 +1171,9 @@ def settle_pins(definitions, statements, names, fixed, starting, strict, progres
   while round <= ROUND_LIMIT
     began = progress.nil? ? 0 : System.monotonic_time
     moving = fields + pinned_answers(pinned)
-    answers = fixed + moving
+    # Made layers once a round, and read through by every walk the round
+    # makes (#607).
+    answers = as_bindings(fixed + moving)
     changed = (reusing && !checking && moving_before.some?) ? changed_between(moving_before, moving) : nil
     gathered = gathered_round(statements, names, answers, pinned, changed, mentions, read_before)
     walk = gathered.walk
@@ -1287,7 +1289,9 @@ end
 # is held to the whole body, which must then answer it.
 def solved_answer(definition, key, parameters, answers, names, strict)
   return NOTHING if answers_nothing?(definition.body, parameters, answers, names)
-  others = without_bound(answers, key)
+  # Its own answer read as not known, laid over the rest, which are not
+  # copied (#607): not known reads as no answer does.
+  others = with_bindings(answers, {key => UnknownType.new})
   plain = body_answer(definition.body, parameters, others, names)
   return plain if concrete?(plain)
   # Every way out an empty array: said as it is, for the combination to
@@ -1297,7 +1301,7 @@ def solved_answer(definition, key, parameters, answers, names, strict)
   # The ways out that are known answer one type, or types that join.
   found = joined_types(known) or return UnknownType.new
   return found unless strict
-  whole = body_answer(definition.body, parameters, with_bound(others, key, found), names)
+  whole = body_answer(definition.body, parameters, with_bindings(others, {key => found}), names)
   whole == found ? found : UnknownType.new
 end
 

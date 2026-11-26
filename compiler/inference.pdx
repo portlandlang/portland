@@ -150,6 +150,15 @@ YIELD = "yield"
 # a block written in that def which yields can then leave too.
 YIELD_LEAVES = "yield leaves"
 
+# Bindings in layers (#607): a Hash from name to type, the newest, over
+# the layers beneath it, or nil where there are none. A name is read from
+# the newest layer that binds it. Laying bindings over others, as a body's
+# locals over a program's answers, copies neither.
+struct Bindings
+  near
+  far
+end
+
 # A value that is one of several structs, taken as the one named (#572):
 # no source spells it. It stands where the receiver did, as the first
 # argument of that struct's method, in the arm of a call that runs only
@@ -258,6 +267,15 @@ def arm_bindings(node, branch, nil_seen, types)
     return [[node.subject.name, NilType.new]]
   end
   pattern_names(pattern).map { [it, UnknownType.new] }
+end
+
+# Bindings in layers, from any shape they are held in while the compiler
+# moves to them (#607): layers as they are, one Hash as a layer of its
+# own, and a list of pairs, the newest first, as the Hash it would make.
+def as_bindings(types)
+  return types if types in Bindings
+  return Bindings.new(near: types, far: nil) if types in Hash
+  Bindings.new(near: types.reverse.to_h, far: nil)
 end
 
 # Every name an assignment or append inside this node binds, at any depth
@@ -396,15 +414,25 @@ end
 # bindings by a name goes through here, and every binding through
 # `with_bound` and `with_bindings`, so what holds them is said once.
 def binding_type(types, name)
+  if types in Bindings
+    found = types.near[name]
+    return found if found.some?
+    return types.far.nil? ? nil : binding_type(types.far, name)
+  end
   return types[name] if types in Hash
   found = types.assoc(name)
   found.nil? ? nil : type_at(found, 1)
 end
 
-# Bindings as a Hash from name to type (#607). While the compiler moves
-# to Hashes, a list of pairs, the newest first, is read as one: where a
-# name is bound twice, the newest binding is kept.
+# Bindings as one Hash from name to type (#607), every layer flattened,
+# the newest binding of a name kept. While the compiler moves to them, a
+# list of pairs, the newest first, is read as one too. A walk over every
+# binding reads them through here; a read of one name never does.
 def bindings_hash(types)
+  if types in Bindings
+    beneath = types.far.nil? ? {} : bindings_hash(types.far)
+    return beneath.merge(types.near)
+  end
   return types if types in Hash
   types.reverse.to_h
 end
@@ -927,6 +955,26 @@ end
 # native build settled for it (#532).
 def field_key(owner, field) = "#{owner}.#{field}"
 
+# The type bound to each struct's field of a name, read off the layers
+# where they lie (#607), the newest of each kept, and none of the layers
+# copied: a field read off one of several structs asks this, and the
+# layers beneath hold all of a program's answers.
+def field_types(types, ending)
+  mutable seen = []
+  mutable found = []
+  mutable layer = types
+  while layer.some?
+    layer.near.each do |key, type|
+      next unless key.end_with?(ending) && !key.include?("#") && !key.include?("(")
+      next if seen.include?(key)
+      seen << key
+      found << type
+    end
+    layer = layer.far
+  end
+  found
+end
+
 # What a call hands a def, with each empty array or Hash among it as the
 # one the def's other calls hand it in that place (#572, #607): an empty
 # literal says nothing of what it holds, and the def it is handed to
@@ -1321,7 +1369,7 @@ end
 # them, where pinning keeps it, so a checker's bindings answer no after
 # one look and are never walked for it.
 def native_reading?(types)
-  return types.key?(NATIVE_READING) if types in Hash
+  return binding_type(types, NATIVE_READING).some? if (types in Bindings) || (types in Hash)
   last = types.last
   last.some? && last[0] == NATIVE_READING
 end
@@ -1521,6 +1569,13 @@ def register_struct(node, mutable types)
     types = with_bound(types, node.name + "." + function.name, synthesize_def_return(function, types))
   end
   types
+end
+
+# These layers laid over other bindings (#607): each layer kept as it is,
+# and the last of them, which lay over nothing, now over those.
+def relayered(layers, beneath)
+  under = layers.far.nil? ? beneath : relayered(layers.far, beneath)
+  layers.with(far: under)
 end
 
 # A type as a combination's name writes it.
@@ -1739,7 +1794,7 @@ end
 # hold types that do not join.
 def shared_field(name, types)
   ending = ".#{name}"
-  held = bindings_hash(types).select { |key, type| key.end_with?(ending) && !key.include?("#") && !key.include?("(") }.map { |key, type| type }
+  held = field_types(as_bindings(types), ending)
   return nil if held.empty?
   mutable joined = held.first
   held.each do |type|
@@ -2434,17 +2489,29 @@ def when_true(proof) = type_at(proof, 0)
 
 # These bindings with newer ones laid over them (#607): where both bind a
 # name, the newer is read.
-def with_bindings(types, newer) = bindings_hash(types).merge(bindings_hash(newer))
+# The newer ones are a layer of their own, so the bindings beneath are
+# never copied, however many they are.
+def with_bindings(types, newer)
+  beneath = as_bindings(types)
+  # Layers already are laid as they are, each relinked over the bindings
+  # beneath, with no layer copied.
+  return relayered(newer, beneath) if newer in Bindings
+  layer = bindings_hash(newer)
+  return beneath if layer.empty?
+  Bindings.new(near: layer, far: beneath)
+end
 
 # These bindings with one more, which is read over any older binding of
-# the name (#607).
-def with_bound(types, name, type) = bindings_hash(types).merge({name => type})
+# the name (#607). Only the newest layer is copied.
+def with_bound(types, name, type)
+  held = as_bindings(types)
+  held.with(near: held.near.merge({name => type}))
+end
 
 # These bindings with every binding of a name gone (#607).
 def without_bound(types, name)
-  held = bindings_hash(types)
-  return held unless held.key?(name)
-  held.reject { |key, type| key == name }
+  return as_bindings(types) if binding_type(types, name).nil?
+  Bindings.new(near: bindings_hash(types).reject { |key, type| key == name }, far: nil)
 end
 
 # What a combination yields, one type for each value, as pinning bound it
