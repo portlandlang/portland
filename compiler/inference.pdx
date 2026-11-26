@@ -2189,12 +2189,14 @@ end
 def synthesize_hash(node, types)
   return HashType.new(key: UnknownType.new, value: UnknownType.new) if node.pairs.empty?
   first = node.pairs.first
-  key = synthesize(first.key, types)
-  entry = synthesize(first.value, types)
+  # Read as the native build runs it, a maybe written into a Hash is
+  # opened first, as one written into an array is (#607).
+  key = opened_natively(synthesize(first.key, types), types)
+  entry = opened_natively(synthesize(first.value, types), types)
   mutable uniform = true
   node.pairs.each do |pair|
-    uniform = false unless synthesize(pair.key, types) == key
-    uniform = false unless synthesize(pair.value, types) == entry
+    uniform = false unless opened_natively(synthesize(pair.key, types), types) == key
+    uniform = false unless opened_natively(synthesize(pair.value, types), types) == entry
   end
   return HashType.new(key: key, value: entry) if uniform
   HashType.new(key: UnknownType.new, value: UnknownType.new)
@@ -2256,7 +2258,7 @@ def synthesize_index(node, types)
   return MaybeType.new(inner: StringType.new) if opened == StringType.new && synthesize(node.index, types) == IntegerType.new
   # A Hash looked up by its key's type answers its value, or nothing
   # where the key is not there (#607).
-  return maybe_of(receiver.value) if (receiver in HashType) && synthesize(node.index, types) == receiver.key
+  return maybe_of(receiver.value) if (receiver in HashType) && opened_natively(synthesize(node.index, types), types) == receiver.key
   return UnknownType.new unless (receiver in ArrayType) && synthesize(node.index, types) == IntegerType.new
   maybe_of(receiver.element)
 end

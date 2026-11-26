@@ -1222,7 +1222,7 @@ def lower_value(node, bindings, context)
     end
     # A Hash is looked up by its key, and answers nothing where the key
     # is not there (#607).
-    return library_call("[]", opened_for(held, "[]"), [lower_value(index, bindings, inner)], node) if plain_of(held.type) in HashType
+    return library_call("[]", opened_for(held, "[]"), [opened_for(lower_value(index, bindings, inner), "[]")], node) if plain_of(held.type) in HashType
     refuse_native("an index into #{with_article(held.type)}", node) unless held.type in ArrayType
     position = lower_value(index, bindings, inner)
     refuse_native("an index that is #{with_article(position.type)}", node) unless position.type == IntegerType.new

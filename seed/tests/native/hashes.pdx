@@ -30,3 +30,18 @@ p(more["oak"])
 p(more.length)
 p(scores["moss"])
 p(scores.length)
+
+# A name that may not be there, written as a key or looked up by, is
+# opened first, as one written into an array is.
+def first_word(words) = words.first
+
+def table_of(words)
+  name = first_word(words)
+  return {"none" => 0} if name.nil?
+  {name => 3}
+end
+
+counted = table_of(["oak"])
+p(counted["oak"])
+p(counted[first_word(["oak"])])
+p(table_of([]).length)
