@@ -38,7 +38,7 @@ COMBINATION_LIMIT = 48
 # changes nothing, and a rebinding to another type leaves the name unknown.
 # An array whose elements are not known yet is the same array once they
 # are: an empty literal, named by its first append.
-EMPTY_ARRAY = ArrayType.new(element: ["unknown"])
+EMPTY_ARRAY = ArrayType.new(element: UnknownType.new)
 
 # The name a struct being made is gathered under (#532), with the struct
 # and the type of each field it was handed.
@@ -175,7 +175,7 @@ end
 def answer_candidates(body, parameters, answers, names)
   mutable walk = PinWalk.new(bindings: parameters, calls: [])
   mutable found = []
-  mutable last = [["nil"]]
+  mutable last = [NilType.new]
   body.each do |statement|
     after = pin_statement(statement, walk, answers, names)
     scope = loop_scope(statement, walk, after) + answers
@@ -186,7 +186,7 @@ def answer_candidates(body, parameters, answers, names)
   # A loop at the end answers nil where it can end, and nothing where it
   # cannot (#572).
   ending = body.last
-  last = endless_loop?(ending) ? [] : [["nil"]] if ending in WhileNode
+  last = endless_loop?(ending) ? [] : [NilType.new] if ending in WhileNode
   found + returns_gathered(walk) + last
 end
 
@@ -232,7 +232,7 @@ end
 def body_answer(body, parameters, answers, names)
   mutable walk = PinWalk.new(bindings: parameters, calls: [])
   mutable early = []
-  mutable last = ["nil"]
+  mutable last = NilType.new
   body.each do |statement|
     after = pin_statement(statement, walk, answers, names)
     scope = loop_scope(statement, walk, after) + answers
@@ -251,7 +251,7 @@ def body_answer(body, parameters, answers, names)
   # returns do (#572): a `while true` is left no other way, and a loop
   # that can end answers nil where it does.
   if (ending in WhileNode) && !leaving.empty?
-    return merge_answers(endless_loop?(ending) ? leaving : leaving + [["nil"]])
+    return merge_answers(endless_loop?(ending) ? leaving : leaving + [NilType.new])
   end
   merge_answers(leaving + [last])
 end
@@ -690,7 +690,7 @@ def pin_block_call(node, walk, answers, names)
   mutable index = 0
   node.block.parameters.each do |parameter|
     type = yielded.nil? ? nil : type_at(type_at(yielded, 1), index)
-    inner = [[parameter, (type or ["unknown"])]] + inner
+    inner = [[parameter, (type or UnknownType.new)]] + inner
     index += 1
   end
   walked = walked_block(node.block.body, current.with(bindings: inner), answers, names)
@@ -703,7 +703,7 @@ end
 # what it yields from its body, and then its answer.
 def pin_combination(definition, arguments, handed, leaves, answers, names, strict)
   key = combination_key(definition.name, arguments, handed, leaves)
-  unpinned = PinnedDef.new(name: definition.name, key: key, arguments: arguments, definition: definition, parameters: [], answer: ["unknown"], reason: nil, block: nil)
+  unpinned = PinnedDef.new(name: definition.name, key: key, arguments: arguments, definition: definition, parameters: [], answer: UnknownType.new, reason: nil, block: nil)
   placed = arguments.reject { it in KeywordType }
   named = arguments.select { it in KeywordType }
   called = called_definition(definition, placed.length, named.map { it.label })
@@ -713,7 +713,7 @@ def pin_combination(definition, arguments, handed, leaves, answers, names, stric
   called.parameters.each do |parameter|
     handed_by_name = named.find { it.label == parameter.name }
     type = index < placed.length ? type_at(placed, index) : (handed_by_name.nil? ? nil : handed_by_name.type)
-    parameters << [parameter.name, (type or ["unknown"])]
+    parameters << [parameter.name, (type or UnknownType.new)]
     index += 1
   end
   block = pinned_block(called, parameters, handed, leaves, answers, names, strict)
@@ -727,7 +727,7 @@ def pin_combination(definition, arguments, handed, leaves, answers, names, stric
   # other combinations do (#572): an empty literal says nothing of what
   # it holds, and the def's other answers do.
   borrowed = solved == EMPTY_ARRAY ? answered_array(definition.name, answers) : nil
-  answer = solved == ["nil"] ? NOTHING : (borrowed or solved)
+  answer = solved == NilType.new ? NOTHING : (borrowed or solved)
   reason = concrete?(answer) ? nil : "its answer is #{render_type(answer)}"
   PinnedDef.new(name: definition.name, key: key, arguments: arguments, definition: called, parameters: parameters, answer: answer, reason: reason, block: block)
 end
@@ -876,7 +876,7 @@ def pin_program(written, core: nil, progress: nil)
     combinations = pinned.select { it.name == definition.name }
     if combinations.empty? && own.include?(definition)
       reason = walk.calls.any? { it[0] == definition.name } ? "it is called with a value whose type is not known" : "nothing calls it"
-      listed << PinnedDef.new(name: definition.name, key: nil, arguments: [], definition: definition, parameters: [], answer: ["unknown"], reason: reason, block: nil)
+      listed << PinnedDef.new(name: definition.name, key: nil, arguments: [], definition: definition, parameters: [], answer: UnknownType.new, reason: reason, block: nil)
     else
       listed += combinations
     end
@@ -900,7 +900,7 @@ def pin_statement(statement, walk, answers, names)
   # A `return` is gathered with what it answers, wherever it is written:
   # one inside a block leaves the def as one outside it does (#523).
   in ReturnNode(value:)
-    return walk.with(calls: walk.calls + [[PLAIN_RETURN, [["nil"]], nil, false]]) if value.nil?
+    return walk.with(calls: walk.calls + [[PLAIN_RETURN, [NilType.new], nil, false]]) if value.nil?
     seen = pin_expression(value, walk, answers, names)
     seen.with(calls: seen.calls + [[PLAIN_RETURN, [synthesize(value, seen.bindings + answers)], nil, false]])
   # What a guard in a loop's body proved of a name holds no further than
@@ -983,7 +983,7 @@ def pinned_answers(pinned)
   # Everything pinning reads, it reads the way the native build runs it
   # (#503): the name that says so rides with the answers into every scope,
   # and is kept last, which is where inference looks for it.
-  answers + yielded + handed_arrays(pinned) + [[NATIVE_READING, ["boolean"]]]
+  answers + yielded + handed_arrays(pinned) + [[NATIVE_READING, BooleanType.new]]
 end
 
 # A yielding combination's block, or nil for a def that does not yield.
@@ -995,7 +995,7 @@ def pinned_block(definition, parameters, handed, leaves, answers, names, strict)
   return nil unless yields?(definition.body)
   mutable reason = nil
   reason = "it yields, and one call hands it no block" if handed.nil?
-  answer = handed or ["unknown"]
+  answer = handed or UnknownType.new
   walked = pin_statements(definition.body, PinWalk.new(bindings: parameters, calls: []), yield_bindings(answer, leaves) + answers, names)
   yields = walked.calls.select { it[0] == YIELD }.map { type_at(it, 1) }
   counts = unique_types(yields.map { it.length })
@@ -1003,11 +1003,11 @@ def pinned_block(definition, parameters, handed, leaves, answers, names, strict)
   mutable types = []
   mutable index = 0
   while index < (counts.first or 0)
-    given = unique_types(yields.map { |yielded| (type_at(yielded, index) or ["unknown"]) })
+    given = unique_types(yields.map { |yielded| (type_at(yielded, index) or UnknownType.new) })
     seen = strict ? given : given.select { concrete?(it) }
     reason = (reason or "it yields a value whose type is not known") if strict && !given.all? { concrete?(it) }
     reason = (reason or "it yields #{with_article(seen[0])} at one place and #{with_article(seen[1])} at another") if seen.length > 1
-    types << (seen.length == 1 ? seen[0] : ["unknown"])
+    types << (seen.length == 1 ? seen[0] : UnknownType.new)
     index += 1
   end
   PinnedBlock.new(parameters: types, answer: answer, reason: reason, leaves: leaves)
@@ -1066,7 +1066,7 @@ def rebound(bindings, name, type)
   widened = joined_pair(held, type)
   return bindings if widened == held
   return bindings.map { it[0] == name ? [name, widened] : it } if widened.some?
-  bindings.map { it[0] == name ? [name, ["unknown"]] : it }
+  bindings.map { it[0] == name ? [name, UnknownType.new] : it }
 end
 
 # The dump's lines, one per def and then one per top-level binding.
@@ -1239,7 +1239,7 @@ def settled_fields(calls)
   # And each struct the program makes, by a name of its own (#572): an
   # `in` test for one it never makes is never true.
   calls_of(calls_by_name(calls), MAKING).map { made_key(type_at(type_at(it, 1), 0)) }.uniq.each do |key|
-    bindings << [key, ["boolean"]]
+    bindings << [key, BooleanType.new]
   end
   bindings
 end
@@ -1273,10 +1273,10 @@ def solved_answer(definition, key, parameters, answers, names, strict)
   return plain if plain == EMPTY_ARRAY
   known = unique_types(answer_candidates(definition.body, parameters, answers, names).select { concrete?(it) })
   # The ways out that are known answer one type, or types that join.
-  found = joined_types(known) or return ["unknown"]
+  found = joined_types(known) or return UnknownType.new
   return found unless strict
   whole = body_answer(definition.body, parameters, [[key, found]] + others, names)
-  whole == found ? found : ["unknown"]
+  whole == found ? found : UnknownType.new
 end
 
 # The calls a body makes, read twice (#572): once with each local as it
@@ -1363,13 +1363,13 @@ def value_candidates(node, scope)
   settled = settled_arm(node, scope)
   if settled.some?
     ending = settled.last
-    return ending.nil? ? [["nil"]] : value_candidates(ending, scope)
+    return ending.nil? ? [NilType.new] : value_candidates(ending, scope)
   end
   taken = node.then_body or []
   other = node.else_body or []
   first = taken.last
   second = other.last
-  (first.nil? ? [["nil"]] : value_candidates(first, scope)) + (second.nil? ? [["nil"]] : value_candidates(second, scope))
+  (first.nil? ? [NilType.new] : value_candidates(first, scope)) + (second.nil? ? [NilType.new] : value_candidates(second, scope))
 end
 
 # A block's body walked (#572), with each local the block binds at the
@@ -1393,7 +1393,7 @@ end
 # What a def's body reads a `yield` by: what its block answers, and
 # whether that block can leave.
 def yield_bindings(answer, leaves)
-  leaves ? [[YIELD, answer], [YIELD_LEAVES, ["boolean"]]] : [[YIELD, answer]]
+  leaves ? [[YIELD, answer], [YIELD_LEAVES, BooleanType.new]] : [[YIELD, answer]]
 end
 
 # The answers a def's own body is read with: the program's, and what its

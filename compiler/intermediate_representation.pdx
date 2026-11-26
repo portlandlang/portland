@@ -461,7 +461,7 @@ def field_offset(fields, place)
   mutable offset = 0
   fields.slice(0, place).each do |field|
     # A field that is only ever nil is kept as a maybe that is not there.
-    offset += (type_at(field, 1) in MaybeType) || type_at(field, 1) == ["nil"] ? 2 : 1
+    offset += (type_at(field, 1) in MaybeType) || type_at(field, 1) == NilType.new ? 2 : 1
   end
   offset
 end
@@ -479,7 +479,7 @@ def fitted(value, type)
   if value.type == EMPTY_ARRAY && (type.inner in ArrayType)
     return IntermediateSome.new(type: type, value: value.with(type: type.inner))
   end
-  return IntermediateConstant.new(type: type, value: nil) if value.type == ["nil"]
+  return IntermediateConstant.new(type: type, value: nil) if value.type == NilType.new
   return IntermediateSome.new(type: type, value: value) if held_as?(value.type, type.inner)
   return value if (value.type in MaybeType) && held_as?(value.type.inner, type.inner)
   nil
@@ -493,7 +493,7 @@ def handed_values(values, parameters)
   mutable index = 0
   values.each do |value|
     taking = type_at(parameters, index)
-    kept << value unless taking.some? && type_at(taking, 1) == ["nil"]
+    kept << value unless taking.some? && type_at(taking, 1) == NilType.new
     index += 1
   end
   kept
@@ -513,7 +513,7 @@ def held_type(name, type, context)
   pinned = context.pinned.assoc(name)
   return type if pinned.nil?
   settled = type_at(pinned, 1)
-  return settled if (settled in MaybeType) && native_type?(settled) && (type == ["nil"] || type == settled.inner)
+  return settled if (settled in MaybeType) && native_type?(settled) && (type == NilType.new || type == settled.inner)
   # One bound to a struct here and to another elsewhere holds one of
   # several (#572), and so with an array of them.
   return settled if native_type?(settled) && held_as?(type, settled)
@@ -524,9 +524,9 @@ end
 # between quotes, a maybe as its value or `nil`, and everything else as
 # it is written out.
 def inspected(value, node)
-  return IntermediateInspect.new(type: ["string"], value: value) if value.type == ["string"] || (value.type in MaybeType)
+  return IntermediateInspect.new(type: StringType.new, value: value) if value.type == StringType.new || (value.type in MaybeType)
   # Nil itself in its source form (#572).
-  return IntermediateConstant.new(type: ["string"], value: "nil") if value.type == ["nil"]
+  return IntermediateConstant.new(type: StringType.new, value: "nil") if value.type == NilType.new
   written_out(value, node)
 end
 
@@ -536,10 +536,10 @@ end
 def joined_type(first, second)
   return first if first == second
   # Nil beside a maybe is that maybe.
-  return second if first == ["nil"] && (second in MaybeType)
-  return first if second == ["nil"] && (first in MaybeType)
-  return MaybeType.new(inner: second) if first == ["nil"] && native_value?(second)
-  return MaybeType.new(inner: first) if second == ["nil"] && native_value?(first)
+  return second if first == NilType.new && (second in MaybeType)
+  return first if second == NilType.new && (first in MaybeType)
+  return MaybeType.new(inner: second) if first == NilType.new && native_value?(second)
+  return MaybeType.new(inner: first) if second == NilType.new && native_value?(first)
   return first if first == MaybeType.new(inner: second)
   return second if second == MaybeType.new(inner: first)
   # One struct and another are one of several (#572).
@@ -550,7 +550,7 @@ end
 # opened and handed values already lowered (#563).
 def library_call(name, holder, handed, node)
   entry = native_library_entry(holder.type, name, handed.map { it.type }) or refuse_native("#{name} asked of #{with_article(holder.type)}", node)
-  IntermediateLibrary.new(type: library_type(type_at(entry, 3), holder.type), symbol: type_at(entry, 4), receiver: holder, arguments: handed, words: type_at(entry, 2).map { it == ["element"] })
+  IntermediateLibrary.new(type: library_type(type_at(entry, 3), holder.type), symbol: type_at(entry, 4), receiver: holder, arguments: handed, words: type_at(entry, 2).map { it == ElementType.new })
 end
 
 # `name << value` (#497). The parser writes it as a binding of the name
@@ -563,7 +563,7 @@ def lower_append(statement, append, bindings, context)
   # A String takes what is appended as `+` does (#557): the name is bound
   # to the two joined, and a maybe on either side is opened as `+` opens
   # its operands.
-  if plain_of(held) == ["string"]
+  if plain_of(held) == StringType.new
     joined = binary_node("+", identifier_node(append.name, line: append.line), append.value, line: append.line)
     return lower_statement(statement.with(value: joined), bindings, context)
   end
@@ -676,10 +676,10 @@ def lower_body(body, owner, what, bindings, answer, context)
   if last in WhileNode
     turned = lower_statement(last, lowered.bindings, context)
     if endless_loop?(last)
-      unreached = IntermediateConstant.new(type: ["string"], value: "a loop that does not end has ended")
+      unreached = IntermediateConstant.new(type: StringType.new, value: "a loop that does not end has ended")
       return Lowered.new(nodes: lowered.nodes + turned.nodes + [IntermediatePanic.new(value: unreached)], bindings: turned.bindings)
     end
-    nothing = fitted(IntermediateConstant.new(type: ["nil"], value: nil), answer) or refuse_native("#{what} that ends in a loop where it answers #{with_article(answer)}", last)
+    nothing = fitted(IntermediateConstant.new(type: NilType.new, value: nil), answer) or refuse_native("#{what} that ends in a loop where it answers #{with_article(answer)}", last)
     return Lowered.new(nodes: lowered.nodes + turned.nodes + [IntermediateReturn.new(value: nothing)], bindings: turned.bindings)
   end
   written = lower_value(last, lowered.bindings, context.with(root: "value"))
@@ -735,7 +735,7 @@ end
 
 def lower_condition(node, bindings, context)
   value = lower_value(node, bindings, context)
-  refuse_native("a condition that is #{with_article(value.type)}", node) unless value.type == ["boolean"]
+  refuse_native("a condition that is #{with_article(value.type)}", node) unless value.type == BooleanType.new
   value
 end
 
@@ -755,7 +755,7 @@ def lower_dispatch(node, several, bindings, context)
   while place >= 0
     owner = type_at(several, place).arguments.first.name
     call = type_at(calls, place)
-    test = IntermediateShaped.new(type: ["boolean"], value: lower_value(asked, bindings, context), name: owner)
+    test = IntermediateShaped.new(type: BooleanType.new, value: lower_value(asked, bindings, context), name: owner)
     chain = IntermediateChoice.new(type: type, condition: test, then_value: (fitted(call, type) or call), else_value: chain)
     place -= 1
   end
@@ -768,7 +768,7 @@ def lower_function(definition, found, context)
   found.parameters.each do |parameter|
     # A parameter every call of this combination hands nil is nil
     # wherever it is read, and is handed nothing (#572).
-    refuse_native("a parameter that is #{with_article(type_at(parameter, 1))}", definition) unless native_type?(type_at(parameter, 1)) || type_at(parameter, 1) == ["nil"]
+    refuse_native("a parameter that is #{with_article(type_at(parameter, 1))}", definition) unless native_type?(type_at(parameter, 1)) || type_at(parameter, 1) == NilType.new
   end
   refuse_native("a def answering #{with_article(found.answer)}", definition) unless found.answer == NOTHING || native_type?(found.answer)
   names = context.arities.map { it[0] }
@@ -792,9 +792,9 @@ def lower_library(node, bindings, context)
   holder = opened_for(asked, node.name)
   if node.name == "include?" && (holder.type in ArrayType)
     held = holder.type.element
-    refuse_native("include? asked of an array of #{render_type(held)}", node) unless held == ["integer"] || held == ["boolean"] || held == ["string"]
+    refuse_native("include? asked of an array of #{render_type(held)}", node) unless held == IntegerType.new || held == BooleanType.new || held == StringType.new
   end
-  words = type_at(entry, 2).map { it == ["element"] }
+  words = type_at(entry, 2).map { it == ElementType.new }
   IntermediateLibrary.new(type: library_type(type_at(entry, 3), holder.type), symbol: type_at(entry, 4), receiver: holder, arguments: handed.map { opened_for(it, node.name) }, words: words)
 end
 
@@ -828,7 +828,7 @@ def lower_program(written, core: nil, progress: nil)
     functions << lower_function(found.definition, found, context)
   end
   entry = lower_statements(statements, [], context)
-  functions << IntermediateFunction.new(name: "main", key: nil, parameters: [], answer: ["nil"], locals: placed_locals(entry.bindings).reverse, body: entry.nodes, block: nil, returned: false)
+  functions << IntermediateFunction.new(name: "main", key: nil, parameters: [], answer: NilType.new, locals: placed_locals(entry.bindings).reverse, body: entry.nodes, block: nil, returned: false)
   IntermediateProgram.new(functions: functions, structs: pinned.structs.map { |made| [made.name, struct_fields(made, context)] })
 end
 
@@ -838,11 +838,11 @@ end
 def lower_ranged(node, held, bindings, context)
   range = node.index
   return nil unless range in RangeNode
-  zero = IntermediateConstant.new(type: ["integer"], value: 0)
+  zero = IntermediateConstant.new(type: IntegerType.new, value: 0)
   start = range.start.nil? ? zero : lower_value(range.start, bindings, context)
   finish = range.finish.nil? ? zero : lower_value(range.finish, bindings, context)
-  refuse_native("an index by a range whose ends are not Integers", node) unless start.type == ["integer"] && finish.type == ["integer"]
-  mode = IntermediateConstant.new(type: ["integer"], value: (range.exclusive ? 1 : 0) + (range.finish.nil? ? 2 : 0))
+  refuse_native("an index by a range whose ends are not Integers", node) unless start.type == IntegerType.new && finish.type == IntegerType.new
+  mode = IntermediateConstant.new(type: IntegerType.new, value: (range.exclusive ? 1 : 0) + (range.finish.nil? ? 2 : 0))
   library_call("[..]", opened_for(held, "[]"), [start, finish, mode], node)
 end
 
@@ -861,7 +861,7 @@ def lower_record(node, made, bindings, context)
     argument = labelled.find { it.label == field[0] } or refuse_native("#{made.name}.new without #{field[0]}", node)
     written = lower_value(argument.value, bindings, context)
     type = type_at(field, 1)
-    refuse_native("a field, #{made.name}.#{field[0]}, that is #{with_article(written.type)}", node) unless native_type?(written.type) || written.type == ["nil"] || written.type == EMPTY_ARRAY
+    refuse_native("a field, #{made.name}.#{field[0]}, that is #{with_article(written.type)}", node) unless native_type?(written.type) || written.type == NilType.new || written.type == EMPTY_ARRAY
     # A value handed to a field that is a maybe of it is one that is
     # there, and nil is one that is not (#553).
     fitted(written, type) or refuse_native("#{made.name}.#{field[0]} handed #{with_article(written.type)} where it is #{with_article(type)}", node)
@@ -891,8 +891,8 @@ def lower_statement(statement, bindings, context)
     # A name bound to nil and to nothing else is nil wherever it is read,
     # and is given no place of its own (#572): a parameter left out whose
     # default is nil is one.
-    return Lowered.new(nodes: [], bindings: [[name, ["nil"]]] + bindings) if found.nil? && holding == ["nil"] && stored.type == ["nil"]
-    return Lowered.new(nodes: [], bindings: bindings) if found.some? && holding == ["nil"] && stored.type == ["nil"]
+    return Lowered.new(nodes: [], bindings: [[name, NilType.new]] + bindings) if found.nil? && holding == NilType.new && stored.type == NilType.new
+    return Lowered.new(nodes: [], bindings: bindings) if found.some? && holding == NilType.new && stored.type == NilType.new
     refuse_native("a binding of #{with_article(stored.type)}", statement) unless native_type?(stored.type) || stored.type == EMPTY_ARRAY
     # The name holds what it was fitted to, which is more than the value
     # where it is one of several structs (#572).
@@ -945,14 +945,14 @@ def lower_statement(statement, bindings, context)
     end
     refuse_native("a return with no value", statement) if value.nil?
     written = lower_value(value, bindings, context.with(root: "value"))
-    returned = returned_as(written, context.answer) or refuse_native("a return of #{with_article(written.type)} where the answer is #{with_article(context.answer or ["nil"])}", statement)
+    returned = returned_as(written, context.answer) or refuse_native("a return of #{with_article(written.type)} where the answer is #{with_article(context.answer or NilType.new)}", statement)
     Lowered.new(nodes: [IntermediateReturn.new(value: returned)], bindings: bindings)
   # `panic(message)` (#505).
   in CallNode(name: "panic", arguments:, block:)
     refuse_native("panic with a block", statement) unless block.nil?
     refuse_native("panic of anything but one message", statement) unless arguments.length == 1
     message = lower_value(arguments[0], bindings, context)
-    refuse_native("panic of #{with_article(message.type)}", statement) unless message.type == ["string"]
+    refuse_native("panic of #{with_article(message.type)}", statement) unless message.type == StringType.new
     Lowered.new(nodes: [IntermediatePanic.new(value: message)], bindings: bindings)
   in CallNode(name: "puts", arguments:, block:)
     refuse_native("puts with a block", statement) unless block.nil?
@@ -961,14 +961,14 @@ def lower_statement(statement, bindings, context)
     # A maybe is opened, and nil refuses as the seed's `puts` does.
     value = (handed.type in MaybeType) ? IntermediateOpen.new(type: handed.type.inner, value: handed, name: "puts") : handed
     # An Integer is printed as it is; everything else as its text.
-    shown = value.type == ["integer"] ? value : written_out(value, statement)
+    shown = value.type == IntegerType.new ? value : written_out(value, statement)
     Lowered.new(nodes: [IntermediatePrint.new(value: shown)], bindings: bindings)
   # `p` of one value (#501): its source form on a line.
   in CallNode(name: "p", arguments:, block:)
     refuse_native("p with a block", statement) unless block.nil?
     refuse_native("p of anything but one value", statement) unless arguments.length == 1
     value = lower_value(arguments[0], bindings, context)
-    shown = value.type == ["integer"] ? value : inspected(value, statement)
+    shown = value.type == IntegerType.new ? value : inspected(value, statement)
     Lowered.new(nodes: [IntermediatePrint.new(value: shown)], bindings: bindings)
   in CallNode(name:, arguments:)
     # A call made for what it does: one to a def that answers nothing may
@@ -1001,13 +1001,13 @@ end
 def lower_system(node, bindings, context, root)
   refuse_native("System.#{node.name} with a block", node) unless node.block.nil?
   if node.name == "arguments" && node.arguments.empty?
-    return IntermediateSystem.new(type: ArrayType.new(element: ["string"]), name: "arguments", arguments: [])
+    return IntermediateSystem.new(type: ArrayType.new(element: StringType.new), name: "arguments", arguments: [])
   end
   if node.name == "read_file" && node.arguments.length == 1
     refuse_native("System.read_file read without an or beside it — it answers a failure where the file cannot be read, and a failure", node) unless root == "or"
     named = lower_value(node.arguments[0], bindings, context)
-    refuse_native("System.read_file of #{with_article(named.type)}", node) unless named.type == ["string"]
-    return IntermediateSystem.new(type: MaybeType.new(inner: ["string"]), name: "read_file", arguments: [named])
+    refuse_native("System.read_file of #{with_article(named.type)}", node) unless named.type == StringType.new
+    return IntermediateSystem.new(type: MaybeType.new(inner: StringType.new), name: "read_file", arguments: [named])
   end
   refuse_native("System.#{node.name}", node)
 end
@@ -1056,11 +1056,11 @@ def lower_value(node, bindings, context)
     end
   end
   case node
-  in IntegerNode(value:) then IntermediateConstant.new(type: ["integer"], value: value)
-  in BooleanNode(value:) then IntermediateConstant.new(type: ["boolean"], value: value)
-  in StringNode(value:) then IntermediateConstant.new(type: ["string"], value: value)
+  in IntegerNode(value:) then IntermediateConstant.new(type: IntegerType.new, value: value)
+  in BooleanNode(value:) then IntermediateConstant.new(type: BooleanType.new, value: value)
+  in StringNode(value:) then IntermediateConstant.new(type: StringType.new, value: value)
   # The one encoding a String has (ADR 0069), by its name (#568).
-  in PathNode(parts: ["Encoding", "UTF_8"]) then IntermediateConstant.new(type: ["string"], value: "UTF-8")
+  in PathNode(parts: ["Encoding", "UTF_8"]) then IntermediateConstant.new(type: StringType.new, value: "UTF-8")
   # A maybe handed to a method as its receiver is opened for it.
   in OpenedNode(value:, name:)
     held = lower_value(value, bindings, inner)
@@ -1079,23 +1079,23 @@ def lower_value(node, bindings, context)
       asked = lower_value(subject, bindings, inner)
       refuse_native("an in test of #{with_article(asked.type)}", node) unless plain_of(asked.type) in StructType
       # A maybe is the struct named only where it is there.
-      return IntermediateShaped.new(type: ["boolean"], value: asked, name: pattern.name) if asked.type == ANY_STRUCT || (asked.type in MaybeType)
+      return IntermediateShaped.new(type: BooleanType.new, value: asked, name: pattern.name) if asked.type == ANY_STRUCT || (asked.type in MaybeType)
       refuse_native("an in test of anything but a local", node) unless subject in IdentifierNode
-      return IntermediateConstant.new(type: ["boolean"], value: type_at(asked.type, 1) == pattern.name)
+      return IntermediateConstant.new(type: BooleanType.new, value: type_at(asked.type, 1) == pattern.name)
     end
     refuse_native("an in test of anything but a local", node) unless subject in IdentifierNode
     tested = lower_value(subject, bindings, inner)
     wanted = native_type_named(pattern.name) or refuse_native("an in test for #{pattern.name}", node)
     refuse_native("an in test of #{with_article(tested.type)}", node) if tested.type in MaybeType
     matches = wanted == ["array"] ? (tested.type in ArrayType) : tested.type == wanted
-    IntermediateConstant.new(type: ["boolean"], value: matches)
+    IntermediateConstant.new(type: BooleanType.new, value: matches)
   # `nil` has no type of its own to be held as; what it is bound to, or
   # answered as, makes it a maybe that is not there (#505).
-  in NilNode then IntermediateConstant.new(type: ["nil"], value: nil)
+  in NilNode then IntermediateConstant.new(type: NilType.new, value: nil)
   in IdentifierNode(name:)
     found = bindings.assoc(name)
     refuse_native("an array that is never given an element, #{name}", node) if found.some? && type_at(found, 1) == EMPTY_ARRAY
-    return IntermediateConstant.new(type: ["nil"], value: nil) if found.some? && type_at(found, 1) == ["nil"]
+    return IntermediateConstant.new(type: NilType.new, value: nil) if found.some? && type_at(found, 1) == NilType.new
     # A name that may not be there, proved to be a struct, is opened and
     # read as that struct (#572): an `in` test found it there.
     if found.some? && (type_at(found, 1) in MaybeType(inner: StructType))
@@ -1127,8 +1127,8 @@ def lower_value(node, bindings, context)
     # `== nil` asks whether a value is there (#503).
     if %w[== !=].include?(operator) && ((left in NilNode) || (right in NilNode))
       asked = lower_value((left in NilNode) ? right : left, bindings, inner)
-      absent = IntermediateMethod.new(type: ["boolean"], receiver: asked, name: "nil?")
-      return operator == "==" ? absent : IntermediateNot.new(type: ["boolean"], value: absent)
+      absent = IntermediateMethod.new(type: BooleanType.new, receiver: asked, name: "nil?")
+      return operator == "==" ? absent : IntermediateNot.new(type: BooleanType.new, value: absent)
     end
     first = lower_value(left, bindings, inner)
     second = lower_value(right, bindings, inner)
@@ -1136,7 +1136,7 @@ def lower_value(node, bindings, context)
     # is read on the values. `==` and `!=` alone compare a maybe as it is.
     before = plain_of(first.type)
     after = plain_of(second.type)
-    return IntermediateConcat.new(type: ["string"], left: first, right: second) if operator == "+" && before == ["string"] && after == ["string"]
+    return IntermediateConcat.new(type: StringType.new, left: first, right: second) if operator == "+" && before == StringType.new && after == StringType.new
     # Two arrays of one type joined are a new array of it (#564). An
     # empty array written out takes the other side's type.
     if operator == "+" && (before in ArrayType) && (after in ArrayType)
@@ -1152,25 +1152,25 @@ def lower_value(node, bindings, context)
       end
     end
     if %w[/ %].include?(operator)
-      refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == ["integer"] && after == ["integer"]
-      return IntermediateDivision.new(type: ["integer"], operator: operator, left: first, right: second)
+      refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == IntegerType.new && after == IntegerType.new
+      return IntermediateDivision.new(type: IntegerType.new, operator: operator, left: first, right: second)
     end
     if %w[+ - *].include?(operator)
-      refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == ["integer"] && after == ["integer"]
-      return IntermediateArithmetic.new(type: ["integer"], operator: operator, left: first, right: second)
+      refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == IntegerType.new && after == IntegerType.new
+      return IntermediateArithmetic.new(type: IntegerType.new, operator: operator, left: first, right: second)
     end
     # `**` between Integers is the library's (#572), by the seed's rule.
-    if operator == "**" && before == ["integer"] && after == ["integer"]
+    if operator == "**" && before == IntegerType.new && after == IntegerType.new
       return library_call("**", opened_for(first, "**"), [opened_for(second, "**")], node)
     end
     refuse_native("the operator '#{operator}'", node) unless %w[< <= > >= == !=].include?(operator)
     refuse_native("'#{operator}' between #{with_article(first.type)} and #{with_article(second.type)}", node) unless before == after
-    refuse_native("'#{operator}' between Booleans", node) if before == ["boolean"] && !%w[== !=].include?(operator)
+    refuse_native("'#{operator}' between Booleans", node) if before == BooleanType.new && !%w[== !=].include?(operator)
     # Arrays and structs are equal or not, by what they hold (#579);
     # ordering them is unbuilt.
     refuse_native("'#{operator}' between arrays", node) if (before in ArrayType) && !%w[== !=].include?(operator)
     refuse_native("'#{operator}' between structs", node) if (before in StructType) && !%w[== !=].include?(operator)
-    IntermediateComparison.new(type: ["boolean"], operator: operator, left: first, right: second)
+    IntermediateComparison.new(type: BooleanType.new, operator: operator, left: first, right: second)
   # `array[index]` (#503): the element, or nil past either end.
   in IndexNode(receiver:, index:)
     held = lower_value(receiver, bindings, inner)
@@ -1178,14 +1178,14 @@ def lower_value(node, bindings, context)
     # a String's character (#563).
     ranged = lower_ranged(node, held, bindings, inner)
     return ranged if ranged.some?
-    if plain_of(held.type) == ["string"]
+    if plain_of(held.type) == StringType.new
       place = lower_value(index, bindings, inner)
-      refuse_native("an index into a String by #{with_article(place.type)}", node) unless place.type == ["integer"]
+      refuse_native("an index into a String by #{with_article(place.type)}", node) unless place.type == IntegerType.new
       return library_call("[]", opened_for(held, "[]"), [place], node)
     end
     refuse_native("an index into #{with_article(held.type)}", node) unless held.type in ArrayType
     position = lower_value(index, bindings, inner)
-    refuse_native("an index that is #{with_article(position.type)}", node) unless position.type == ["integer"]
+    refuse_native("an index that is #{with_article(position.type)}", node) unless position.type == IntegerType.new
     IntermediateIndex.new(type: MaybeType.new(inner: held.type.element), array: held, index: position)
   in CallNode(name:, arguments:)
     # `inspect(value)` (#501), where the program has no def of that name.
@@ -1208,16 +1208,16 @@ def lower_value(node, bindings, context)
     # is none. The fallback is a value of the same type, or another maybe.
     # A name that is nil in this combination gives way to the right side
     # (#572), as a maybe that is not there does.
-    return lower_value(right, bindings, inner) if operator == "||" && first.type == ["nil"]
+    return lower_value(right, bindings, inner) if operator == "||" && first.type == NilType.new
     # And one that holds a value in this combination is that value: the
     # right side is never reached.
-    return first if operator == "||" && first.type != ["boolean"] && native_value?(first.type)
+    return first if operator == "||" && first.type != BooleanType.new && native_value?(first.type)
     if operator == "||" && (first.type in MaybeType)
       # `maybe or panic "…"`: the right side stops the program, so the
       # whole is the value (#534).
       if (right in CallNode) && right.name == "panic" && right.arguments.length == 1 && right.block.nil?
         message = lower_value(right.arguments[0], bindings, inner)
-        refuse_native("panic of #{with_article(message.type)}", right) unless message.type == ["string"]
+        refuse_native("panic of #{with_article(message.type)}", right) unless message.type == StringType.new
         plain = first.type.inner
         return IntermediateDefault.new(type: plain, value: first, fallback: IntermediateStop.new(type: plain, message: message))
       end
@@ -1230,17 +1230,17 @@ def lower_value(node, bindings, context)
       refuse_native("'||' between #{with_article(first.type)} and #{with_article(fallback.type)}", node) unless fits
       return IntermediateDefault.new(type: fallback.type, value: first, fallback: fallback)
     end
-    refuse_native("a condition that is #{with_article(first.type)}", left) unless first.type == ["boolean"]
+    refuse_native("a condition that is #{with_article(first.type)}", left) unless first.type == BooleanType.new
     # The right of an `&&` is read with what the left proved (#572).
     proof = shape_narrowings(left, bindings + inner.answers)
     second = lower_condition(right, narrowed_bindings(bindings, operator == "&&" ? when_true(proof) : when_false(proof)), inner)
-    IntermediateLogical.new(type: ["boolean"], operator: operator, left: first, right: second)
+    IntermediateLogical.new(type: BooleanType.new, operator: operator, left: first, right: second)
   in UnaryNode(operator: "-", operand:)
     negated = lower_value(operand, bindings, inner)
-    refuse_native("'-' before #{with_article(negated.type)}", node) unless negated.type == ["integer"]
-    IntermediateNegation.new(type: ["integer"], value: negated)
+    refuse_native("'-' before #{with_article(negated.type)}", node) unless negated.type == IntegerType.new
+    IntermediateNegation.new(type: IntegerType.new, value: negated)
   in UnaryNode(operator: "!", operand:)
-    IntermediateNot.new(type: ["boolean"], value: lower_condition(operand, bindings, inner))
+    IntermediateNot.new(type: BooleanType.new, value: lower_condition(operand, bindings, inner))
   # `to_s`, which is what interpolation asks of each piece.
   in MethodCallNode(receiver:, name: "to_s", arguments: [], block: nil)
     written_out(lower_value(receiver, bindings, inner), node)
@@ -1263,20 +1263,20 @@ def lower_value(node, bindings, context)
   in MethodCallNode(receiver:, name: "times", arguments: [], block:)
     refuse_native("times without a block", node) if block.nil?
     counted = lower_value(receiver, bindings, inner)
-    refuse_native("a call with a dot, .times, on #{with_article(counted.type)}", node) unless counted.type == ["integer"]
+    refuse_native("a call with a dot, .times, on #{with_article(counted.type)}", node) unless counted.type == IntegerType.new
     leaves = native_block_leaves?(block, bindings + yielding_answers(context.answers, context.yielding))
     refuse_leaving_inside(block, leaves, context.root, node)
-    handed = PinnedBlock.new(parameters: (block.parameters.empty? ? [] : [["integer"]]), answer: NOTHING, reason: nil, leaves: leaves)
-    IntermediateCount.new(type: ["integer"], count: counted, block: lower_block(block, handed, bindings, inner))
+    handed = PinnedBlock.new(parameters: (block.parameters.empty? ? [] : [IntegerType.new]), answer: NOTHING, reason: nil, leaves: leaves)
+    IntermediateCount.new(type: IntegerType.new, count: counted, block: lower_block(block, handed, bindings, inner))
   in MethodCallNode(receiver:, name:, arguments: [], block: nil)
     asked = lower_value(receiver, bindings, inner)
     # Asked of nil itself, whether a value is there is known as written.
-    return IntermediateConstant.new(type: ["boolean"], value: name == "nil?") if asked.type == ["nil"] && %w[nil? some?].include?(name)
-    refuse_native("a call with a dot, .#{name}, on nil", node) if asked.type == ["nil"]
+    return IntermediateConstant.new(type: BooleanType.new, value: name == "nil?") if asked.type == NilType.new && %w[nil? some?].include?(name)
+    refuse_native("a call with a dot, .#{name}, on nil", node) if asked.type == NilType.new
     # Whether a value is there, asked of anything (#503).
-    return IntermediateMethod.new(type: ["boolean"], receiver: asked, name: name) if %w[nil? some?].include?(name)
+    return IntermediateMethod.new(type: BooleanType.new, receiver: asked, name: name) if %w[nil? some?].include?(name)
     if (asked.type in ArrayType) && %w[first last].include?(name)
-      position = IntermediateConstant.new(type: ["integer"], value: name == "first" ? 0 : -1)
+      position = IntermediateConstant.new(type: IntegerType.new, value: name == "first" ? 0 : -1)
       return IntermediateIndex.new(type: MaybeType.new(inner: asked.type.element), array: asked, index: position)
     end
     # A struct's field is read by its name (#532), a maybe opened for it.
@@ -1318,7 +1318,7 @@ def lower_value(node, bindings, context)
       stopping = panics?(taken) ? taken[0] : other[0]
       refuse_native("panic of anything but one message", stopping) unless stopping.arguments.length == 1 && stopping.block.nil?
       message = lower_value(stopping.arguments[0], bindings, inner)
-      refuse_native("panic of #{with_article(message.type)}", stopping) unless message.type == ["string"]
+      refuse_native("panic of #{with_article(message.type)}", stopping) unless message.type == StringType.new
       staying = panics?(taken) ? (other[0] or nil_node(line: node.line)) : taken[0]
       value = lower_value(staying, narrowed_bindings(bindings, panics?(taken) ? when_false(proof) : when_true(proof)), inner)
       stop = IntermediateStop.new(type: value.type, message: message)
@@ -1326,7 +1326,7 @@ def lower_value(node, bindings, context)
     end
     first = lower_value(taken[0], narrowed_bindings(bindings, when_true(proof)), inner)
     # A missing `else` answers nil (ADR 0012).
-    second = other.empty? ? IntermediateConstant.new(type: ["nil"], value: nil) : lower_value(other[0], narrowed_bindings(bindings, when_false(proof)), inner)
+    second = other.empty? ? IntermediateConstant.new(type: NilType.new, value: nil) : lower_value(other[0], narrowed_bindings(bindings, when_false(proof)), inner)
     type = joined_type(first.type, second.type) or refuse_native("an if whose arms are #{with_article(first.type)} and #{with_article(second.type)}", node)
     IntermediateChoice.new(type: type, condition: lower_condition(condition, bindings, inner), then_value: (fitted(first, type) or first), else_value: (fitted(second, type) or second))
   else
@@ -1378,15 +1378,15 @@ end
 
 def native_method_answer(type, name)
   case type
-  in ["integer"]
-    return ["integer"] if %w[abs succ next pred].include?(name)
-    return ["boolean"] if %w[even? odd? zero? positive? negative?].include?(name)
-  in ["string"]
-    return ["integer"] if %w[length size].include?(name)
-    return ["boolean"] if name == "empty?"
+  in IntegerType
+    return IntegerType.new if %w[abs succ next pred].include?(name)
+    return BooleanType.new if %w[even? odd? zero? positive? negative?].include?(name)
+  in StringType
+    return IntegerType.new if %w[length size].include?(name)
+    return BooleanType.new if name == "empty?"
   in ArrayType
-    return ["integer"] if %w[length size].include?(name)
-    return ["boolean"] if name == "empty?"
+    return IntegerType.new if %w[length size].include?(name)
+    return BooleanType.new if name == "empty?"
   else
     return nil
   end
@@ -1425,15 +1425,15 @@ end
 def native_type_named(name)
   case name
   when "Array" then ["array"]
-  when "Boolean" then ["boolean"]
-  when "Integer" then ["integer"]
-  when "String" then ["string"]
+  when "Boolean" then BooleanType.new
+  when "Integer" then IntegerType.new
+  when "String" then StringType.new
   else nil
   end
 end
 
 def native_value?(type)
-  return true if type == ["integer"] || type == ["boolean"] || type == ["string"]
+  return true if type == IntegerType.new || type == BooleanType.new || type == StringType.new
   return true if type in StructType
   (type in ArrayType) && native_value?(type.element)
 end
@@ -1447,7 +1447,7 @@ end
 # The locals that are given a place: every one but a name bound only to
 # nil, which is nil wherever it is read (#572), and a proof bound beside
 # a name, which is no local.
-def placed_locals(bindings) = bindings.reject { type_at(it, 1) == ["nil"] || proved_key?(it[0]) }
+def placed_locals(bindings) = bindings.reject { type_at(it, 1) == NilType.new || proved_key?(it[0]) }
 
 # A type with a maybe opened: what an operation that needs the value
 # works on.
@@ -1522,7 +1522,7 @@ end
 
 def render_value(value)
   case value
-  in IntermediateConstant(type: ["string"], value: text) then inspect(text)
+  in IntermediateConstant(type: StringType, value: text) then inspect(text)
   in IntermediateConstant(value: nil) then "nil"
   in IntermediateConstant(value: literal) then literal.to_s
   in IntermediateLocal(name:) then name
@@ -1598,7 +1598,7 @@ end
 def struct_fields(made, context)
   made.fields.map do |field|
     settled = context.answers.assoc(field_key(made.name, field))
-    [field, settled.nil? ? ["unknown"] : type_at(settled, 1)]
+    [field, settled.nil? ? UnknownType.new : type_at(settled, 1)]
   end
 end
 
@@ -1607,14 +1607,14 @@ end
 def written_out(value, node)
   # A maybe is opened first, and nil refuses as the seed's `to_s` does.
   return written_out(IntermediateOpen.new(type: value.type.inner, value: value, name: "to_s"), node) if value.type in MaybeType
-  return value if value.type == ["string"]
+  return value if value.type == StringType.new
   # A name that is nil in this combination of its def's types refuses
   # when the line runs, in the seed's words, and builds: the line may
   # stand behind a guard that never lets it run (#572).
-  if value.type == ["nil"]
-    return IntermediateStop.new(type: ["string"], message: IntermediateConstant.new(type: ["string"], value: "nil has no method 'to_s' — handle the nil case first"))
+  if value.type == NilType.new
+    return IntermediateStop.new(type: StringType.new, message: IntermediateConstant.new(type: StringType.new, value: "nil has no method 'to_s' — handle the nil case first"))
   end
-  writable = value.type == ["integer"] || value.type == ["boolean"] || (value.type in ArrayType) || (value.type in StructType)
+  writable = value.type == IntegerType.new || value.type == BooleanType.new || (value.type in ArrayType) || (value.type in StructType)
   refuse_native("writing out #{with_article(value.type)}", node) unless writable
-  IntermediateText.new(type: ["string"], value: value)
+  IntermediateText.new(type: StringType.new, value: value)
 end

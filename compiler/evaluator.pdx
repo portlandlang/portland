@@ -171,7 +171,7 @@ def binary_search(values, count, ranged, block, entry, mutable scope)
         found = middle if verdict == 0
         verdict < 0
       else
-        panic("wrong argument type #{type_at(builtin_type_of(verdict), 0).capitalize} (must be numeric, true, false or nil)")
+        panic("wrong argument type #{kind_word(builtin_type_of(verdict)).capitalize} (must be numeric, true, false or nil)")
       end
       if smaller
         high = middle
@@ -324,21 +324,21 @@ end
 # does not cover — a struct, a symbol's tagged array, a range or float the
 # host patterns cannot name yet — which declines both checks below.
 def builtin_type_of(value)
-  return ["string"] if value in String
-  return ["integer"] if value in Integer
-  return ["float"] if value in Float
-  return ["boolean"] if value in Boolean
-  return HashType.new(key: ["unknown"], value: ["unknown"]) if value in Hash
-  return ArrayType.new(element: ["unknown"]) if plain_array?(value)
-  return ["random"] if value in Random
-  return ["regexp"] if value in Regexp
-  return ["matchdata"] if value in MatchData
-  return ["set"] if value in ["__set__", *]
+  return StringType.new if value in String
+  return IntegerType.new if value in Integer
+  return FloatType.new if value in Float
+  return BooleanType.new if value in Boolean
+  return HashType.new(key: UnknownType.new, value: UnknownType.new) if value in Hash
+  return ArrayType.new(element: UnknownType.new) if plain_array?(value)
+  return RandomType.new if value in Random
+  return RegexpType.new if value in Regexp
+  return MatchDataType.new if value in MatchData
+  return SetType.new if value in ["__set__", *]
   # A range has a row in the table too, so a wrong count on one refuses
   # here as it does on the seed, and is never dropped (#332).
-  return RangeType.new(element: ["unknown"]) if value in Range
-  return ["rational"] if value in Rational
-  return ["complex"] if value in Complex
+  return RangeType.new(element: UnknownType.new) if value in Range
+  return RationalType.new if value in Rational
+  return ComplexType.new if value in Complex
   nil
 end
 
@@ -883,7 +883,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         answer = slot_value(step.value)
         unless plain_array?(answer)
           kind = builtin_type_of(answer)
-          label = kind.nil? ? value_at(answer, 1) : type_at(kind, 0).capitalize
+          label = kind.nil? ? value_at(answer, 1) : kind_word(kind).capitalize
           panic("wrong element type #{label} (expected array)")
         end
         panic("element has wrong array length (expected 2, was #{answer.length})") unless answer.length == 2
@@ -2036,7 +2036,7 @@ def evaluate_call(node, mutable bindings)
     panic("too few arguments") if arguments.empty?
     template = value_at(arguments, 0)
     unless template in String
-      shown = template.nil? ? "nil" : type_at(builtin_type_of(template), 0).capitalize
+      shown = template.nil? ? "nil" : kind_word(builtin_type_of(template)).capitalize
       panic("no implicit conversion of #{shown} into String")
     end
     mutable rest = []
@@ -2095,7 +2095,7 @@ def evaluate_call(node, mutable bindings)
     panic("too few arguments") if arguments.empty?
     template = value_at(arguments, 0)
     unless template in String
-      shown = template.nil? ? "nil" : type_at(builtin_type_of(template), 0).capitalize
+      shown = template.nil? ? "nil" : kind_word(builtin_type_of(template)).capitalize
       panic("no implicit conversion of #{shown} into String")
     end
     # Gathered by hand rather than sliced: a slice lifts a stored nil to
@@ -3740,7 +3740,7 @@ def format_type_name(value)
   type = builtin_type_of(value)
   return "Object" if type.nil?
   return "MatchData" if value in MatchData
-  type_at(type, 0).capitalize
+  kind_word(type).capitalize
 end
 
 # The call depth of the frame these bindings belong to. Rides the bindings
@@ -4737,7 +4737,7 @@ end
 def product_of(elements, others)
   mutable combined = elements.map { [it] }
   others.each do |other|
-    panic("no implicit conversion of #{type_at(builtin_type_of(other), 0).capitalize} into Array") unless plain_array?(other)
+    panic("no implicit conversion of #{kind_word(builtin_type_of(other)).capitalize} into Array") unless plain_array?(other)
     combined = combined.flat_map { |prefix| other.map { |choice| prefix + [choice] } }
   end
   combined
@@ -4877,7 +4877,7 @@ def refuse_missing_builtin(receiver, name)
   # A removed Ruby method names its rewrite (#135).
   retired = retired_sentence(name)
   panic(retired) unless retired.nil?
-  runtime_name = type_at(type, 0).capitalize
+  runtime_name = kind_word(type).capitalize
   panic("#{shorten(render_inspect(receiver))} is #{article(runtime_name)} #{runtime_name}, which has no method #{spelled(name)}")
 end
 

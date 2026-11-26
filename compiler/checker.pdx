@@ -166,7 +166,7 @@ def agreed_parameters(node, calls, declarations)
       seen << passed unless passed.nil? || seen.include?(passed)
     end
     next if disqualified || seen.length != 1
-    agreed = seen.first or ["unknown"]
+    agreed = seen.first or UnknownType.new
     next unless known?(agreed)
     pairs << [parameter.name, agreed]
   end
@@ -180,7 +180,7 @@ end
 def answers_demand?(type, methods, demand)
   return methods.include?(demand.slice(1, demand.length - 1)) if demand.start_with?(".")
   return true if demand == "==" || demand == "!="
-  return (type == ["string"]) || (type in ArrayType) || (type in HashType) if demand == "[]"
+  return (type == StringType.new) || (type in ArrayType) || (type in HashType) if demand == "[]"
   !(type in StructType)
 end
 
@@ -351,7 +351,7 @@ def calls_in_node(node, locals, globals, mutable found)
       end
     end
     found << [name, positional, keywords]
-    calls_in_block(node, ["unknown"], locals, globals, found)
+    calls_in_block(node, UnknownType.new, locals, globals, found)
   # A def with no arguments handed is called by its bare name, which
   # parses as a name and not as a call (#585). A local of that name is
   # the local, and only a name the file can see declared is counted.
@@ -457,7 +457,7 @@ end
 # question is silence.
 def check_boolean_coverage(node, scope, found)
   subject = synthesize(node.subject, known_types(scope))
-  return found unless subject == ["boolean"]
+  return found unless subject == BooleanType.new
   left_out = uncovered_booleans(unguarded_arms(node).map { it.pattern })
   return found if left_out.nil? || left_out.empty?
   noted(found, ["coverage", left_out.join(", ")], locate(node, scope))
@@ -491,7 +491,7 @@ def check_call(node, scope, mutable found)
   found = check_body(node.arguments, scope, found)
   found = check_arity(node, scope, found)
   found = check_contracts(node, scope, found)
-  check_block(node, ["unknown"], scope, found)
+  check_block(node, UnknownType.new, scope, found)
 end
 
 def check_case(node, scope, mutable found)
@@ -571,7 +571,7 @@ end
 def check_condition(construct, node, scope, found)
   condition = node.condition
   type = synthesize(condition, known_types(scope))
-  return found if type == ["boolean"]
+  return found if type == BooleanType.new
   return found unless known?(type)
   noted(found, ["condition", construct, type, spell_node(condition)], locate(node, scope))
 end
@@ -708,7 +708,7 @@ def check_maybe_coverage(node, scope, mutable found)
   # A present Boolean is true or false, so arms that take both between
   # them cover the present case, and arms that provably take one leave
   # the other, named.
-  left_out = if inner == ["boolean"] then uncovered_booleans(patterns) else nil end
+  left_out = if inner == BooleanType.new then uncovered_booleans(patterns) else nil end
   return found if left_out in []
   return noted(found, ["coverage", left_out.first], locate(node, scope)) if left_out.some? && left_out.length == 1
   noted(found, ["coverage", "the present case"], locate(node, scope))
@@ -876,19 +876,19 @@ def check_operands(node, scope, mutable found)
   left = synthesize(node.left, types)
   right = synthesize(node.right, types)
   if node.operator == "&&"
-    found = noted(found, ["operand", "&&", left], locate(node, scope)) if known?(left) && left != ["boolean"]
-    found = noted(found, ["operand", "&&", right], locate(node, scope)) if known?(right) && right != ["boolean"]
+    found = noted(found, ["operand", "&&", left], locate(node, scope)) if known?(left) && left != BooleanType.new
+    found = noted(found, ["operand", "&&", right], locate(node, scope)) if known?(right) && right != BooleanType.new
   end
   return found unless node.operator == "||"
-  if left == ["boolean"]
-    found = noted(found, ["operand", "||", right], locate(node, scope)) if known?(right) && right != ["boolean"]
+  if left == BooleanType.new
+    found = noted(found, ["operand", "||", right], locate(node, scope)) if known?(right) && right != BooleanType.new
     return found
   end
   return found unless known?(left)
   spelling = spell_node(node.left)
   return found if spelling.nil?
-  return noted(found, ["boolean_maybe_or", spelling], locate(node, scope)) if left == MaybeType.new(inner: ["boolean"])
-  return found if (left in MaybeType) || left == ["nil"]
+  return noted(found, ["boolean_maybe_or", spelling], locate(node, scope)) if left == MaybeType.new(inner: BooleanType.new)
+  return found if (left in MaybeType) || left == NilType.new
   noted(found, ["dead_or", spelling, left], locate(node, scope))
 end
 
@@ -908,7 +908,7 @@ def check_operator(node, scope, found)
   return found if operator_takes?(node.operator, left, right)
   # `"%d" % x` is Ruby's formatting operator; here formatting is a function
   # (ADR 0067), and the refusal names it, as the seed's does.
-  return noted(found, ["string_percent"], locate(node, scope)) if node.operator == "%" && left == ["string"]
+  return noted(found, ["string_percent"], locate(node, scope)) if node.operator == "%" && left == StringType.new
   noted(found, ["operator", node.operator, left, right], locate(node, scope))
 end
 
@@ -1241,7 +1241,7 @@ end
 def check_unary(node, scope, found)
   operand = synthesize(node.operand, known_types(scope))
   return found unless plain_value?(operand)
-  return found if node.operator == "!" && operand == ["boolean"]
+  return found if node.operator == "!" && operand == BooleanType.new
   return found if (node.operator == "-" || node.operator == "+") && numeric?(operand)
   return found unless node.operator == "!" || node.operator == "-" || node.operator == "+"
   noted(found, ["unary", node.operator, operand], locate(node, scope))
@@ -1596,7 +1596,7 @@ end
 # would have to render as Unknown.
 def known?(type)
   case type
-  in ["unknown"] then false
+  in UnknownType then false
   in ArrayType(element:) then known?(element)
   in HashType(key:, value: entry) then known?(key) && known?(entry)
   in MaybeType(inner:) then known?(inner)
@@ -1666,29 +1666,29 @@ def operator_takes?(operator, left, right)
     # both sides are real; the other three floors order.
     return true if real_numeric?(left) && real_numeric?(right)
     return true if operator == "<=>" && numeric?(left) && numeric?(right)
-    return true if left == ["string"] && right == ["string"]
+    return true if left == StringType.new && right == StringType.new
     # Symbols order by their names (#105).
-    return true if left == ["symbol"] && right == ["symbol"]
+    return true if left == SymbolType.new && right == SymbolType.new
     # Hashes compare as sets of pairs (#105), under everything but `<=>`.
     return true if operator != "<=>" && (left in HashType) && (right in HashType)
     # Sets order by the subset relations (ADR 0082).
-    return true if left == ["set"] && right == ["set"]
+    return true if left == SetType.new && right == SetType.new
     # Arrays order element by element, under `<=>` alone.
     operator == "<=>" && (left in ArrayType) && (right in ArrayType)
   when "+"
     return true if numeric?(left) && numeric?(right)
-    return true if left == ["string"] && right == ["string"]
+    return true if left == StringType.new && right == StringType.new
     # A set's union and difference take any enumerable (ADR 0082).
-    return true if left == ["set"] && set_operand_type?(right)
+    return true if left == SetType.new && set_operand_type?(right)
     (left in ArrayType) && (right in ArrayType)
   when "*"
     return true if numeric?(left) && numeric?(right)
-    return true if left == ["string"] && right == ["integer"]
-    (left in ArrayType) && right == ["integer"]
+    return true if left == StringType.new && right == IntegerType.new
+    (left in ArrayType) && right == IntegerType.new
   # An array less another is the elements the other lacks (#104).
   when "-"
     return true if numeric?(left) && numeric?(right)
-    return true if left == ["set"] && set_operand_type?(right)
+    return true if left == SetType.new && set_operand_type?(right)
     (left in ArrayType) && (right in ArrayType)
   when "/", "%", "**" then numeric?(left) && numeric?(right)
   else
@@ -1701,7 +1701,7 @@ end
 # symbols, two arrays.
 def orderable_pair_types?(left, right)
   return true if numeric?(left) && numeric?(right)
-  return true if left == right && (left == ["string"] || left == ["symbol"])
+  return true if left == right && (left == StringType.new || left == SymbolType.new)
   (left in ArrayType) && (right in ArrayType)
 end
 
@@ -1823,7 +1823,7 @@ end
 
 # The types a set's algebra takes on the right (ADR 0082): a set, an array,
 # a range, or a hash.
-def set_operand_type?(type) = type == ["set"] || (type in RangeType) || (type in ArrayType) || (type in HashType)
+def set_operand_type?(type) = type == SetType.new || (type in RangeType) || (type in ArrayType) || (type in HashType)
 
 def shape_methods(declaration, traits)
   mutable methods = %w[each each_pair eql? failure? filter length members nil? select size some? to_a to_h to_s values with] + declaration.fields

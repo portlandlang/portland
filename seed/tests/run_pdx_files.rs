@@ -2192,6 +2192,19 @@ fn a_case_in_on_a_parameter_narrows_its_contract() {
     );
 }
 
+/// An `in` test of a parameter narrows its contract as a `case/in` does
+/// (#593): what an `if` asks of the name where the test holds, and what a
+/// body asks below a guard that leaves where it does not, is asked of a
+/// value the test matched, and not of every value the def is handed.
+#[test]
+fn an_in_test_of_a_parameter_narrows_its_contract() {
+    assert_both_print(
+        "narrowed_by_in.pdx",
+        "struct Box\n  width\nend\n\nstruct Tag\nend\n\ndef width_of(value)\n  if value in Box\n    return value.width\n  end\n  0\nend\n\ndef doubled(value) = (value in Box) ? value.width * 2 : 0\n\ndef guarded(value)\n  return 0 unless value in Box\n  value.width + 1\nend\n\nputs width_of(Box.new(width: 3))\nputs width_of(Tag.new)\nputs doubled(Box.new(width: 3))\nputs doubled(Tag.new)\nputs guarded(Box.new(width: 3))\nputs guarded(Tag.new)\n",
+        "3\n0\n6\n0\n4\n0\n",
+    );
+}
+
 /// The core is carried in the binary (ADR 0093, #436): every file under
 /// `core/` answers `System.core_source` with its own text, on the seed and
 /// hosted, and a name the binary does not hold refuses on both.
@@ -6241,20 +6254,20 @@ fn portland_refusals_render_the_house_voice() {
         &driver,
         format!(
             "require_relative \"{library}\"\n\
-             puts render_refusal([\"condition\", \"if\", [\"string\"], \"name\"])\n\
+             puts render_refusal([\"condition\", \"if\", StringType.new, \"name\"])\n\
              puts render_refusal([\"condition\", \"if\", MaybeType.new(inner: StructType.new(name: \"User\")), \"user\"])\n\
-             puts render_refusal([\"condition\", \"if\", MaybeType.new(inner: [\"integer\"]), nil])\n\
-             puts render_refusal([\"condition\", \"while\", [\"integer\"], nil])\n\
-             puts render_refusal([\"operand\", \"&&\", [\"string\"]])\n\
+             puts render_refusal([\"condition\", \"if\", MaybeType.new(inner: IntegerType.new), nil])\n\
+             puts render_refusal([\"condition\", \"while\", IntegerType.new, nil])\n\
+             puts render_refusal([\"operand\", \"&&\", StringType.new])\n\
              puts render_refusal([\"no_method\", \"token\", StructType.new(name: \"Token\"), \"knd\"])\n\
-             puts render_refusal([\"no_method\", \"count\", [\"integer\"], \"knd\"])\n\
-             puts render_refusal([\"no_method\", \"\\\"Shane\\\"\", [\"string\"], \"knd\"])\n\
-             puts render_refusal([\"no_method\", \"\\\"Lorem ipsum dolor sit amet, consectetur adipiscing elit\\\"\", [\"string\"], \"knd\"])\n\
-             puts render_refusal([\"no_method\", \"orders.select.map.first.second.third.fourth.fifth\", [\"string\"], \"knd\"])\n\
-             puts render_refusal([\"unhandled_maybe\", \"users.first\", MaybeType.new(inner: [\"string\"]), \"upcase\"])\n\
-             puts render_refusal([\"operator\", \"+\", [\"string\"], [\"integer\"]])\n\
-             puts render_refusal([\"unary\", \"-\", [\"string\"]])\n\
-             puts render_refusal([\"annotation\", \"handle\", [\"integer\"], \"String\"])\n\
+             puts render_refusal([\"no_method\", \"count\", IntegerType.new, \"knd\"])\n\
+             puts render_refusal([\"no_method\", \"\\\"Shane\\\"\", StringType.new, \"knd\"])\n\
+             puts render_refusal([\"no_method\", \"\\\"Lorem ipsum dolor sit amet, consectetur adipiscing elit\\\"\", StringType.new, \"knd\"])\n\
+             puts render_refusal([\"no_method\", \"orders.select.map.first.second.third.fourth.fifth\", StringType.new, \"knd\"])\n\
+             puts render_refusal([\"unhandled_maybe\", \"users.first\", MaybeType.new(inner: StringType.new), \"upcase\"])\n\
+             puts render_refusal([\"operator\", \"+\", StringType.new, IntegerType.new])\n\
+             puts render_refusal([\"unary\", \"-\", StringType.new])\n\
+             puts render_refusal([\"annotation\", \"handle\", IntegerType.new, \"String\"])\n\
              puts render_refusal([\"arity\", \"greet\", \"1\", 0])\n\
              puts render_refusal([\"arity\", \"greet\", \"1 to 2\", 0])\n\
              puts render_refusal([\"coverage\", \"nil\"])\n\
