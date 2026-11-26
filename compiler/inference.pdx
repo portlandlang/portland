@@ -560,11 +560,13 @@ end
 # A struct or local wearing the name wins, as everywhere, so only an
 # unbound name is the type's.
 def builtin_type_function?(node, types)
-  return false unless node.receiver in IdentifierNode
-  return false unless %w[Array Complex Hash Integer JSON Math Random Range Regexp Set System].include?(node.receiver.name)
+  # The receiver as a local, so the `in` test proves it below (#607).
+  receiver = node.receiver
+  return false unless receiver in IdentifierNode
+  return false unless %w[Array Complex Hash Integer JSON Math Random Range Regexp Set System].include?(receiver.name)
   # Unbound, or bound to nothing but itself as a type value (ADR 0074).
-  answered = synthesize_name(node.receiver.name, types)
-  answered == UnknownType.new || answered == ClassType.new(name: node.receiver.name)
+  answered = synthesize_name(receiver.name, types)
+  answered == UnknownType.new || answered == ClassType.new(name: receiver.name)
 end
 
 def call_answer(receiver, node, types)
@@ -724,13 +726,23 @@ def case_in_as_if(node)
   message = binary_node("+", binary_node("+", string_node("no pattern matched ", line: node.line), shown, line: node.line), string_node(" — add an in branch or an else", line: node.line), line: node.line)
   mutable rest = (node.else_body or [call_node("panic", [message], line: node.line)])
   node.branches.reverse.each do |branch|
-    named = struct_pattern_node(branch.pattern.name, [], line: branch.line)
-    test = match_test_node(node.subject, named, line: branch.line)
-    bound = branch.pattern.fields.map do |field|
-      read = method_call_node(node.subject, field.label, [], nil, line: branch.line)
-      assignment_node(field.pattern.name, read, line: branch.line)
+    # Every arm's pattern is a struct's, as `struct_arm?` held; said here,
+    # it is read as one (#607).
+    pattern = branch.pattern
+    if pattern in StructPatternNode
+      named = struct_pattern_node(pattern.name, [], line: branch.line)
+      test = match_test_node(node.subject, named, line: branch.line)
+      mutable bound = []
+      pattern.fields.each do |field|
+        # Each field is bound to a name, as `struct_arm?` held.
+        taken = field.pattern
+        if taken in IdentifierNode
+          read = method_call_node(node.subject, field.label, [], nil, line: branch.line)
+          bound << assignment_node(taken.name, read, line: branch.line)
+        end
+      end
+      rest = [if_node(test, bound + branch.body, rest, line: branch.line)]
     end
-    rest = [if_node(test, bound + branch.body, rest, line: branch.line)]
   end
   rest.first
 end
@@ -1190,8 +1202,10 @@ def maybe_inner(name, types)
 end
 
 def maybe_of(type)
-  return type if (type in MaybeType) || type == NilType.new || type == UnknownType.new
-  MaybeType.new(inner: type)
+  # No type at all is one not known (#607).
+  plain = type or return UnknownType.new
+  return plain if (plain in MaybeType) || plain == NilType.new || plain == UnknownType.new
+  MaybeType.new(inner: plain)
 end
 
 # Agreement answers the type; a lone nil among agreeing others makes a
@@ -1586,8 +1600,11 @@ def render_type(type)
   in ArrayType(element:) then "[" + render_type(element) + "]"
   in HashType(key:, value: entry) then "{" + render_type(key) + " => " + render_type(entry) + "}"
   in MaybeType(inner:) then render_type(inner) + "?"
-  in StructType(name: "*") then "Struct"
-  in StructType(name:) then name
+  # One of several structs is `*` (#572). Said in the arm, not in its
+  # pattern, every arm here is a struct's with its fields bound to names,
+  # so the native build passes over an arm for a struct a program never
+  # makes, whose fields it has no type for (#607).
+  in StructType(name:) then name == "*" ? "Struct" : name
   in ClassType(name:) then name
   in EnumType(name:) then name
   in ModuleType(name:) then name
@@ -1708,15 +1725,33 @@ end
 # over.
 def settled_arm(node, types)
   test = node.condition
-  return nil unless (test in MatchTestNode) && (test.subject in IdentifierNode) && (test.pattern in StructPatternNode) && test.pattern.fields.empty?
-  held = synthesize_name(test.subject.name, types)
+  return nil unless test in MatchTestNode
+  # The subject and the pattern as locals, so what an `in` test proves of
+  # each holds below it (#607).
+  subject = test.subject
+  pattern = test.pattern
+  return nil unless (subject in IdentifierNode) && (pattern in StructPatternNode) && pattern.fields.empty?
+  held = synthesize_name(subject.name, types)
   # Only of a struct the program declares: a builtin type's name is bound
   # nowhere, and its tests are the build's to settle elsewhere.
-  return nil unless binding_type(types, test.pattern.name) == ClassType.new(name: test.pattern.name)
+  return nil unless binding_type(types, pattern.name) == ClassType.new(name: pattern.name)
   # A struct the program never makes is one no value is.
-  return (node.else_body or []) if binding_type(types, made_key(test.pattern.name)).nil?
+  return (node.else_body or []) if binding_type(types, made_key(pattern.name)).nil?
   return nil unless (held in StructType) && held != ANY_STRUCT
-  held.name == test.pattern.name ? (node.then_body or []) : (node.else_body or [])
+  held.name == pattern.name ? (node.then_body or []) : (node.else_body or [])
+end
+
+# Whether a body ends in `panic` as the native build runs it (#607): by
+# its own last statement, or by an `if` there that settles to an arm that
+# does. A `case` whose last arms test for structs a program never makes
+# reads as such an `if`, settled to its `else`.
+def settled_panics?(body, types)
+  return true if panics?(body)
+  return false if body.nil? || body.empty?
+  last = body.last
+  return false unless last in IfNode
+  settled = settled_arm(last, types)
+  settled.some? && settled_panics?(settled, types)
 end
 
 # Whether a method answers a call (ADR 0093, #536), by its shape: [the
@@ -1772,12 +1807,16 @@ end
 # proof is bound beside the name and not in its place, and a read of the
 # name opens it.
 def shape_proof(node, types)
-  return no_proof unless (node.subject in IdentifierNode) && (node.pattern in StructPatternNode) && node.pattern.fields.empty?
-  held = synthesize_name(node.subject.name, types)
-  return no_proof unless synthesize_name(node.pattern.name, types) == ClassType.new(name: node.pattern.name)
-  return [bound_one(node.subject.name, StructType.new(name: node.pattern.name)), no_bindings] if held == ANY_STRUCT
+  # The subject and the pattern as locals, so what an `in` test proves of
+  # each holds below it (#607).
+  subject = node.subject
+  pattern = node.pattern
+  return no_proof unless (subject in IdentifierNode) && (pattern in StructPatternNode) && pattern.fields.empty?
+  held = synthesize_name(subject.name, types)
+  return no_proof unless synthesize_name(pattern.name, types) == ClassType.new(name: pattern.name)
+  return [bound_one(subject.name, StructType.new(name: pattern.name)), no_bindings] if held == ANY_STRUCT
   return no_proof unless native_reading?(types) && (held in MaybeType) && (held.inner in StructType)
-  [bound_one(proved_key(node.subject.name), StructType.new(name: node.pattern.name)), no_bindings]
+  [bound_one(proved_key(subject.name), StructType.new(name: pattern.name)), no_bindings]
 end
 
 # The type a field of this name has, read off a value that is one of
@@ -2231,8 +2270,8 @@ def synthesize_if(node, types)
   # Read as the native build runs it, an arm that ends in `panic`
   # answers nothing, so the `if` answers what the other arm does (#572).
   if native_reading?(types)
-    return no if panics?(node.then_body)
-    return yes if panics?(node.else_body)
+    return no if settled_panics?(node.then_body, types)
+    return yes if settled_panics?(node.else_body, types)
   end
   merged = merge_candidates([yes, no])
   # Read as the native build runs it, a value on one side and a maybe of
@@ -2295,9 +2334,11 @@ def synthesize_logical(node, types)
 end
 
 def synthesize_name(name, types)
-  found = binding_type(types, name)
+  # A name that is not there names nothing (#607).
+  named = name or return UnknownType.new
+  found = binding_type(types, named)
   # A builtin type's bare name is the type as a value (ADR 0074).
-  return ClassType.new(name: name) if found.nil? && %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(name)
+  return ClassType.new(name: named) if found.nil? && %w[Array Boolean Complex Float Hash Integer Random Range Rational Set String Symbol].include?(named)
   found or UnknownType.new
 end
 

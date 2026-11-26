@@ -3566,9 +3566,9 @@ end
 # name, or an ErrorNode. Wordings are the seed's.
 def parse_struct_alias(tokens, position, struct_name, fields, methods, type_functions)
   first = parse_alias_name(tokens, position)
-  return first if first in Step
+  return first unless first in NameStep
   second = parse_alias_name(tokens, first.position)
-  return second if second in Step
+  return second unless second in NameStep
   new_name = first.name
   old_name = second.name
   after = second.position
@@ -3751,9 +3751,9 @@ end
 # One trait-body alias: same desugar, the trait's own wordings.
 def parse_trait_alias(tokens, position, trait_name, methods)
   first = parse_alias_name(tokens, position)
-  return first if first in Step
+  return first unless first in NameStep
   second = parse_alias_name(tokens, first.position)
-  return second if second in Step
+  return second unless second in NameStep
   new_name = first.name
   old_name = second.name
   after = second.position
