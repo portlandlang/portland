@@ -724,13 +724,23 @@ def case_in_as_if(node)
   message = binary_node("+", binary_node("+", string_node("no pattern matched ", line: node.line), shown, line: node.line), string_node(" — add an in branch or an else", line: node.line), line: node.line)
   mutable rest = (node.else_body or [call_node("panic", [message], line: node.line)])
   node.branches.reverse.each do |branch|
-    named = struct_pattern_node(branch.pattern.name, [], line: branch.line)
-    test = match_test_node(node.subject, named, line: branch.line)
-    bound = branch.pattern.fields.map do |field|
-      read = method_call_node(node.subject, field.label, [], nil, line: branch.line)
-      assignment_node(field.pattern.name, read, line: branch.line)
+    # Every arm's pattern is a struct's, as `struct_arm?` held; said here,
+    # it is read as one (#607).
+    pattern = branch.pattern
+    if pattern in StructPatternNode
+      named = struct_pattern_node(pattern.name, [], line: branch.line)
+      test = match_test_node(node.subject, named, line: branch.line)
+      mutable bound = []
+      pattern.fields.each do |field|
+        # Each field is bound to a name, as `struct_arm?` held.
+        taken = field.pattern
+        if taken in IdentifierNode
+          read = method_call_node(node.subject, field.label, [], nil, line: branch.line)
+          bound << assignment_node(taken.name, read, line: branch.line)
+        end
+      end
+      rest = [if_node(test, bound + branch.body, rest, line: branch.line)]
     end
-    rest = [if_node(test, bound + branch.body, rest, line: branch.line)]
   end
   rest.first
 end
