@@ -221,6 +221,36 @@ pub unsafe extern "C" fn portland_hash_length(hash: *const HashBlock) -> i64 {
     unsafe { (*(*hash).keys).length }
 }
 
+/// The key at a place, held once: what the native core's walks over a
+/// Hash read its pairs by, from the first place to the last. No program
+/// names it, and the seed has none.
+///
+/// # Safety
+/// `hash` points at a live Hash, and `place` is one of its places.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_hash_key_at(hash: *const HashBlock, place: i64) -> i64 {
+    unsafe {
+        let key = elements_of((*hash).keys).add(place as usize).read();
+        hold_word(STRINGS, key, true);
+        key
+    }
+}
+
+/// The value at a place, held once, as `portland_hash_key_at` reads the
+/// key there.
+///
+/// # Safety
+/// `hash` points at a live Hash, and `place` is one of its places.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn portland_hash_value_at(hash: *const HashBlock, place: i64) -> i64 {
+    unsafe {
+        let values = (*hash).values;
+        let value = elements_of(values).add(place as usize).read();
+        hold_word((*values).kind, value, true);
+        value
+    }
+}
+
 /// One name fewer holds this Hash, and the last one frees it, with its
 /// two arrays.
 ///
