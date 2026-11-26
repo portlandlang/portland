@@ -957,7 +957,7 @@ def forget_types(locals, names)
   return locals if native_reading?(locals)
   mutable widened = locals
   names.each do |name|
-    next if locals.none? { it[0] == name }
+    next if binding_type(locals, name).nil?
     widened = with_bound(widened, name, UnknownType.new)
   end
   widened
@@ -1244,7 +1244,7 @@ end
 # or by yielding to a block that can.
 def native_block_leaves?(block, types)
   return true if block_breaks?(block.body) || block_returns?(block.body)
-  yields?(block.body) && types.any? { it[0] == YIELD_LEAVES }
+  yields?(block.body) && binding_type(types, YIELD_LEAVES).some?
 end
 
 # What a call to one of the program's defs answers under the native
