@@ -6242,11 +6242,11 @@ fn portland_refusals_render_the_house_voice() {
         format!(
             "require_relative \"{library}\"\n\
              puts render_refusal([\"condition\", \"if\", [\"string\"], \"name\"])\n\
-             puts render_refusal([\"condition\", \"if\", MaybeType.new(inner: [\"struct\", \"User\"]), \"user\"])\n\
+             puts render_refusal([\"condition\", \"if\", MaybeType.new(inner: StructType.new(name: \"User\")), \"user\"])\n\
              puts render_refusal([\"condition\", \"if\", MaybeType.new(inner: [\"integer\"]), nil])\n\
              puts render_refusal([\"condition\", \"while\", [\"integer\"], nil])\n\
              puts render_refusal([\"operand\", \"&&\", [\"string\"]])\n\
-             puts render_refusal([\"no_method\", \"token\", [\"struct\", \"Token\"], \"knd\"])\n\
+             puts render_refusal([\"no_method\", \"token\", StructType.new(name: \"Token\"), \"knd\"])\n\
              puts render_refusal([\"no_method\", \"count\", [\"integer\"], \"knd\"])\n\
              puts render_refusal([\"no_method\", \"\\\"Shane\\\"\", [\"string\"], \"knd\"])\n\
              puts render_refusal([\"no_method\", \"\\\"Lorem ipsum dolor sit amet, consectetur adipiscing elit\\\"\", [\"string\"], \"knd\"])\n\
@@ -6259,8 +6259,8 @@ fn portland_refusals_render_the_house_voice() {
              puts render_refusal([\"arity\", \"greet\", \"1 to 2\", 0])\n\
              puts render_refusal([\"coverage\", \"nil\"])\n\
              puts render_refusal([\"coverage\", \"the present case\"])\n\
-             puts render_refusal([\"contract\", \"token\", [\"struct\", \"Token\"], \"greet\", [\"demands\", [\".upcase\", \"+\"]]])\n\
-             puts render_refusal([\"contract\", \"box\", [\"struct\", \"Box\"], \"show\", [\"trait\", \"Describable\"]])\n\
+             puts render_refusal([\"contract\", \"token\", StructType.new(name: \"Token\"), \"greet\", [\"demands\", [\".upcase\", \"+\"]]])\n\
+             puts render_refusal([\"contract\", \"box\", StructType.new(name: \"Box\"), \"show\", [\"trait\", \"Describable\"]])\n\
              puts render_refusal([\"alias\", \"to_int\", \"to_i\"])\n\
              puts render_location([12, \"puts name.knd\"])\n\
              puts render_report([[[\"coverage\", \"nil\"], [3, \"case top\", nil]], [[\"arity\", \"greet\", \"1\", 0], nil]])\n\

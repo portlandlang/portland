@@ -5535,7 +5535,7 @@ def struct_field(instance, field)
   end
   retired = retired_sentence(field)
   panic(retired) unless retired.nil?
-  panic("#{shorten(render_inspect(instance))} is #{a_type(["struct", value_at(instance, 1)])}, which has no method #{spelled(field)}")
+  panic("#{shorten(render_inspect(instance))} is #{a_type(StructType.new(name: value_at(instance, 1)))}, which has no method #{spelled(field)}")
 end
 
 def struct_has_field?(instance, field)

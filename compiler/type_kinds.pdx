@@ -20,3 +20,9 @@ end
 struct MaybeType
   inner
 end
+
+# An instance of one of the program's structs, by the struct's name, or
+# of whichever of them it is, by `*` (#572).
+struct StructType
+  name
+end

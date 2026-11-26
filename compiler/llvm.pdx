@@ -287,7 +287,7 @@ def llvm_array_kind(type)
   in ["integer"] then 0
   in ["boolean"] then 1
   in ["string"] then 2
-  in ["struct", *] then 4
+  in StructType then 4
   else 3
   end
 end
@@ -417,7 +417,7 @@ end
 # array, or a maybe of either.
 def llvm_counted?(type)
   return llvm_counted?(type.inner) if type in MaybeType
-  type == ["string"] || (type in ArrayType) || (type in ["struct", *])
+  type == ["string"] || (type in ArrayType) || (type in StructType)
 end
 
 # A value that was handed over and is done with: released if it is
@@ -429,7 +429,7 @@ def llvm_drop(emitter, type, operand)
     return llvm_drop(held.emitter, type.inner, held.operand)
   end
   return llvm_line(emitter, "call void @portland_release(ptr #{operand})") if type == ["string"]
-  return llvm_line(emitter, "call void @portland_struct_release(ptr #{operand})") if type in ["struct", *]
+  return llvm_line(emitter, "call void @portland_struct_release(ptr #{operand})") if type in StructType
   llvm_line(emitter, "call void @portland_array_release(ptr #{operand})")
 end
 
@@ -730,7 +730,7 @@ def llvm_same(emitter, type, left, right)
   # runtime reads off the kind an array carries and the shape a struct
   # does.
   return llvm_named(emitter, "call zeroext i1 @portland_array_equal(ptr #{left}, ptr #{right})") if type in ArrayType
-  return llvm_named(emitter, "call zeroext i1 @portland_struct_equal(ptr #{left}, ptr #{right})") if type in ["struct", *]
+  return llvm_named(emitter, "call zeroext i1 @portland_struct_equal(ptr #{left}, ptr #{right})") if type in StructType
   llvm_named(emitter, "icmp eq #{llvm_type(type)} #{left}, #{right}")
 end
 
@@ -798,7 +798,7 @@ def llvm_source(emitter, type, operand)
     held = llvm_named(flag.emitter, "extractvalue #{llvm_type(type)} #{operand}, 1")
     written = llvm_source(held.emitter, type.inner, held.operand)
     llvm_named(written.emitter, "select i1 #{flag.operand}, ptr #{written.operand}, ptr null")
-  in ["struct", *] then llvm_named(emitter, "call ptr @portland_struct_to_string(ptr #{operand})")
+  in StructType then llvm_named(emitter, "call ptr @portland_struct_to_string(ptr #{operand})")
   else llvm_named(emitter, "call ptr @portland_array_to_string(ptr #{operand})")
   end
 end
@@ -926,7 +926,7 @@ def llvm_type(type)
   in ["boolean"] then "i1"
   in ["string"] then "ptr"
   in ArrayType then "ptr"
-  in ["struct", *] then "ptr"
+  in StructType then "ptr"
   in MaybeType then "{ i1, #{llvm_type(type.inner)} }"
   in ["nothing"] then "void"
   else panic("llvm.pdx: no machine type for #{render_type(type)}")
@@ -958,7 +958,7 @@ def llvm_value(emitter, value)
     written = llvm_value(emitter, shown)
     return llvm_named(written.emitter, "call ptr @portland_string_from_integer(i64 #{written.operand})") if shown.type == ["integer"]
     return llvm_named(written.emitter, "call ptr @portland_string_from_boolean(i1 zeroext #{written.operand})") if shown.type == ["boolean"]
-    writer = (shown.type in ["struct", *]) ? "portland_struct_to_string" : "portland_array_to_string"
+    writer = (shown.type in StructType) ? "portland_struct_to_string" : "portland_array_to_string"
     made = llvm_named(written.emitter, "call ptr @#{writer}(ptr #{written.operand})")
     LLVMValue.new(emitter: llvm_drop(made.emitter, shown.type, written.operand), operand: made.operand)
   in IntermediateInspect(value: shown)

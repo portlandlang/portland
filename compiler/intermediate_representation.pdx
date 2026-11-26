@@ -502,7 +502,7 @@ end
 # Whether a value of one type is held as another with nothing done to
 # it: the same type, or a struct held as one of several (#572).
 def held_as?(type, holding)
-  return true if type == holding || (holding == ANY_STRUCT && (type in ["struct", *]))
+  return true if type == holding || (holding == ANY_STRUCT && (type in StructType))
   (type in ArrayType) && (holding in ArrayType) && held_as?(type.element, holding.element)
 end
 
@@ -866,7 +866,7 @@ def lower_record(node, made, bindings, context)
     # there, and nil is one that is not (#553).
     fitted(written, type) or refuse_native("#{made.name}.#{field[0]} handed #{with_article(written.type)} where it is #{with_article(type)}", node)
   end
-  IntermediateRecord.new(type: ["struct", made.name], fields: values)
+  IntermediateRecord.new(type: StructType.new(name: made.name), fields: values)
 end
 
 def lower_statement(statement, bindings, context)
@@ -1030,7 +1030,7 @@ def lower_value(node, bindings, context)
   end
   # A value taken as the struct it was asked to be: held the same way,
   # and read as that struct.
-  return lower_value(node.value, bindings, context).with(type: ["struct", node.name]) if node in NarrowedNode
+  return lower_value(node.value, bindings, context).with(type: StructType.new(name: node.name)) if node in NarrowedNode
   # `%w[a b]` is the array of its words (#562).
   if node in WordArrayNode
     words = word_array_elements(node.text).map { string_node(it, line: node.line) }
@@ -1077,7 +1077,7 @@ def lower_value(node, bindings, context)
     named = inner.structs.find { it.name == pattern.name }
     if named.some?
       asked = lower_value(subject, bindings, inner)
-      refuse_native("an in test of #{with_article(asked.type)}", node) unless plain_of(asked.type) in ["struct", *]
+      refuse_native("an in test of #{with_article(asked.type)}", node) unless plain_of(asked.type) in StructType
       # A maybe is the struct named only where it is there.
       return IntermediateShaped.new(type: ["boolean"], value: asked, name: pattern.name) if asked.type == ANY_STRUCT || (asked.type in MaybeType)
       refuse_native("an in test of anything but a local", node) unless subject in IdentifierNode
@@ -1098,7 +1098,7 @@ def lower_value(node, bindings, context)
     return IntermediateConstant.new(type: ["nil"], value: nil) if found.some? && type_at(found, 1) == ["nil"]
     # A name that may not be there, proved to be a struct, is opened and
     # read as that struct (#572): an `in` test found it there.
-    if found.some? && (type_at(found, 1) in MaybeType(inner: ["struct", *]))
+    if found.some? && (type_at(found, 1) in MaybeType(inner: StructType))
       proved = bindings.assoc(proved_key(name))
       return IntermediateOpen.new(type: type_at(proved, 1), value: IntermediateLocal.new(type: type_at(found, 1), name: name), name: name) if proved.some?
     end
@@ -1169,7 +1169,7 @@ def lower_value(node, bindings, context)
     # Arrays and structs are equal or not, by what they hold (#579);
     # ordering them is unbuilt.
     refuse_native("'#{operator}' between arrays", node) if (before in ArrayType) && !%w[== !=].include?(operator)
-    refuse_native("'#{operator}' between structs", node) if (before in ["struct", *]) && !%w[== !=].include?(operator)
+    refuse_native("'#{operator}' between structs", node) if (before in StructType) && !%w[== !=].include?(operator)
     IntermediateComparison.new(type: ["boolean"], operator: operator, left: first, right: second)
   # `array[index]` (#503): the element, or nil past either end.
   in IndexNode(receiver:, index:)
@@ -1280,7 +1280,7 @@ def lower_value(node, bindings, context)
       return IntermediateIndex.new(type: MaybeType.new(inner: asked.type.element), array: asked, index: position)
     end
     # A struct's field is read by its name (#532), a maybe opened for it.
-    if plain_of(asked.type) in ["struct", *]
+    if plain_of(asked.type) in StructType
       made = context.structs.find { it.name == type_at(plain_of(asked.type), 1) }
       fields = made.nil? ? [] : struct_fields(made, context)
       place = fields.find_index { it[0] == name }
@@ -1340,9 +1340,9 @@ end
 # it is one that reads the same each time.
 def lower_with(node, bindings, context)
   asked = lower_value(node.receiver, bindings, context)
-  refuse_native("with asked of #{with_article(asked.type)}", node) unless asked.type in ["struct", *]
+  refuse_native("with asked of #{with_article(asked.type)}", node) unless asked.type in StructType
   refuse_native("with asked of more than a name or a field of one", node) unless steady_subject?(node.receiver)
-  made = context.structs.find { it.name == type_at(asked.type, 1) } or refuse_native("with asked of #{with_article(asked.type)}", node)
+  made = context.structs.find { it.name == asked.type.name } or refuse_native("with asked of #{with_article(asked.type)}", node)
   labelled = node.arguments.select { it in KeywordArgumentNode }
   refuse_native("#{made.name}.with handed a value without its field's name", node) unless labelled.length == node.arguments.length
   fields = struct_fields(made, context)
@@ -1434,7 +1434,7 @@ end
 
 def native_value?(type)
   return true if type == ["integer"] || type == ["boolean"] || type == ["string"]
-  return true if type in ["struct", *]
+  return true if type in StructType
   (type in ArrayType) && native_value?(type.element)
 end
 
@@ -1614,7 +1614,7 @@ def written_out(value, node)
   if value.type == ["nil"]
     return IntermediateStop.new(type: ["string"], message: IntermediateConstant.new(type: ["string"], value: "nil has no method 'to_s' — handle the nil case first"))
   end
-  writable = value.type == ["integer"] || value.type == ["boolean"] || (value.type in ArrayType) || (value.type in ["struct", *])
+  writable = value.type == ["integer"] || value.type == ["boolean"] || (value.type in ArrayType) || (value.type in StructType)
   refuse_native("writing out #{with_article(value.type)}", node) unless writable
   IntermediateText.new(type: ["string"], value: value)
 end

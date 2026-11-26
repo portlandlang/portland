@@ -820,9 +820,9 @@ def pin_expression(node, walk, answers, names)
   if (node in MethodCallNode) && node.name == "with"
     reading = current.bindings + answers
     asked = synthesize(node.receiver, reading)
-    if asked in ["struct", *]
+    if asked in StructType
       handed = node.arguments.select { it in KeywordArgumentNode }.map { [it.label, synthesize(it.value, reading)] }
-      current = current.with(calls: current.calls + [[MAKING, [type_at(asked, 1), handed], nil, false]])
+      current = current.with(calls: current.calls + [[MAKING, [asked.name, handed], nil, false]])
     end
   end
   if (node in CallNode) && names.include?(node.name)
@@ -1048,7 +1048,7 @@ def rebound(bindings, name, type)
   return [[name, type]] + bindings if found.nil?
   # What was proved of the name was proved of what it held (#572), and
   # goes when the name is bound again.
-  if (type_at(found, 1) in MaybeType(inner: ["struct", *])) && bindings.assoc(proved_key(name)).some?
+  if (type_at(found, 1) in MaybeType(inner: StructType)) && bindings.assoc(proved_key(name)).some?
     return rebound(bindings.reject { it[0] == proved_key(name) }, name, type)
   end
   return bindings if type_at(found, 1) == type

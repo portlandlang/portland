@@ -181,7 +181,7 @@ def answers_demand?(type, methods, demand)
   return methods.include?(demand.slice(1, demand.length - 1)) if demand.start_with?(".")
   return true if demand == "==" || demand == "!="
   return (type == ["string"]) || (type in ArrayType) || (type in ["hash", *]) if demand == "[]"
-  !(type in ["struct", *])
+  !(type in StructType)
 end
 
 # The method set an argument's type states whole: a declared struct's
@@ -189,8 +189,8 @@ end
 # else — a maybe, an unknown, a struct declared elsewhere.
 def argument_methods(type, scope)
   return nil unless known?(type)
-  if type in ["struct", *]
-    shape = scope.shapes.find { it[0] == type_at(type, 1) }
+  if type in StructType
+    shape = scope.shapes.find { it[0] == type.name }
     return nil if shape.nil?
     return value_at_checked(shape, 1)
   end
@@ -1203,8 +1203,8 @@ end
 # completely (declared_shapes). The receiver must be spellable — no
 # spelling, no sentence, so a computed receiver declines.
 def check_struct_method(node, receiver, scope, found)
-  return found unless receiver in ["struct", *]
-  shape = scope.shapes.find { it[0] == type_at(receiver, 1) }
+  return found unless receiver in StructType
+  shape = scope.shapes.find { it[0] == receiver.name }
   return found if shape.nil?
   return found if value_at_checked(shape, 1).include?(node.name)
   # Two values between brackets (ADR 0091) refuse when they run, in the
@@ -1271,9 +1271,9 @@ end
 # marked and what type the receiver is are static facts, so the refusal is
 # the build's — where Ruby raises NoMethodError at the call.
 def check_visibility(node, receiver, scope, found)
-  return found unless receiver in ["struct", *]
+  return found unless receiver in StructType
   return found if node.receiver in SelfNode
-  type_name = type_at(receiver, 1)
+  type_name = receiver.name
   marked = scope.visibilities.find { it[0] == type_name }
   return found if marked.nil?
   entry = value_at_checked(marked, 1).find { it[0] == node.name }
@@ -1710,7 +1710,7 @@ def plain_value?(type)
   return false unless known?(type)
   case type
   in MaybeType then false
-  in ["struct", *] then false
+  in StructType then false
   in ["enum", *] then false
   else
     true
