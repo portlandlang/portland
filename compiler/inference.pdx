@@ -1613,17 +1613,21 @@ end
 
 # A type as a combination's name writes it.
 def render_native_type(type)
-  return "nothing" if type == NOTHING
+  # No type at all is one not known (#607).
+  plain = type or return "Unknown"
+  return "nothing" if plain == NOTHING
   # What a call hands a def by name (#536): the name, and the type.
-  return "#{type.label}: #{render_native_type(type.type)}" if type in KeywordType
-  render_type(type)
+  return "#{plain.label}: #{render_native_type(plain.type)}" if plain in KeywordType
+  render_type(plain)
 end
 
 # How a type is written back out, for the debug driver. This rendering is
 # NOT ratified surface — the error-voice decision owns the real spelling —
 # it is the plainest thing that could work in a dump.
 def render_type(type)
-  case type
+  # No type at all is one not known (#607).
+  plain = type or return "Unknown"
+  case plain
   in ArrayType(element:) then "[" + render_type(element) + "]"
   in HashType(key:, value: entry) then "{" + render_type(key) + " => " + render_type(entry) + "}"
   in MaybeType(inner:) then render_type(inner) + "?"
@@ -1653,7 +1657,7 @@ def render_type(type)
   in SymbolType then "Symbol"
   in UnknownType then "Unknown"
   else
-    label = kind_word(type)
+    label = kind_word(plain)
     label.slice(0, 1).upcase + label.slice(1, label.length - 1)
   end
 end
