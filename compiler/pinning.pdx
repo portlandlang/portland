@@ -368,7 +368,7 @@ def changed_between(before, after)
 end
 
 # Whether a type says everything a code generator needs: no unknown in it.
-def concrete?(type) = type == NOTHING || !render_native_type(type).include?("Unknown")
+def concrete?(type) = type == NOTHING || !holds_unknown?(type)
 
 # A program with each constant bound at its top level as a def of that
 # name, with no parameters, answering its value (#562): a read of the

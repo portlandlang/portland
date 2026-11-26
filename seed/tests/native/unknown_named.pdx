@@ -1,0 +1,11 @@
+# A struct whose name holds the word Unknown is a type like any other
+# (#607): whether a type is known is read off what it is, not off how it
+# is spelled.
+struct UnknownBox
+  size
+end
+
+def boxed(size) = UnknownBox.new(size: size)
+
+p(boxed(3).size)
+p(boxed(4))

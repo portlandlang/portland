@@ -1048,6 +1048,22 @@ def held_by(node)
   end
 end
 
+# Whether a type is not known, or holds one that is not, anywhere in it
+# (#607): read off what the type is, so a struct of the program's own
+# whose name holds the word, `UnknownBox` or the compiler's `UnknownType`,
+# is a type like any other.
+def holds_unknown?(type)
+  case type
+  in UnknownType then true
+  in ArrayType(element:) then holds_unknown?(element)
+  in MaybeType(inner:) then holds_unknown?(inner)
+  in HashType(key:, value:) then holds_unknown?(key) || holds_unknown?(value)
+  in RangeType(element:) then holds_unknown?(element)
+  in KeywordType(type: held) then holds_unknown?(held)
+  else false
+  end
+end
+
 # Each top-level def's parameters, as [name, entry] pairs — an entry is a
 # type where a default gives one, or ["needs", demands].
 def infer_contracts(nodes)
@@ -1292,7 +1308,7 @@ def native_block_answer(node, arguments, types)
   end
   return NOTHING if native_nothing?(node.block.body, inner)
   found = synthesize_body(node.block.body, inner)
-  return NOTHING if found == NilType.new || render_type(found).include?("Unknown")
+  return NOTHING if found == NilType.new || holds_unknown?(found)
   found
 end
 
