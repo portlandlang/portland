@@ -5576,6 +5576,50 @@ fn join_flattens_nested_arrays_and_refuses_nil() {
     assert_both_oracles_refuse("join_nil_refusal.pdx", None, &cases);
 }
 
+/// An expression read for a value it did not produce refuses on both
+/// oracles (#473, #624), named as the program wrote it: as an element, an
+/// argument, a receiver, an interpolation, and an operand. The compiler
+/// read the missing value as nil and ran on.
+#[test]
+fn an_expression_that_produced_no_value_refuses_on_both_oracles() {
+    let cases = [
+        ("list = [puts(1)]\n", "puts produced no value"),
+        ("p(puts(1))\n", "puts produced no value"),
+        ("x = \"#{puts(1)}\"\n", "puts produced no value"),
+        ("p(puts(1).length)\n", "puts produced no value"),
+        ("x = 1 + puts(1)\n", "puts produced no value"),
+        ("def show = puts(1)\np([show])\n", "show produced no value"),
+        (
+            "def go = yield\np([go { puts 1 }])\n",
+            "go produced no value",
+        ),
+        (
+            "def twice\n  1 + yield\nend\np(twice { puts 1 })\n",
+            "twice's block produced no value",
+        ),
+    ];
+    assert_both_oracles_refuse("produced_no_value.pdx", None, &cases);
+}
+
+/// A method handed a block and asked of nil refuses as one without a
+/// block does (#592): by the method's name, with the way forward, on both
+/// oracles. It said only that the block method was undefined, naming no
+/// receiver.
+#[test]
+fn a_block_method_asked_of_nil_refuses_as_a_plain_one_does() {
+    let cases = [
+        (
+            "groups = [[\"a\"]]\ngroups[4].each do |word|\n  puts word\nend\n",
+            "nil has no method 'each' — handle the nil case first",
+        ),
+        (
+            "groups = [[\"a\"]]\np(groups[4].map { it })\n",
+            "nil has no method 'map' — handle the nil case first",
+        ),
+    ];
+    assert_both_oracles_refuse("block_method_of_nil.pdx", None, &cases);
+}
+
 /// A comparator block's rebindings carry from one comparison to the next
 /// on both implementations, in Ruby's call order — the hosted evaluator
 /// had kept each inside its comparison — and `min`/`max` order arrays of
@@ -6702,6 +6746,92 @@ fn portland_check_passes_a_clean_program_without_running_it() {
         "ok\n",
         "check must not evaluate the program"
     );
+}
+
+/// What `check.pdx` says of a sample, standard output and error together,
+/// and whether it passed.
+fn checked_sample(name: &str, source: &str) -> (bool, String) {
+    let sample = std::env::temp_dir().join(name);
+    std::fs::write(&sample, source).unwrap();
+    let checked = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(format!(
+            "{}/../compiler/check.pdx",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    let said = format!(
+        "{}{}",
+        String::from_utf8_lossy(&checked.stdout),
+        String::from_utf8_lossy(&checked.stderr)
+    );
+    (checked.status.success(), said)
+}
+
+/// A file's top level runs in order (#514), so a line that reads a def, a
+/// constant, a struct, a module, or a trait written below it refuses when
+/// it runs. The checker says so first, in the run's words, at the line
+/// that reads it, through any def that line calls. A def's body that reads
+/// a name written below it is fine where it is called after that name.
+#[test]
+fn the_checker_refuses_a_name_read_above_where_it_is_written() {
+    let cases = [
+        (
+            "struct Point\n  horizontal\n\n  include Labelled\nend\n\ntrait Labelled\n  def label = \"point #{horizontal}\"\nend\n",
+            "undefined trait Labelled\n  1 | struct Point",
+        ),
+        (
+            "BIGGER = LIMIT * 2\nLIMIT = 10\n",
+            "'LIMIT' is not defined\n  1 | BIGGER = LIMIT * 2",
+        ),
+        (
+            "BIGGER = doubled(10)\n\ndef doubled(number) = number * 2\n",
+            "'doubled' is not defined\n  1 | BIGGER = doubled(10)",
+        ),
+        (
+            "p Point.new(x: 1)\nstruct Point\n  x\nend\n",
+            "undefined struct Point\n  1 | p Point.new(x: 1)",
+        ),
+        (
+            "def first = second\np first\ndef second = 1\n",
+            "'second' is not defined\n  2 | p first",
+        ),
+        (
+            "[1].each { p doubled(it) }\ndef doubled(number) = number * 2\n",
+            "'doubled' is not defined\n  1 | [1].each { p doubled(it) }",
+        ),
+    ];
+    for (source, expected) in cases {
+        let (passed, said) = checked_sample("written_order.pdx", source);
+        assert!(!passed, "the checker should refuse {source:?}");
+        assert!(
+            said.contains(expected),
+            "the checker should say {expected:?}, got: {said}"
+        );
+        let sentence = expected.lines().next().unwrap();
+        let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(std::env::temp_dir().join("written_order.pdx"))
+            .output()
+            .expect("failed to run pdx");
+        assert!(
+            String::from_utf8_lossy(&seed.stderr).contains(sentence),
+            "the seed should say {sentence:?} of {source:?}, got: {}",
+            String::from_utf8_lossy(&seed.stderr)
+        );
+    }
+    let passing = [
+        "def go = doubled(2)\ndef doubled(number) = number * 2\np go\n",
+        "def count_down(number) = number == 0 ? 0 : count_down(number - 1)\np count_down(3)\n",
+        "def show(size) = size\np show(1)\ndef size = 3\n",
+        "[1].each { |size| p size }\ndef size = 3\n",
+        "LIMIT = 10\nBIGGER = LIMIT * 2\np BIGGER\n",
+        "struct Box\n  item\n  def late = LATER\nend\nLATER = 2\np Box.new(item: 1).late\n",
+    ];
+    for source in passing {
+        let (passed, said) = checked_sample("written_order_passes.pdx", source);
+        assert!(passed, "the checker should pass {source:?}, got: {said}");
+    }
 }
 
 /// ADR 0018: the compiler delegates `/` and `%` to the host, so Ruby's
