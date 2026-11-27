@@ -689,7 +689,7 @@ def evaluate_array(node, mutable bindings)
     step = evaluate_expression(element, bindings)
     return step if step.signal != "none"
     bindings = step.bindings
-    elements += step.value
+    elements << produced_value(step, element)
   end
   outcome([elements], bindings)
 end
@@ -731,8 +731,8 @@ def evaluate_binary(node, bindings)
   return left_step if left_step.signal != "none"
   right_step = evaluate_expression(node.right, left_step.bindings)
   return right_step if right_step.signal != "none"
-  left = slot_value(left_step.value)
-  right = slot_value(right_step.value)
+  left = produced_value(left_step, node.left)
+  right = produced_value(right_step, node.right)
   # A struct orders by its own `<=>` (ADR 0054), which is a call, so it
   # cannot ride the host's operators below.
   if (left in ["__struct__", *]) && %w[<=> < <= > >=].include?(node.operator)
@@ -1952,12 +1952,12 @@ def evaluate_call(node, mutable bindings)
       step = evaluate_expression(argument.value, bindings)
       return step if step.signal != "none"
       bindings = step.bindings
-      keyword_values << [argument.label, slot_value(step.value)]
+      keyword_values << [argument.label, produced_value(step, argument.value)]
     else
       step = evaluate_expression(argument, bindings)
       return step if step.signal != "none"
       bindings = step.bindings
-      arguments += step.value
+      arguments << produced_value(step, argument)
     end
   end
   # Inside a struct method, bare calls reach own methods first (#27).
@@ -2544,11 +2544,11 @@ def evaluate_method_call(node, mutable bindings)
           if argument in KeywordArgumentNode
             step = evaluate_expression(argument.value, bindings)
             bindings = step.bindings
-            keyword_values << [argument.label, slot_value(step.value)]
+            keyword_values << [argument.label, produced_value(step, argument.value)]
           else
             step = evaluate_expression(argument, bindings)
             bindings = step.bindings
-            arguments += step.value
+            arguments << produced_value(step, argument)
           end
         end
         check_call_count("#{struct_slot.first[0]}::#{node.name}", value_at(function_slot.first[2], 0), arguments.length)
@@ -2574,7 +2574,7 @@ def evaluate_method_call(node, mutable bindings)
   # A receiver or an argument that left a `return` or `break` pending
   # stops the call (#208), the seed's operand.
   return step if step.signal != "none"
-  mutable receiver = slot_value(step.value)
+  mutable receiver = produced_value(step, node.receiver)
   bindings = step.bindings
   # `&.`: an absent receiver short-circuits; arguments never run.
   if (node in SafeMethodCallNode) && receiver.nil?
@@ -2597,12 +2597,12 @@ def evaluate_method_call(node, mutable bindings)
       argument_step = evaluate_expression(argument.value, bindings)
       return argument_step if argument_step.signal != "none"
       bindings = argument_step.bindings
-      keyword_values << [argument.label, slot_value(argument_step.value)]
+      keyword_values << [argument.label, produced_value(argument_step, argument.value)]
     else
       argument_step = evaluate_expression(argument, bindings)
       return argument_step if argument_step.signal != "none"
       bindings = argument_step.bindings
-      arguments += argument_step.value
+      arguments << produced_value(argument_step, argument)
     end
   end
   # A keyword a builtin does not take refuses before any arm can answer
@@ -4628,6 +4628,23 @@ def namespace_for(bindings, name)
   nil
 end
 
+# What to say of an expression read for a value it did not produce: the
+# seed's sentence (#473, #624), naming it as the program wrote it. A
+# `yield` whose block answered nothing is the block's doing.
+def no_value_sentence(node, bindings)
+  case node
+  in CallNode(name:) then "#{name} produced no value"
+  in MethodCallNode(name:) then "#{name} produced no value"
+  in SafeMethodCallNode(name:) then "#{name} produced no value"
+  in IdentifierNode(name:) then "#{name} produced no value"
+  in YieldNode then silent_yield_sentence(bindings)
+  in IfNode then "the if produced no value"
+  in CaseNode | CaseInNode then "the case produced no value"
+  else
+    "the expression produced no value"
+  end
+end
+
 def note_named(sourcing, used, open, key, close)
   panic("named#{open}#{key}#{close} after unnumbered(#{used})") if sourcing == "unnumbered"
   panic("named#{open}#{key}#{close} after numbered") if sourcing == "numbered"
@@ -4743,6 +4760,14 @@ def plain_array?(value)
   return false unless value in Array
   return false if value in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *] | ["__type__", *] | ["__set__", *]
   true
+end
+
+# What an expression's step produced, read where a value is needed: an
+# element, an argument, a receiver (#624). One that produced none refuses
+# as the seed does, where reading the empty slot answered nil and ran on.
+def produced_value(step, node)
+  panic(no_value_sentence(node, step.bindings)) if step.value.empty?
+  slot_value(step.value)
 end
 
 # `product` (#104): every way to take one element from each array in

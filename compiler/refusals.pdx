@@ -24,6 +24,8 @@
 #   ["alias", name, survivor]                 — a false alias (ADR 0036), the seed's sentence moved earlier
 #   ["sentence", words]                       — a sentence an earlier ADR pinned whole (0034, 0035)
 #   ["undefined", name]                       — a bare name no local, def, builtin, or type answers (#98)
+#   ["undefined_struct", name]                — a struct made above the line that writes it (#514)
+#   ["undefined_trait", name]                 — a trait included above the line that writes it (#514)
 #
 # A spelling is the offending expression written back as source, or nil
 # where spell_node cannot write it faithfully — and a refusal that wants a
@@ -132,6 +134,10 @@ def render_refusal(refusal)
   # A sentence pinned by an earlier ADR (0034, 0035), carried whole.
   in ["sentence", words] then words
   in ["undefined", name] then "#{spelled(name)} is not defined"
+  # A struct made, or a trait included, above the line that writes it
+  # (#514): the seed's runtime sentences, said at build.
+  in ["undefined_struct", name] then "undefined struct #{name}"
+  in ["undefined_trait", name] then "undefined trait #{name}"
   # A removed Ruby spelling (#135): the rewrite its ledger page names, the
   # lexer's table (every file in view loads it first).
   in ["retired", name] then retired_sentence(name) or "#{spelled(name)} is not defined"
