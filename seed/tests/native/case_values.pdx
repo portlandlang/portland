@@ -1,0 +1,24 @@
+# A `case` read for its value and bound to a local (#631): each arm is
+# read with what its pattern proved, as one ending a def is, so a call in
+# an arm is built for the struct the arm is for.
+struct Box
+  items
+end
+
+struct Pair
+  left
+end
+
+def names_of(items) = items.map { |item| item + "!" }
+
+def shown(node)
+  named = case node
+  in Box(items:) then names_of(items)
+  else
+    ["none"]
+  end
+  named.length
+end
+
+p shown(Box.new(items: ["a", "b"]))
+p shown(Pair.new(left: 1))

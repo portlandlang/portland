@@ -800,8 +800,11 @@ def pin_expression(node, walk, answers, names)
   guarded = safe_as_if(node)
   return pin_statement(guarded, walk, answers, names) if guarded.some?
   # An `if` read for its value is walked as one run for what it does,
-  # each arm with what the condition proved (#572).
+  # each arm with what the condition proved (#572), and so is a `case`
+  # read for its value, as the `if`s it means (#631).
   return pin_statement(node, walk, answers, names) if node in IfNode
+  plain = case_as_if(node)
+  return pin_statement(plain, walk, answers, names) if plain.some?
   # The right of an `&&` or an `||` is walked with what the left proved
   # (#572), so a call there is gathered with the types it is read with.
   if (node in LogicalNode) && %w[&& ||].include?(node.operator)
