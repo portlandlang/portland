@@ -81,6 +81,48 @@ fn integer_ends(range: &Value) -> Option<(Option<i64>, Option<i64>, bool)> {
     Some((as_integer(start)?, as_integer(end)?, exclusive))
 }
 
+/// `max(n)` and `min(n)` of a range of integers (#413): the greatest
+/// counted down from its last, or the least counted up from its start,
+/// stopping at the other end. An endless range has no greatest and a
+/// beginless one no least, in Ruby's words.
+fn integer_range_extremes(
+    start: Option<i64>,
+    end: Option<i64>,
+    exclusive: bool,
+    which: &str,
+    count: usize,
+) -> Vec<Value> {
+    let last = end.map(|end| i128::from(end) - i128::from(exclusive));
+    let (from, step, stop) = if which == "max" {
+        let Some(last) = last else {
+            panic!("cannot get the maximum of endless range");
+        };
+        (last, -1, start.map(i128::from))
+    } else {
+        let Some(start) = start else {
+            panic!("cannot get the minimum of beginless range");
+        };
+        (i128::from(start), 1, last)
+    };
+    let mut answered = Vec::new();
+    let mut current = from;
+    while answered.len() < count {
+        let past = match stop {
+            Some(stop) => (step < 0 && current < stop) || (step > 0 && current > stop),
+            None => false,
+        };
+        let Ok(value) = i64::try_from(current) else {
+            break;
+        };
+        if past {
+            break;
+        }
+        answered.push(Value::Integer(value));
+        current += step;
+    }
+    answered
+}
+
 /// A range of integers, either end open.
 fn integer_range(start: Option<i64>, end: Option<i64>, exclusive: bool) -> Value {
     Value::Range {
@@ -5700,7 +5742,29 @@ impl<W: std::io::Write> Interpreter<W> {
             panic!("'{name}' takes no keyword arguments, got {label}:");
         }
         // `minmax` is `min` and `max` together (#104), each a maybe, and a
-        // comparator block goes to both.
+        // comparator block goes to both, refused by the name written (#485).
+        if let Some(block) = block
+            && name == "minmax"
+            && arguments.is_empty()
+            && matches!(receiver, Value::Array(_) | Value::Range { .. })
+        {
+            let elements: Vec<Value> = match &receiver {
+                Value::Array(elements) => elements.iter().cloned().collect(),
+                _ => range_elements(&receiver),
+            };
+            let low = match self.block_extreme(elements.clone(), block, name, false) {
+                Ok(best) => best,
+                Err(interrupted) => return interrupted,
+            };
+            let high = match self.block_extreme(elements, block, name, true) {
+                Ok(best) => best,
+                Err(interrupted) => return interrupted,
+            };
+            return Some(Value::array(vec![
+                low.map_or(Value::Nil, Value::present),
+                high.map_or(Value::Nil, Value::present),
+            ]));
+        }
         if name == "minmax"
             && arguments.is_empty()
             && matches!(receiver, Value::Array(_) | Value::Range { .. })
@@ -5717,6 +5781,47 @@ impl<W: std::io::Write> Interpreter<W> {
                 low.unwrap_or(Value::Nil),
                 high.unwrap_or(Value::Nil),
             ]));
+        }
+        // `max(n)` and `min(n)` (#413): that many, the greatest or the
+        // least first, by `<=>` or by a comparator block — the sort, cut
+        // short. An array's elements, a range's, a hash's pairs, and a
+        // set's members alike, as Ruby's.
+        if matches!(name, "max" | "min")
+            && let [Value::Integer(count)] = arguments.as_slice()
+            && matches!(
+                receiver,
+                Value::Array(_) | Value::Range { .. } | Value::Hash(_) | Value::Set(_)
+            )
+        {
+            if *count < 0 {
+                panic!("negative size ({count})");
+            }
+            let count = *count as usize;
+            // A range of integers is counted from its end, or its start,
+            // walking only what it answers: an open end on the other side
+            // is no matter, and a range too long to walk is not walked.
+            if block.is_none()
+                && matches!(receiver, Value::Range { .. })
+                && let Some((start, end, exclusive)) = integer_ends(&receiver)
+            {
+                return Some(Value::array(integer_range_extremes(
+                    start, end, exclusive, name, count,
+                )));
+            }
+            let elements = Value::array(set_operand(&receiver, &format!("'{name}'")));
+            let sorted = self.method_call(elements, "sort", Vec::new(), Vec::new(), block);
+            if self.pending.is_some() {
+                return None;
+            }
+            let Some(Value::Array(sorted)) = sorted else {
+                unreachable!("sort answers an array");
+            };
+            let ordered: Vec<Value> = if name == "max" {
+                sorted.iter().rev().cloned().collect()
+            } else {
+                sorted.iter().cloned().collect()
+            };
+            return Some(Value::array(ordered.into_iter().take(count).collect()));
         }
         // `value.class` answers the type (ADR 0074) — the static kind of
         // reflection: a name with `new`, its type functions, and `name`. A
@@ -6791,7 +6896,9 @@ impl<W: std::io::Write> Interpreter<W> {
                         match verdict {
                             Some(Value::Boolean(true)) => kept.push(element),
                             Some(Value::Boolean(false)) => {}
-                            other => self.refuse_verdict("select", other),
+                            // By the name written (#485): one behavior,
+                            // many spellings (ADR 0036).
+                            other => self.refuse_verdict(name, other),
                         }
                     }
                     Some(Value::array(kept))
@@ -6848,7 +6955,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         match verdict {
                             Some(Value::Boolean(true)) => return Some(Value::present(element)),
                             Some(Value::Boolean(false)) => {}
-                            other => self.refuse_verdict("find", other),
+                            other => self.refuse_verdict(name, other),
                         }
                     }
                     Some(Value::Nil)
@@ -6902,37 +7009,27 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(Value::array(sorted))
                 }
-                // A count beside the comparator block is the same wrong
-                // count it is without one, in the same sentence (#332).
+                // A count that is no Integer beside the comparator block is
+                // the same wrong count it is without one, in the same
+                // sentence (#332, #413): an Integer one is answered above.
                 (Value::Array(_), "min" | "max", counted) if !counted.is_empty() => {
-                    refusal("arity");
-                    panic!("'{name}' takes 0 arguments, got {}", counted.len())
+                    refusal("arguments");
+                    let shown: Vec<String> =
+                        counted.iter().map(|argument| argument.shown()).collect();
+                    panic!(
+                        "undefined method {name} for {} with [{}]",
+                        receiver.shown(),
+                        shown.join(", ")
+                    )
                 }
                 // `min`/`max` by a comparator block (#99): the first of
                 // equals, and absent for an empty array, as without one.
                 (Value::Array(elements), "min" | "max", []) => {
-                    let mut best: Option<Value> = None;
-                    for element in elements.iter().cloned() {
-                        let replaces = match &best {
-                            None => true,
-                            Some(current) => {
-                                let ordering =
-                                    match self.block_ordering(block, &element, current, name) {
-                                        Ok(ordering) => ordering,
-                                        Err(interrupted) => return interrupted,
-                                    };
-                                if name == "max" {
-                                    ordering > 0
-                                } else {
-                                    ordering < 0
-                                }
-                            }
-                        };
-                        if replaces {
-                            best = Some(element);
-                        }
+                    let elements: Vec<Value> = elements.iter().cloned().collect();
+                    match self.block_extreme(elements, block, name, name == "max") {
+                        Ok(best) => Some(best.map_or(Value::Nil, Value::present)),
+                        Err(interrupted) => interrupted,
                     }
-                    Some(best.map_or(Value::Nil, Value::present))
                 }
                 // `min_by`/`max_by` (#99): the element whose block answer
                 // is least or greatest under `<=>`, the first of equals.
@@ -7289,6 +7386,11 @@ impl<W: std::io::Write> Interpreter<W> {
                 (Value::String(_), "sub" | "gsub", []) => {
                     refusal("arity");
                     panic!("'{name}' takes 1 to 2 arguments, got 0")
+                }
+                // Nil handed a block refuses as nil without one does
+                // (#592): by the method's name, with the way forward.
+                (Value::Nil, name, _) => {
+                    panic!("nil has no method '{name}' — handle the nil case first")
                 }
                 (receiver, name, _) => {
                     if let Some(survivor) = alias_survivor(name) {
@@ -9028,6 +9130,33 @@ impl<W: std::io::Write> Interpreter<W> {
     /// integer compared with 0, as Ruby reads one, refused otherwise in ADR
     /// 0054's words for `<=>`. `Err` carries a `break` or `return` out, as
     /// `block_interrupt` hands it.
+    /// The least or the greatest of the elements by a comparator block
+    /// (#99), the first of equals, or none for no elements. `name` is the
+    /// method written, which a block answering other than an Integer is
+    /// refused by (#485). `Err` carries a `break` or `return` out.
+    fn block_extreme(
+        &mut self,
+        elements: Vec<Value>,
+        block: &Block,
+        name: &str,
+        greatest: bool,
+    ) -> Result<Option<Value>, Option<Value>> {
+        let mut best: Option<Value> = None;
+        for element in elements {
+            let replaces = match &best {
+                None => true,
+                Some(current) => {
+                    let ordering = self.block_ordering(block, &element, current, name)?;
+                    if greatest { ordering > 0 } else { ordering < 0 }
+                }
+            };
+            if replaces {
+                best = Some(element);
+            }
+        }
+        Ok(best)
+    }
+
     fn block_ordering(
         &mut self,
         block: &Block,
@@ -9758,7 +9887,20 @@ impl<W: std::io::Write> Interpreter<W> {
                     format!("{}'s block produced no value", handed.method)
                 }
             }
-            (other, _) => format!("{other:?} produced no value"),
+            // Anything else is named as the program wrote it (#473): a
+            // call by its name, and the rest by the kind of thing it is.
+            (
+                Expression::Call { name, .. }
+                | Expression::MethodCall { name, .. }
+                | Expression::Variable(name),
+                _,
+            ) => format!("{name} produced no value"),
+            (Expression::Yield(_), None) => "yield produced no value".to_string(),
+            (Expression::If { .. }, _) => "the if produced no value".to_string(),
+            (Expression::Case { .. } | Expression::CaseIn { .. }, _) => {
+                "the case produced no value".to_string()
+            }
+            (_, _) => "the expression produced no value".to_string(),
         }
     }
 
@@ -13381,5 +13523,31 @@ end
     #[should_panic(expected = "produced no value")]
     fn puts_produces_no_value() {
         evaluate("1 + puts(\"value\")");
+    }
+
+    // An expression read for a value it did not produce is named as the
+    // program wrote it (#473), not in Rust's debug form.
+    #[test]
+    #[should_panic(expected = "puts produced no value")]
+    fn an_element_that_produces_no_value_is_named() {
+        evaluate("list = [puts(1)]");
+    }
+
+    #[test]
+    #[should_panic(expected = "show produced no value")]
+    fn a_bare_call_that_produces_no_value_is_named() {
+        evaluate("def show = puts(1)\np([show])\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "go produced no value")]
+    fn a_call_with_a_block_that_produces_no_value_is_named() {
+        evaluate("def go = yield\np([go { puts 1 }])\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "upcase produced no value")]
+    fn a_method_that_produces_no_value_is_named() {
+        evaluate("struct Word\n  def upcase = puts(1)\nend\np([Word.new.upcase])\n");
     }
 }

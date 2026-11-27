@@ -780,6 +780,16 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "p \"abc\".slice (0)\n",
             "ambiguous without parens — write slice(...) with no space to call",
         ),
+        // `yield` before a bracket with a space is the same shape (#424):
+        // it hands an array, or indexes what the block answered.
+        (
+            "def each_empty\n  yield []\nend\neach_empty { p it }\n",
+            "ambiguous without parens — write yield([...]) to pass an array or yield[...] to index",
+        ),
+        (
+            "def each_one\n  yield [1]\nend\neach_one { p it }\n",
+            "ambiguous without parens — write yield([...]) to pass an array or yield[...] to index",
+        ),
         // The escapes are a closed set. Until 2026-08-12 the compiler passed
         // an unknown one through as its bare character — accepting a string
         // the seed refused, and silently, since no fixture could hold one.
@@ -1340,6 +1350,36 @@ fn portland_lint_finds_a_line_at_the_margin_inside_a_statement() {
         .expect("failed to run pdx");
     assert!(output.status.success(), "a clean file should pass");
     assert_eq!(String::from_utf8(output.stdout).unwrap(), "ok\n");
+}
+
+/// The linter finds a name of one character (#518): a local, a def's
+/// parameter, and a block's, a throwaway among them. A lone `_` binds
+/// nothing, and is no name.
+#[test]
+fn portland_lint_finds_a_name_of_one_character() {
+    let driver = format!("{}/../compiler/lint.pdx", env!("CARGO_MANIFEST_DIR"));
+    let sample = std::env::temp_dir().join("lint_short_names_sample.pdx");
+    std::fs::write(
+        &sample,
+        "def doubled(n) = n * 2\n\ncount = 1\nmutable c = 2\n[1].each { |x| p x }\n[1].each { |_| p count }\n{ a: 1 }.each do |key, v|\n  p key\nend\n",
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        !output.status.success(),
+        "a file with findings should refuse"
+    );
+    let path = sample.display();
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        format!(
+            "{path}:1: n is a name of one character — name what it holds\n{path}:4: c is a name of one character — name what it holds\n{path}:5: x is a name of one character — name what it holds\n{path}:7: v is a name of one character — name what it holds\n"
+        )
+    );
 }
 
 /// `report.pdx` — a program's own loud choices read back to it (#30):
@@ -3227,24 +3267,17 @@ fn a_matchs_positions_refuse_a_negative_index() {
     assert_both_oracles_refuse("match_negative_position.pdx", None, &cases);
 }
 
-/// A count given to `max` or `min` refuses on both oracles in one
-/// sentence, with or without a comparator block (#332): the hosted
-/// evaluator checks a range's argument count as it does an array's.
+/// A count given to `max` or `min` answers alike on both oracles, with or
+/// without a comparator block (#332, #413): the hosted evaluator reads a
+/// range's count as it does an array's. Both refused it until the count
+/// form was built.
 #[test]
-fn a_count_to_max_or_min_refuses_on_both_oracles() {
-    let cases = [
-        ("p((1..10).max(2))\n", "'max' takes 0 arguments, got 1"),
-        ("p((1..10).min(2))\n", "'min' takes 0 arguments, got 1"),
-        (
-            "p((1..10).max(2) { |left, right| left <=> right })\n",
-            "'max' takes 0 arguments, got 1",
-        ),
-        (
-            "p([3, 1].min(2) { |left, right| left <=> right })\n",
-            "'min' takes 0 arguments, got 1",
-        ),
-    ];
-    assert_both_oracles_refuse("counted_extreme.pdx", None, &cases);
+fn a_count_to_max_or_min_answers_alike_on_both_oracles() {
+    assert_both_print(
+        "counted_extreme.pdx",
+        "p((1..10).max(2))\np((1..10).min(2))\np((1..10).max(2) { |left, right| left <=> right })\np([3, 1].min(2) { |left, right| left <=> right })\n",
+        "[10, 9]\n[1, 2]\n[10, 9]\n[1, 3]\n",
+    );
 }
 
 /// A refusal about a guest value names it as the guest writes it on both
@@ -5566,6 +5599,172 @@ fn join_flattens_nested_arrays_and_refuses_nil() {
     assert_both_oracles_refuse("join_nil_refusal.pdx", None, &cases);
 }
 
+/// `reduce` and `inject` take their start explicitly (ADR 0036): with a
+/// block and none, both oracles refuse by name (#485), over an array, a
+/// hash, and a range. The compiler ran them from nil.
+#[test]
+fn reduce_without_a_start_refuses_on_both_oracles() {
+    let cases = [
+        (
+            "p([1, 2, 3].reduce { |sum, number| sum + number })\n",
+            "undefined block-taking method reduce",
+        ),
+        (
+            "p([1, 2].inject { |sum, number| sum + number })\n",
+            "undefined block-taking method inject",
+        ),
+        (
+            "p({ a: 1 }.reduce { |kept, pair| kept })\n",
+            "undefined block-taking method reduce",
+        ),
+        (
+            "p((1..4).reduce { |product, number| product * number })\n",
+            "undefined block-taking method reduce",
+        ),
+    ];
+    assert_both_oracles_refuse("reduce_without_a_start.pdx", None, &cases);
+}
+
+/// A block read as true or false refuses by the method's name as written
+/// (#485, ADR 0036), on both oracles: `filter` is not called `select` in
+/// its own refusal. And `index` is an array's alone, so a hash's and a
+/// range's refuse it by name, where the compiler walked them by
+/// `find_index`.
+#[test]
+fn a_verdict_block_refuses_by_the_name_written() {
+    let cases = [
+        (
+            "p([1, 2].index { 1 })\n",
+            "index's block must answer true or false, got 1",
+        ),
+        (
+            "p([1].filter { 1 })\n",
+            "filter's block must answer true or false, got 1",
+        ),
+        (
+            "p({ a: 1 }.filter { |key, value| 1 })\n",
+            "filter's block must answer true or false, got 1",
+        ),
+        (
+            "p([1].detect { 1 })\n",
+            "detect's block must answer true or false, got 1",
+        ),
+        (
+            "p({ a: 1 }.index { true })\n",
+            "undefined block-taking method index",
+        ),
+        (
+            "p((1..3).index { true })\n",
+            "undefined block-taking method index",
+        ),
+    ];
+    assert_both_oracles_refuse("verdict_by_name.pdx", None, &cases);
+}
+
+/// A comparison block that answers nothing refuses as answering nothing
+/// (#485), on both oracles: the compiler read the missing answer as nil.
+#[test]
+fn a_comparison_block_that_answers_nothing_says_so() {
+    let cases = [
+        (
+            "p([1, 2].sort { puts 0 })\n",
+            "'sort' block answers -1, 0, or 1, got nothing",
+        ),
+        (
+            "p([1, 2].min { puts 0 })\n",
+            "'min' block answers -1, 0, or 1, got nothing",
+        ),
+        (
+            "p([1, 2].max { puts 0 })\n",
+            "'max' block answers -1, 0, or 1, got nothing",
+        ),
+        (
+            "p([1, 2].minmax { puts 0 })\n",
+            "'minmax' block answers -1, 0, or 1, got nothing",
+        ),
+    ];
+    assert_both_oracles_refuse("comparison_nothing.pdx", None, &cases);
+}
+
+/// `max(n)` and `min(n)` (#413): that many, the greatest or the least
+/// first, by `<=>` or by a comparator block, over an array, a range, a
+/// hash's pairs, and a set's members. A range of integers is counted from
+/// an end, so an open start is no matter and a long range is not walked.
+/// A count that is no Integer, or is negative, refuses. Ruby 4.0.9 prints
+/// the same lines.
+#[test]
+fn max_and_min_take_a_count() {
+    assert_both_print(
+        "max_and_min_counted.pdx",
+        "p([3, 1, 2].max(2), [3, 1, 2].min(2), [3, 1, 2].max(5), [3, 1, 2].max(0), [].max(2))\np((1..10).max(2), (1...10).min(2), (100..10).max(2), (..1).max(2), (1..).min(2))\np((0...4611686018427387903).max(2))\np([3, 1, 2].max(2) { |left, right| left <=> right }, [3, 1, 2].min(2) { |left, right| right <=> left })\np({ a: 1, b: 2 }.max(1), { a: 1, b: 2 }.min(2))\np(Set[3, 1, 2].max(2), [1, 3, 3, 2].max(2), [\"b\", \"a\", \"c\"].min(2))\n",
+        "[3, 2]\n[1, 2]\n[3, 2, 1]\n[]\n[]\n[10, 9]\n[1, 2]\n[]\n[1, 0]\n[1, 2]\n[4611686018427387902, 4611686018427387901]\n[3, 2]\n[3, 2]\n[[:b, 2]]\n[[:a, 1], [:b, 2]]\n[3, 2]\n[3, 3]\n[\"a\", \"b\"]\n",
+    );
+    let cases = [
+        ("p([1].max(-1))\n", "negative size (-1)"),
+        (
+            "p([1, 2].min(nil) { |left, right| left <=> right })\n",
+            "undefined method min for [1, 2] with [nil]",
+        ),
+        (
+            "p([1, 2].max(nil))\n",
+            "undefined method max for [1, 2] with [nil]",
+        ),
+        (
+            "p((1..).max(2))\n",
+            "cannot get the maximum of endless range",
+        ),
+        (
+            "p((..1).min(2))\n",
+            "cannot get the minimum of beginless range",
+        ),
+    ];
+    assert_both_oracles_refuse("max_and_min_counted_refusals.pdx", None, &cases);
+}
+
+/// An expression read for a value it did not produce refuses on both
+/// oracles (#473, #624), named as the program wrote it: as an element, an
+/// argument, a receiver, an interpolation, and an operand. The compiler
+/// read the missing value as nil and ran on.
+#[test]
+fn an_expression_that_produced_no_value_refuses_on_both_oracles() {
+    let cases = [
+        ("list = [puts(1)]\n", "puts produced no value"),
+        ("p(puts(1))\n", "puts produced no value"),
+        ("x = \"#{puts(1)}\"\n", "puts produced no value"),
+        ("p(puts(1).length)\n", "puts produced no value"),
+        ("x = 1 + puts(1)\n", "puts produced no value"),
+        ("def show = puts(1)\np([show])\n", "show produced no value"),
+        (
+            "def go = yield\np([go { puts 1 }])\n",
+            "go produced no value",
+        ),
+        (
+            "def twice\n  1 + yield\nend\np(twice { puts 1 })\n",
+            "twice's block produced no value",
+        ),
+    ];
+    assert_both_oracles_refuse("produced_no_value.pdx", None, &cases);
+}
+
+/// A method handed a block and asked of nil refuses as one without a
+/// block does (#592): by the method's name, with the way forward, on both
+/// oracles. It said only that the block method was undefined, naming no
+/// receiver.
+#[test]
+fn a_block_method_asked_of_nil_refuses_as_a_plain_one_does() {
+    let cases = [
+        (
+            "groups = [[\"a\"]]\ngroups[4].each do |word|\n  puts word\nend\n",
+            "nil has no method 'each' — handle the nil case first",
+        ),
+        (
+            "groups = [[\"a\"]]\np(groups[4].map { it })\n",
+            "nil has no method 'map' — handle the nil case first",
+        ),
+    ];
+    assert_both_oracles_refuse("block_method_of_nil.pdx", None, &cases);
+}
+
 /// A comparator block's rebindings carry from one comparison to the next
 /// on both implementations, in Ruby's call order — the hosted evaluator
 /// had kept each inside its comparison — and `min`/`max` order arrays of
@@ -6692,6 +6891,92 @@ fn portland_check_passes_a_clean_program_without_running_it() {
         "ok\n",
         "check must not evaluate the program"
     );
+}
+
+/// What `check.pdx` says of a sample, standard output and error together,
+/// and whether it passed.
+fn checked_sample(name: &str, source: &str) -> (bool, String) {
+    let sample = std::env::temp_dir().join(name);
+    std::fs::write(&sample, source).unwrap();
+    let checked = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(format!(
+            "{}/../compiler/check.pdx",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    let said = format!(
+        "{}{}",
+        String::from_utf8_lossy(&checked.stdout),
+        String::from_utf8_lossy(&checked.stderr)
+    );
+    (checked.status.success(), said)
+}
+
+/// A file's top level runs in order (#514), so a line that reads a def, a
+/// constant, a struct, a module, or a trait written below it refuses when
+/// it runs. The checker says so first, in the run's words, at the line
+/// that reads it, through any def that line calls. A def's body that reads
+/// a name written below it is fine where it is called after that name.
+#[test]
+fn the_checker_refuses_a_name_read_above_where_it_is_written() {
+    let cases = [
+        (
+            "struct Point\n  horizontal\n\n  include Labelled\nend\n\ntrait Labelled\n  def label = \"point #{horizontal}\"\nend\n",
+            "undefined trait Labelled\n  1 | struct Point",
+        ),
+        (
+            "BIGGER = LIMIT * 2\nLIMIT = 10\n",
+            "'LIMIT' is not defined\n  1 | BIGGER = LIMIT * 2",
+        ),
+        (
+            "BIGGER = doubled(10)\n\ndef doubled(number) = number * 2\n",
+            "'doubled' is not defined\n  1 | BIGGER = doubled(10)",
+        ),
+        (
+            "p Point.new(x: 1)\nstruct Point\n  x\nend\n",
+            "undefined struct Point\n  1 | p Point.new(x: 1)",
+        ),
+        (
+            "def first = second\np first\ndef second = 1\n",
+            "'second' is not defined\n  2 | p first",
+        ),
+        (
+            "[1].each { p doubled(it) }\ndef doubled(number) = number * 2\n",
+            "'doubled' is not defined\n  1 | [1].each { p doubled(it) }",
+        ),
+    ];
+    for (source, expected) in cases {
+        let (passed, said) = checked_sample("written_order.pdx", source);
+        assert!(!passed, "the checker should refuse {source:?}");
+        assert!(
+            said.contains(expected),
+            "the checker should say {expected:?}, got: {said}"
+        );
+        let sentence = expected.lines().next().unwrap();
+        let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(std::env::temp_dir().join("written_order.pdx"))
+            .output()
+            .expect("failed to run pdx");
+        assert!(
+            String::from_utf8_lossy(&seed.stderr).contains(sentence),
+            "the seed should say {sentence:?} of {source:?}, got: {}",
+            String::from_utf8_lossy(&seed.stderr)
+        );
+    }
+    let passing = [
+        "def go = doubled(2)\ndef doubled(number) = number * 2\np go\n",
+        "def count_down(number) = number == 0 ? 0 : count_down(number - 1)\np count_down(3)\n",
+        "def show(size) = size\np show(1)\ndef size = 3\n",
+        "[1].each { |size| p size }\ndef size = 3\n",
+        "LIMIT = 10\nBIGGER = LIMIT * 2\np BIGGER\n",
+        "struct Box\n  item\n  def late = LATER\nend\nLATER = 2\np Box.new(item: 1).late\n",
+    ];
+    for source in passing {
+        let (passed, said) = checked_sample("written_order_passes.pdx", source);
+        assert!(passed, "the checker should pass {source:?}, got: {said}");
+    }
 }
 
 /// ADR 0018: the compiler delegates `/` and `%` to the host, so Ruby's

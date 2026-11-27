@@ -145,6 +145,15 @@ struct Scope
   visibilities
 end
 
+# A name the top level reads when a line of it runs (#514): read as a name
+# (`name`), as a struct being made (`made`), or as a trait a struct
+# includes (`trait`), and the node at the top level whose line reads it.
+struct WrittenRead
+  kind
+  name
+  site
+end
+
 # The parameters of one def every caller agrees on. A caller that omits an
 # optional parameter passes its default; a caller with the wrong count, or
 # one whose argument fails the parameter's contract, is a refusal at its
@@ -278,6 +287,16 @@ def builtin_function?(name) = %w[Complex Rational failure fields format inspect 
 # (#151): a type, not a value, so not a name to find defined.
 def builtin_type_name?(node)
   (node in IdentifierNode) && %w[Array Boolean Complex Float Hash Integer MatchData Random Range Rational Regexp Set String Symbol].include?(node.name)
+end
+
+# What a def's body reads, where a line of the top level calls it (#514):
+# nothing for a name that is no def of the file's, or one this line's
+# reading has already passed through.
+def called_reads(name, site, defs, visited)
+  return [] if visited.include?(name)
+  called = defs.find { it.name == name } or return []
+  bound = names_bound_in(called.body) + called.parameters.map { it.name }
+  called.body.flat_map { order_reads(it, site, defs, bound, visited + [name]) }
 end
 
 # Every bare call in a body with its argument types — [name, positional
@@ -1046,7 +1065,8 @@ def check_program_with(nodes, source, file, imports, sharpened)
   found = check_requires(nodes, false, scope, annotated)
   walked = check_redefinitions(nodes, "", scope, imported_names(imports), found)
   hidden = check_private_constant_names(nodes, "", scope, walked.last)
-  in_source_order(check_body(nodes, scope, hidden))
+  ordered = check_written_order(nodes, scope, hidden)
+  in_source_order(check_body(nodes, scope, ordered))
 end
 
 # A range's ends are checked like any expression, then as a pair (ADR
@@ -1282,6 +1302,36 @@ def check_visibility(node, receiver, scope, found)
   return found if kind == "protected" && scope.inside == type_name
   return noted(found, ["sentence", "'#{node.name}' is private to #{type_name}"], locate(node, scope)) if kind == "private"
   noted(found, ["sentence", "'#{node.name}' is protected — only #{type_name}'s own methods may call it on another #{type_name}"], locate(node, scope))
+end
+
+# A name the top level reads before the line that writes it (#514). A
+# file's top level runs in order, so a def, a constant, a struct, a
+# module, or a trait written below the line that reads it is not there
+# yet when that line runs, and the run refuses there, in these words. A
+# def's body reads its names when it is called, so what a def reads is
+# read at the line that calls it. A name a local may hold is passed over:
+# a parameter or a block's may share a def's name.
+def check_written_order(nodes, scope, mutable found)
+  return found unless scope.judging
+  positions = written_positions(nodes)
+  structs = nodes.select { it in StructDefNode }.map { it.name }
+  defs = nodes.select { it in DefNode }
+  locals = names_bound_in(nodes.reject { it in DefNode })
+  nodes.each_with_index do |node, index|
+    order_reads(node, nil, defs, locals, []).each do |read|
+      next unless positions.key?(read.name)
+      where = positions[read.name] or 0
+      next if where < index
+      refusal = case read.kind
+      when "made"  then structs.include?(read.name) ? ["undefined_struct", read.name] : ["undefined", read.name]
+      when "trait" then ["undefined_trait", read.name]
+      else
+        ["undefined", read.name]
+      end
+      found = noted(found, refusal, locate(read.site, scope))
+    end
+  end
+  found
 end
 
 # A `require` or `require_relative` whose path is not a literal string.
@@ -1657,6 +1707,28 @@ def module_name(node)
   first
 end
 
+# Every name a body may bind as a local, wherever in it (#514): what it
+# assigns, what its patterns capture, and its blocks' parameters. More
+# than the locals any one line sees, so a name read where a local of it
+# may be is passed over, never refused.
+def names_bound_in(nodes)
+  nodes.reject { it.nil? }.flat_map do |node|
+    own = case node
+    # A constant is no local.
+    in AssignmentNode(name:) then constant_name?(name) ? [] : [name]
+    in AppendNode(name:) then [name]
+    in MatchAssertNode(pattern:) then pattern_names(pattern)
+    in MatchTestNode(pattern:) then pattern_names(pattern)
+    in CaseInNode(branches:) then branches.flat_map { pattern_names(it.pattern) }
+    in CallNode(block:) then block.nil? ? [] : block.parameters
+    in MethodCallNode(block:) then block.nil? ? [] : block.parameters
+    in SafeMethodCallNode(block:) then block.nil? ? [] : block.parameters
+    else []
+    end
+    own + names_bound_in(children_of(node))
+  end
+end
+
 def operator_takes?(operator, left, right)
   case operator
   when "==", "!=" then true
@@ -1695,6 +1767,37 @@ def operator_takes?(operator, left, right)
   else
     # An operator this table does not know is not one it may refuse.
     true
+  end
+end
+
+# The names a line of the top level reads when it runs (#514), each with
+# the node whose line reads it: the line's own, or the call of a def whose
+# body reads it. A def's body is read where it is called, once however
+# often; a struct's body reads the traits it includes; the other bodies a
+# line declares read nothing as it runs.
+def order_reads(node, site, defs, locals, visited)
+  return [] if node.nil?
+  here = (site or node)
+  case node
+  in DefNode | EnumDefNode | ModuleDefNode | TraitDefNode then []
+  in StructDefNode(includes:) then includes.map { WrittenRead.new(kind: "trait", name: it, site: here) }
+  in IdentifierNode(name:)
+    return [] if locals.include?(name)
+    [WrittenRead.new(kind: "name", name: name, site: here)] + called_reads(name, here, defs, visited)
+  in CallNode(name:)
+    own = [WrittenRead.new(kind: "name", name: name, site: here)] + called_reads(name, here, defs, visited)
+    own + children_of(node).flat_map { order_reads(it, site, defs, locals, visited) }
+  # A struct made by its name, `Point.new`, is read as the struct.
+  in MethodCallNode(receiver:, arguments:, block:)
+    rest = arguments + block_body(block)
+    unless (receiver in IdentifierNode) && node.name == "new"
+      return ([receiver] + rest).flat_map { order_reads(it, site, defs, locals, visited) }
+    end
+    made = receiver.name
+    own = locals.include?(made) ? [] : [WrittenRead.new(kind: "made", name: made, site: here)]
+    own + rest.flat_map { order_reads(it, site, defs, locals, visited) }
+  else
+    children_of(node).flat_map { order_reads(it, site, defs, locals, visited) }
   end
 end
 
@@ -1965,4 +2068,21 @@ end
 # A branch's scope: the pairs a condition proved, before the locals.
 def with_proof(scope, pairs)
   scope.with(locals: with_bindings(scope.locals, pairs))
+end
+
+# Where each name the top level writes is first written (#514): a def, a
+# struct, a trait, a module, or a constant, by the place of its line among
+# the top level's.
+def written_positions(nodes)
+  mutable positions = {}
+  nodes.each_with_index do |node, index|
+    name = case node
+    in DefNode | StructDefNode | TraitDefNode then node.name
+    in ModuleDefNode then module_name(node)
+    in AssignmentNode then constant_declaration?(node) ? node.name : nil
+    else nil
+    end
+    positions = positions.merge({name => index}) if name.some? && !positions.key?(name)
+  end
+  positions
 end

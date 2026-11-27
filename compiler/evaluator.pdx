@@ -540,6 +540,20 @@ def count_of(receiver, arguments)
   receiver.count(value_at(arguments, 0))
 end
 
+# `max(n)` and `min(n)` (#413): that many, the greatest or the least
+# first, by `<=>` — the sort, cut short, as the seed's. An array's
+# elements, a range's, a hash's pairs, and a set's members alike.
+def counted_extremes(receiver, which, count, bindings)
+  refuse_count(receiver, which, count)
+  # A range is the host's to count, from an end, walking only what it
+  # answers: one too long to walk, or open at the other end, is no matter.
+  return receiver.max(count) if (receiver in Range) && which == "max"
+  return receiver.min(count) if receiver in Range
+  sorted = sorted_values(set_operand(receiver, "'#{which}'"), bindings)
+  ordered = which == "max" ? sorted.reverse : sorted
+  ordered.take(count)
+end
+
 # `DATA` (ADR 0092): the text after the `__END__` line of the file that is
 # run, bound as a top-level constant before its first line runs, beside
 # the `__data__` marker that says the constant is the predefined one. A
@@ -689,7 +703,7 @@ def evaluate_array(node, mutable bindings)
     step = evaluate_expression(element, bindings)
     return step if step.signal != "none"
     bindings = step.bindings
-    elements += step.value
+    elements << produced_value(step, element)
   end
   outcome([elements], bindings)
 end
@@ -731,8 +745,8 @@ def evaluate_binary(node, bindings)
   return left_step if left_step.signal != "none"
   right_step = evaluate_expression(node.right, left_step.bindings)
   return right_step if right_step.signal != "none"
-  left = slot_value(left_step.value)
-  right = slot_value(right_step.value)
+  left = produced_value(left_step, node.left)
+  right = produced_value(right_step, node.right)
   # A struct orders by its own `<=>` (ADR 0054), which is a call, so it
   # cannot ride the host's operators below.
   if (left in ["__struct__", *]) && %w[<=> < <= > >=].include?(node.operator)
@@ -867,7 +881,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
       return block_interrupted(interrupt, scope) if interrupt.some?
       return outcome([results], scope)
@@ -992,7 +1006,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
@@ -1004,7 +1018,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
@@ -1018,7 +1032,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     else
       receiver.select do |element|
@@ -1028,7 +1042,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -1201,7 +1215,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
@@ -1214,7 +1228,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     else
       receiver.reject do |element|
@@ -1224,7 +1238,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -1306,7 +1320,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1346,6 +1360,9 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
   when "reduce", "inject"
+    # The start is explicit (ADR 0036): with none, the seed's refusal, where
+    # nil handed to the host would start the walk (#485).
+    panic("undefined block-taking method #{node.name}") if arguments.empty?
     results = receiver.reduce(value_at(arguments, 0)) do |running, element|
       step = run_guest_block(block, [running, element], scope)
       scope = compacted_since(entry, step.bindings)
@@ -1402,7 +1419,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1414,7 +1431,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1426,13 +1443,16 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
   # Where a true-or-false block first says true (#104), riding the host's
   # by name so a refusal quotes the method written.
   when "index", "find_index"
+    # `index` is an array's alone (#485): a hash's and a range's
+    # Enumerable answers `find_index`, and the seed refuses `index` by name.
+    panic("undefined block-taking method index") if node.name == "index" && !plain_array?(receiver)
     result = receiver.find_index do |element|
       step = run_guest_block(block, [element], scope)
       scope = compacted_since(entry, step.bindings)
@@ -1440,7 +1460,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1452,7 +1472,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1467,7 +1487,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1494,30 +1514,54 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     result = receiver.sort do |left, right|
       step = run_guest_block(block, [left, right], scope)
       scope = compacted_since(entry, step.bindings)
-      slot_value(step.value)
+      ordering_answer(step, node.name)
     end
     outcome([result], scope)
   when "min"
     check_builtin_count(receiver, node.name, arguments.length)
+    # With a count (#413), that many of the least first: the sort by the
+    # block, cut short, as the seed's.
+    unless arguments.empty?
+      count = value_at(arguments, 0)
+      refuse_count(receiver, "min", count)
+      least = set_operand(receiver, "'min'").sort do |left, right|
+        step = run_guest_block(block, [left, right], scope)
+        scope = compacted_since(entry, step.bindings)
+        ordering_answer(step, node.name)
+      end
+      return outcome([least.take(count)], scope)
+    end
     result = receiver.min do |left, right|
       step = run_guest_block(block, [left, right], scope)
       scope = compacted_since(entry, step.bindings)
-      slot_value(step.value)
+      ordering_answer(step, node.name)
     end
     outcome([result], scope)
   when "max"
     check_builtin_count(receiver, node.name, arguments.length)
+    # With a count (#413), that many of the greatest first: the sort by
+    # the block, turned around and cut short, as the seed's.
+    unless arguments.empty?
+      count = value_at(arguments, 0)
+      refuse_count(receiver, "max", count)
+      least = set_operand(receiver, "'max'").sort do |left, right|
+        step = run_guest_block(block, [left, right], scope)
+        scope = compacted_since(entry, step.bindings)
+        ordering_answer(step, node.name)
+      end
+      return outcome([least.reverse.take(count)], scope)
+    end
     result = receiver.max do |left, right|
       step = run_guest_block(block, [left, right], scope)
       scope = compacted_since(entry, step.bindings)
-      slot_value(step.value)
+      ordering_answer(step, node.name)
     end
     outcome([result], scope)
   when "minmax"
     result = receiver.minmax do |left, right|
       step = run_guest_block(block, [left, right], scope)
       scope = compacted_since(entry, step.bindings)
-      slot_value(step.value)
+      ordering_answer(step, node.name)
     end
     outcome([result], scope)
   # The kept and the rest (#104), and exactly one true (#104), riding the
@@ -1530,7 +1574,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
@@ -1542,7 +1586,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1554,7 +1598,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1641,7 +1685,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     when "slice_when"
       elements.slice_when do |left, right|
@@ -1651,7 +1695,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     when "slice_before"
       elements.slice_before do |element|
@@ -1661,7 +1705,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     else
       elements.slice_after do |element|
@@ -1671,7 +1715,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -1946,12 +1990,12 @@ def evaluate_call(node, mutable bindings)
       step = evaluate_expression(argument.value, bindings)
       return step if step.signal != "none"
       bindings = step.bindings
-      keyword_values << [argument.label, slot_value(step.value)]
+      keyword_values << [argument.label, produced_value(step, argument.value)]
     else
       step = evaluate_expression(argument, bindings)
       return step if step.signal != "none"
       bindings = step.bindings
-      arguments += step.value
+      arguments << produced_value(step, argument)
     end
   end
   # Inside a struct method, bare calls reach own methods first (#27).
@@ -2538,11 +2582,11 @@ def evaluate_method_call(node, mutable bindings)
           if argument in KeywordArgumentNode
             step = evaluate_expression(argument.value, bindings)
             bindings = step.bindings
-            keyword_values << [argument.label, slot_value(step.value)]
+            keyword_values << [argument.label, produced_value(step, argument.value)]
           else
             step = evaluate_expression(argument, bindings)
             bindings = step.bindings
-            arguments += step.value
+            arguments << produced_value(step, argument)
           end
         end
         check_call_count("#{struct_slot.first[0]}::#{node.name}", value_at(function_slot.first[2], 0), arguments.length)
@@ -2568,7 +2612,7 @@ def evaluate_method_call(node, mutable bindings)
   # A receiver or an argument that left a `return` or `break` pending
   # stops the call (#208), the seed's operand.
   return step if step.signal != "none"
-  mutable receiver = slot_value(step.value)
+  mutable receiver = produced_value(step, node.receiver)
   bindings = step.bindings
   # `&.`: an absent receiver short-circuits; arguments never run.
   if (node in SafeMethodCallNode) && receiver.nil?
@@ -2591,12 +2635,12 @@ def evaluate_method_call(node, mutable bindings)
       argument_step = evaluate_expression(argument.value, bindings)
       return argument_step if argument_step.signal != "none"
       bindings = argument_step.bindings
-      keyword_values << [argument.label, slot_value(argument_step.value)]
+      keyword_values << [argument.label, produced_value(argument_step, argument.value)]
     else
       argument_step = evaluate_expression(argument, bindings)
       return argument_step if argument_step.signal != "none"
       bindings = argument_step.bindings
-      arguments += argument_step.value
+      arguments << produced_value(argument_step, argument)
     end
   end
   # A keyword a builtin does not take refuses before any arm can answer
@@ -3001,9 +3045,9 @@ def evaluate_method_call(node, mutable bindings)
   when "rindex" then receiver.rindex(value_at(arguments, 0))
   when "sum" then arguments.empty? ? receiver.sum : receiver.sum(value_at(arguments, 0))
   when "sort" then sorted_values(receiver, bindings)
-  when "min" then extreme_value(receiver, "min", bindings)
+  when "min" then arguments.empty? ? extreme_value(receiver, "min", bindings) : counted_extremes(receiver, "min", value_at(arguments, 0), bindings)
   when "minmax" then [extreme_value(receiver, "min", bindings), extreme_value(receiver, "max", bindings)]
-  when "max" then extreme_value(receiver, "max", bindings)
+  when "max" then arguments.empty? ? extreme_value(receiver, "max", bindings) : counted_extremes(receiver, "max", value_at(arguments, 0), bindings)
   when "between?" then receiver.between?(value_at(arguments, 0), value_at(arguments, 1))
   # One range for both bounds (#101), or the two bounds.
   when "clamp" then arguments.length == 1 ? receiver.clamp(value_at(arguments, 0)) : receiver.clamp(value_at(arguments, 0), value_at(arguments, 1))
@@ -4622,6 +4666,23 @@ def namespace_for(bindings, name)
   nil
 end
 
+# What to say of an expression read for a value it did not produce: the
+# seed's sentence (#473, #624), naming it as the program wrote it. A
+# `yield` whose block answered nothing is the block's doing.
+def no_value_sentence(node, bindings)
+  case node
+  in CallNode(name:) then "#{name} produced no value"
+  in MethodCallNode(name:) then "#{name} produced no value"
+  in SafeMethodCallNode(name:) then "#{name} produced no value"
+  in IdentifierNode(name:) then "#{name} produced no value"
+  in YieldNode then silent_yield_sentence(bindings)
+  in IfNode then "the if produced no value"
+  in CaseNode | CaseInNode then "the case produced no value"
+  else
+    "the expression produced no value"
+  end
+end
+
 def note_named(sourcing, used, open, key, close)
   panic("named#{open}#{key}#{close} after unnumbered(#{used})") if sourcing == "unnumbered"
   panic("named#{open}#{key}#{close} after numbered") if sourcing == "numbered"
@@ -4661,6 +4722,13 @@ def ordered_answer(name, receiver, arguments, bindings)
   return low unless above_low
   return high unless below_high
   receiver
+end
+
+# What a comparison block answered (#485): the value, or the seed's
+# refusal where it answered nothing, which handed to the host read as nil.
+def ordering_answer(step, name)
+  panic("'#{name}' block answers -1, 0, or 1, got nothing") if step.value.empty?
+  slot_value(step.value)
 end
 
 def ordering_sign(ordering)
@@ -4730,6 +4798,14 @@ def plain_array?(value)
   return false unless value in Array
   return false if value in ["__struct__", *] | ["__symbol__", *] | ["__enum_case__", *] | ["__type__", *] | ["__set__", *]
   true
+end
+
+# What an expression's step produced, read where a value is needed: an
+# element, an argument, a receiver (#624). One that produced none refuses
+# as the seed does, where reading the empty slot answered nil and ran on.
+def produced_value(step, node)
+  panic(no_value_sentence(node, step.bindings)) if step.value.empty?
+  slot_value(step.value)
 end
 
 # `product` (#104): every way to take one element from each array in
@@ -4831,6 +4907,13 @@ def read_format_digits(letters, start)
     at += 1
   end
   [number, at]
+end
+
+# The count `max(n)` and `min(n)` take (#413): an Integer no less than
+# zero, refused otherwise in the seed's sentences.
+def refuse_count(receiver, name, count)
+  panic("undefined method #{name} for #{render_inspect(receiver)} with [#{render_inspect(count)}]") unless count in Integer
+  panic("negative size (#{count})") if count < 0
 end
 
 # A number or string method handed a guest value it does not take (#330):
@@ -5733,6 +5816,16 @@ end
 
 def values_at_of(receiver, arguments)
   arguments.flat_map { |position| receiver.values_at(position) }
+end
+
+# What a block answered where its method reads it as true or false: the
+# answer, or the seed's refusal by the method's name as written (#485).
+# Handed on to the host, anything else was refused by the host's own
+# method, `select` where `filter` was written.
+def verdict_answer(step, name)
+  answer = block_answer(step, name)
+  return answer if answer == true || answer == false
+  panic("#{name}'s block must answer true or false, got #{render_inspect(answer, step.bindings)}")
 end
 
 # The bindings a program starts with once the core has run in them (ADR
