@@ -1352,6 +1352,36 @@ fn portland_lint_finds_a_line_at_the_margin_inside_a_statement() {
     assert_eq!(String::from_utf8(output.stdout).unwrap(), "ok\n");
 }
 
+/// The linter finds a name of one character (#518): a local, a def's
+/// parameter, and a block's, a throwaway among them. A lone `_` binds
+/// nothing, and is no name.
+#[test]
+fn portland_lint_finds_a_name_of_one_character() {
+    let driver = format!("{}/../compiler/lint.pdx", env!("CARGO_MANIFEST_DIR"));
+    let sample = std::env::temp_dir().join("lint_short_names_sample.pdx");
+    std::fs::write(
+        &sample,
+        "def doubled(n) = n * 2\n\ncount = 1\nmutable c = 2\n[1].each { |x| p x }\n[1].each { |_| p count }\n{ a: 1 }.each do |key, v|\n  p key\nend\n",
+    )
+    .unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(&driver)
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    assert!(
+        !output.status.success(),
+        "a file with findings should refuse"
+    );
+    let path = sample.display();
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        format!(
+            "{path}:1: n is a name of one character — name what it holds\n{path}:4: c is a name of one character — name what it holds\n{path}:5: x is a name of one character — name what it holds\n{path}:7: v is a name of one character — name what it holds\n"
+        )
+    );
+}
+
 /// `report.pdx` — a program's own loud choices read back to it (#30):
 /// every `panic` with the reason its writer gave, and every `mutable`
 /// name with the lines that rebind it. It judges nothing and never

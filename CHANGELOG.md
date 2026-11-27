@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The linter finds a name of one character** ([#518](https://github.com/portlandlang/portland/issues/518)) — a local, a def's parameter, or a block's, a throwaway among them: `character`, not `c`. A lone `_` binds nothing, and is passed over. The compiler's and the core's own source have none, and the linter built natively finds the same.
+
 - **`max(n)` and `min(n)`** ([#413](https://github.com/portlandlang/portland/issues/413)) — that many, the greatest or the least first, by `<=>` or by a comparator block, over an array, a range, a hash's pairs, and a set's members, on the seed and hosted alike: `(1..10).max(2)` is `[10, 9]`. A range of integers is counted from an end, so `(..1).max(2)` is `[1, 0]` and a range too long to walk is not walked; an endless range has no greatest and a beginless one no least, in Ruby's words. A negative count, or one that is no Integer, refuses. They refused on the count. The count rows of ruby/spec's range and Enumerable `max` and `min` are ported.
 
 - **The seed and the compiler agree on a few block-taking calls** ([#485](https://github.com/portlandlang/portland/issues/485)):
