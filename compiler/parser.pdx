@@ -3918,6 +3918,11 @@ def parse_yield(tokens, position)
     end
     return Step.new(node: yield_node(arguments.nodes, line: line), position: arguments.position)
   end
+  # A bracket after a space hands an array or indexes what the block
+  # answered (#424), and is refused in a command's words.
+  if operator_at?(tokens, position, ["["]) && token.leading_space
+    return Step.new(node: error_node("ambiguous without parens — write yield([...]) to pass an array or yield[...] to index"), position: skip_line_at(tokens, position))
+  end
   starts_a_value = token.leading_space && (%w[float identifier integer string symbol symbol_array word_array regex].include?(token.kind) || (token.keyword? && %w[false nil self true].include?(token.text)))
   return Step.new(node: yield_node([], line: line), position: position) unless starts_a_value
 
