@@ -1346,6 +1346,9 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
   when "reduce", "inject"
+    # The start is explicit (ADR 0036): with none, the seed's refusal, where
+    # nil handed to the host would start the walk (#485).
+    panic("undefined block-taking method #{node.name}") if arguments.empty?
     results = receiver.reduce(value_at(arguments, 0)) do |running, element|
       step = run_guest_block(block, [running, element], scope)
       scope = compacted_since(entry, step.bindings)

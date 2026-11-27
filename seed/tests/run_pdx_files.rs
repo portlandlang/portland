@@ -5566,6 +5566,32 @@ fn join_flattens_nested_arrays_and_refuses_nil() {
     assert_both_oracles_refuse("join_nil_refusal.pdx", None, &cases);
 }
 
+/// `reduce` and `inject` take their start explicitly (ADR 0036): with a
+/// block and none, both oracles refuse by name (#485), over an array, a
+/// hash, and a range. The compiler ran them from nil.
+#[test]
+fn reduce_without_a_start_refuses_on_both_oracles() {
+    let cases = [
+        (
+            "p([1, 2, 3].reduce { |sum, number| sum + number })\n",
+            "undefined block-taking method reduce",
+        ),
+        (
+            "p([1, 2].inject { |sum, number| sum + number })\n",
+            "undefined block-taking method inject",
+        ),
+        (
+            "p({ a: 1 }.reduce { |kept, pair| kept })\n",
+            "undefined block-taking method reduce",
+        ),
+        (
+            "p((1..4).reduce { |product, number| product * number })\n",
+            "undefined block-taking method reduce",
+        ),
+    ];
+    assert_both_oracles_refuse("reduce_without_a_start.pdx", None, &cases);
+}
+
 /// A comparator block's rebindings carry from one comparison to the next
 /// on both implementations, in Ruby's call order — the hosted evaluator
 /// had kept each inside its comparison — and `min`/`max` order arrays of
