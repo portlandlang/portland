@@ -3237,24 +3237,17 @@ fn a_matchs_positions_refuse_a_negative_index() {
     assert_both_oracles_refuse("match_negative_position.pdx", None, &cases);
 }
 
-/// A count given to `max` or `min` refuses on both oracles in one
-/// sentence, with or without a comparator block (#332): the hosted
-/// evaluator checks a range's argument count as it does an array's.
+/// A count given to `max` or `min` answers alike on both oracles, with or
+/// without a comparator block (#332, #413): the hosted evaluator reads a
+/// range's count as it does an array's. Both refused it until the count
+/// form was built.
 #[test]
-fn a_count_to_max_or_min_refuses_on_both_oracles() {
-    let cases = [
-        ("p((1..10).max(2))\n", "'max' takes 0 arguments, got 1"),
-        ("p((1..10).min(2))\n", "'min' takes 0 arguments, got 1"),
-        (
-            "p((1..10).max(2) { |left, right| left <=> right })\n",
-            "'max' takes 0 arguments, got 1",
-        ),
-        (
-            "p([3, 1].min(2) { |left, right| left <=> right })\n",
-            "'min' takes 0 arguments, got 1",
-        ),
-    ];
-    assert_both_oracles_refuse("counted_extreme.pdx", None, &cases);
+fn a_count_to_max_or_min_answers_alike_on_both_oracles() {
+    assert_both_print(
+        "counted_extreme.pdx",
+        "p((1..10).max(2))\np((1..10).min(2))\np((1..10).max(2) { |left, right| left <=> right })\np([3, 1].min(2) { |left, right| left <=> right })\n",
+        "[10, 9]\n[1, 2]\n[10, 9]\n[1, 3]\n",
+    );
 }
 
 /// A refusal about a guest value names it as the guest writes it on both
@@ -5661,6 +5654,41 @@ fn a_comparison_block_that_answers_nothing_says_so() {
         ),
     ];
     assert_both_oracles_refuse("comparison_nothing.pdx", None, &cases);
+}
+
+/// `max(n)` and `min(n)` (#413): that many, the greatest or the least
+/// first, by `<=>` or by a comparator block, over an array, a range, a
+/// hash's pairs, and a set's members. A range of integers is counted from
+/// an end, so an open start is no matter and a long range is not walked.
+/// A count that is no Integer, or is negative, refuses. Ruby 4.0.9 prints
+/// the same lines.
+#[test]
+fn max_and_min_take_a_count() {
+    assert_both_print(
+        "max_and_min_counted.pdx",
+        "p([3, 1, 2].max(2), [3, 1, 2].min(2), [3, 1, 2].max(5), [3, 1, 2].max(0), [].max(2))\np((1..10).max(2), (1...10).min(2), (100..10).max(2), (..1).max(2), (1..).min(2))\np((0...4611686018427387903).max(2))\np([3, 1, 2].max(2) { |left, right| left <=> right }, [3, 1, 2].min(2) { |left, right| right <=> left })\np({ a: 1, b: 2 }.max(1), { a: 1, b: 2 }.min(2))\np(Set[3, 1, 2].max(2), [1, 3, 3, 2].max(2), [\"b\", \"a\", \"c\"].min(2))\n",
+        "[3, 2]\n[1, 2]\n[3, 2, 1]\n[]\n[]\n[10, 9]\n[1, 2]\n[]\n[1, 0]\n[1, 2]\n[4611686018427387902, 4611686018427387901]\n[3, 2]\n[3, 2]\n[[:b, 2]]\n[[:a, 1], [:b, 2]]\n[3, 2]\n[3, 3]\n[\"a\", \"b\"]\n",
+    );
+    let cases = [
+        ("p([1].max(-1))\n", "negative size (-1)"),
+        (
+            "p([1, 2].min(nil) { |left, right| left <=> right })\n",
+            "undefined method min for [1, 2] with [nil]",
+        ),
+        (
+            "p([1, 2].max(nil))\n",
+            "undefined method max for [1, 2] with [nil]",
+        ),
+        (
+            "p((1..).max(2))\n",
+            "cannot get the maximum of endless range",
+        ),
+        (
+            "p((..1).min(2))\n",
+            "cannot get the minimum of beginless range",
+        ),
+    ];
+    assert_both_oracles_refuse("max_and_min_counted_refusals.pdx", None, &cases);
 }
 
 /// An expression read for a value it did not produce refuses on both

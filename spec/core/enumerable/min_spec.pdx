@@ -104,3 +104,17 @@ context "Enumerable#min" do
     expect(Set[3, 1, 2].min).to eq(1)
   end
 end
+
+context "Enumerable#min when called with an argument n" do
+  specify "returns an array containing the minimum n elements" do
+    expect(numerous(INTEGERS).min(2)).to eq([22, 333])
+  end
+
+  specify "returns an array containing the minimum n elements, with a block" do
+    expect(numerous(INTEGERS).min(2) { |left, right| left * 2 <=> right * 2 }).to eq([22, 333])
+  end
+
+  specify "returns an array containing the minimum n elements of length x where x < n" do
+    expect(numerous(INTEGERS).min(500).length).to eq(5)
+  end
+end

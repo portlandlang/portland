@@ -81,6 +81,48 @@ fn integer_ends(range: &Value) -> Option<(Option<i64>, Option<i64>, bool)> {
     Some((as_integer(start)?, as_integer(end)?, exclusive))
 }
 
+/// `max(n)` and `min(n)` of a range of integers (#413): the greatest
+/// counted down from its last, or the least counted up from its start,
+/// stopping at the other end. An endless range has no greatest and a
+/// beginless one no least, in Ruby's words.
+fn integer_range_extremes(
+    start: Option<i64>,
+    end: Option<i64>,
+    exclusive: bool,
+    which: &str,
+    count: usize,
+) -> Vec<Value> {
+    let last = end.map(|end| i128::from(end) - i128::from(exclusive));
+    let (from, step, stop) = if which == "max" {
+        let Some(last) = last else {
+            panic!("cannot get the maximum of endless range");
+        };
+        (last, -1, start.map(i128::from))
+    } else {
+        let Some(start) = start else {
+            panic!("cannot get the minimum of beginless range");
+        };
+        (i128::from(start), 1, last)
+    };
+    let mut answered = Vec::new();
+    let mut current = from;
+    while answered.len() < count {
+        let past = match stop {
+            Some(stop) => (step < 0 && current < stop) || (step > 0 && current > stop),
+            None => false,
+        };
+        let Ok(value) = i64::try_from(current) else {
+            break;
+        };
+        if past {
+            break;
+        }
+        answered.push(Value::Integer(value));
+        current += step;
+    }
+    answered
+}
+
 /// A range of integers, either end open.
 fn integer_range(start: Option<i64>, end: Option<i64>, exclusive: bool) -> Value {
     Value::Range {
@@ -5740,6 +5782,47 @@ impl<W: std::io::Write> Interpreter<W> {
                 high.unwrap_or(Value::Nil),
             ]));
         }
+        // `max(n)` and `min(n)` (#413): that many, the greatest or the
+        // least first, by `<=>` or by a comparator block — the sort, cut
+        // short. An array's elements, a range's, a hash's pairs, and a
+        // set's members alike, as Ruby's.
+        if matches!(name, "max" | "min")
+            && let [Value::Integer(count)] = arguments.as_slice()
+            && matches!(
+                receiver,
+                Value::Array(_) | Value::Range { .. } | Value::Hash(_) | Value::Set(_)
+            )
+        {
+            if *count < 0 {
+                panic!("negative size ({count})");
+            }
+            let count = *count as usize;
+            // A range of integers is counted from its end, or its start,
+            // walking only what it answers: an open end on the other side
+            // is no matter, and a range too long to walk is not walked.
+            if block.is_none()
+                && matches!(receiver, Value::Range { .. })
+                && let Some((start, end, exclusive)) = integer_ends(&receiver)
+            {
+                return Some(Value::array(integer_range_extremes(
+                    start, end, exclusive, name, count,
+                )));
+            }
+            let elements = Value::array(set_operand(&receiver, &format!("'{name}'")));
+            let sorted = self.method_call(elements, "sort", Vec::new(), Vec::new(), block);
+            if self.pending.is_some() {
+                return None;
+            }
+            let Some(Value::Array(sorted)) = sorted else {
+                unreachable!("sort answers an array");
+            };
+            let ordered: Vec<Value> = if name == "max" {
+                sorted.iter().rev().cloned().collect()
+            } else {
+                sorted.iter().cloned().collect()
+            };
+            return Some(Value::array(ordered.into_iter().take(count).collect()));
+        }
         // `value.class` answers the type (ADR 0074) — the static kind of
         // reflection: a name with `new`, its type functions, and `name`. A
         // nil receiver falls through to nil's own refusal.
@@ -6926,11 +7009,18 @@ impl<W: std::io::Write> Interpreter<W> {
                     }
                     Some(Value::array(sorted))
                 }
-                // A count beside the comparator block is the same wrong
-                // count it is without one, in the same sentence (#332).
+                // A count that is no Integer beside the comparator block is
+                // the same wrong count it is without one, in the same
+                // sentence (#332, #413): an Integer one is answered above.
                 (Value::Array(_), "min" | "max", counted) if !counted.is_empty() => {
-                    refusal("arity");
-                    panic!("'{name}' takes 0 arguments, got {}", counted.len())
+                    refusal("arguments");
+                    let shown: Vec<String> =
+                        counted.iter().map(|argument| argument.shown()).collect();
+                    panic!(
+                        "undefined method {name} for {} with [{}]",
+                        receiver.shown(),
+                        shown.join(", ")
+                    )
                 }
                 // `min`/`max` by a comparator block (#99): the first of
                 // equals, and absent for an empty array, as without one.
