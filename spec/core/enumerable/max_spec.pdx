@@ -102,3 +102,17 @@ context "Enumerable#max" do
     expect(Set[3, 1, 2].max).to eq(3)
   end
 end
+
+context "Enumerable#max when called with an argument n" do
+  specify "returns an array containing the maximum n elements" do
+    expect(numerous(INTEGERS).max(2)).to eq([1010101010, 666666])
+  end
+
+  specify "returns an array containing the maximum n elements, with a block" do
+    expect(numerous(INTEGERS).max(2) { |left, right| left * 2 <=> right * 2 }).to eq([1010101010, 666666])
+  end
+
+  specify "returns an array containing the maximum n elements of length x where x < n" do
+    expect(numerous(INTEGERS).max(500).length).to eq(5)
+  end
+end

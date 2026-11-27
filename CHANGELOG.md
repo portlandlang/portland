@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`max(n)` and `min(n)`** ([#413](https://github.com/portlandlang/portland/issues/413)) — that many, the greatest or the least first, by `<=>` or by a comparator block, over an array, a range, a hash's pairs, and a set's members, on the seed and hosted alike: `(1..10).max(2)` is `[10, 9]`. A range of integers is counted from an end, so `(..1).max(2)` is `[1, 0]` and a range too long to walk is not walked; an endless range has no greatest and a beginless one no least, in Ruby's words. A negative count, or one that is no Integer, refuses. They refused on the count. The count rows of ruby/spec's range and Enumerable `max` and `min` are ported.
+
 - **The seed and the compiler agree on a few block-taking calls** ([#485](https://github.com/portlandlang/portland/issues/485)):
   - `reduce` and `inject` with a block and no start refuse hosted as on the seed, since the start is explicit (ADR 0036). The compiler ran them from nil.
   - A block read as true or false refuses by the method's name as written on both: `filter's block`, `detect's block`, `index's block`. The compiler named the host's method (`select`, `find_index`), and the core's `filter`, `find_all`, and `detect` named their twins.

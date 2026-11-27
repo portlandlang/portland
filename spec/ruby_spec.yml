@@ -692,12 +692,12 @@ core/enumerable/find_index_spec.rb:
 core/enumerable/min_spec.rb:
   pdx: [spec/core/enumerable/min_spec.pdx]
   status: partial_intentional
-  reason: "min takes no count; elements without <=> and incompatible pairs refuse where Ruby raises; the nil-holding row orders through truthiness; a comparator answers -1, 0, or 1."
+  reason: "A nil count refuses where Ruby reads it as none; elements without <=> and incompatible pairs refuse where Ruby raises; the nil-holding row orders through truthiness; a comparator answers -1, 0, or 1."
   link: docs/ruby/ordering.md
 core/enumerable/max_spec.rb:
   pdx: [spec/core/enumerable/max_spec.pdx]
   status: partial_intentional
-  reason: "max takes no count; elements without <=> and incompatible pairs refuse where Ruby raises; the nil-holding row orders through truthiness; a comparator answers -1, 0, or 1."
+  reason: "A nil count refuses where Ruby reads it as none; elements without <=> and incompatible pairs refuse where Ruby raises; the nil-holding row orders through truthiness; a comparator answers -1, 0, or 1."
   link: docs/ruby/ordering.md
 core/enumerable/min_by_spec.rb:
   pdx: [spec/core/enumerable/min_by_spec.pdx]
@@ -2575,13 +2575,13 @@ core/range/count_spec.rb:
 core/range/max_spec.rb:
   pdx: [spec/core/range/max_spec.pdx]
   status: partial_planned
-  reason: "A count argument refuses, the count form being unbuilt (#413); Time waits on #334; endless and non-integer exclusive ranges refuse where Ruby raises, and a string range's succ walk refuses by name."
-  link: https://github.com/portlandlang/portland/issues/413
+  reason: "Time waits on #334; endless and non-integer ranges refuse where Ruby raises, and a string range's succ walk refuses by name; no bignums, so the very large range stays behind; no to_int conversion (ADR 0036)."
+  link: https://github.com/portlandlang/portland/issues/334
 core/range/min_spec.rb:
   pdx: [spec/core/range/min_spec.pdx]
   status: partial_planned
-  reason: "A count argument refuses, the count form being unbuilt (#413); Time waits on #334; endless and non-integer exclusive ranges refuse where Ruby raises."
-  link: https://github.com/portlandlang/portland/issues/413
+  reason: "Time waits on #334; beginless and non-integer ranges refuse where Ruby raises, and a string range's succ walk refuses by name; no bignums, so the very large range stays behind; no to_int conversion (ADR 0036)."
+  link: https://github.com/portlandlang/portland/issues/334
 core/range/step_spec.rb:
   pdx: [spec/core/range/step_spec.pdx]
   status: partial_planned
