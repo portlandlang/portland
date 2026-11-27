@@ -3867,6 +3867,13 @@ impl<'source> Parser<'source> {
             }
             return positional;
         }
+        // A bracket after a space hands an array or indexes what the block
+        // answered (#424), and is refused in a command's words.
+        if next.kind == TokenKind::LeftBracket && next.leading_space {
+            panic!(
+                "ambiguous without parens — write yield([...]) to pass an array or yield[...] to index"
+            );
+        }
         let starts_a_value = next.leading_space
             && (matches!(
                 next.kind,

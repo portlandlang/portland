@@ -780,6 +780,16 @@ fn portland_evaluator_reports_the_seed_wording_on_errors() {
             "p \"abc\".slice (0)\n",
             "ambiguous without parens — write slice(...) with no space to call",
         ),
+        // `yield` before a bracket with a space is the same shape (#424):
+        // it hands an array, or indexes what the block answered.
+        (
+            "def each_empty\n  yield []\nend\neach_empty { p it }\n",
+            "ambiguous without parens — write yield([...]) to pass an array or yield[...] to index",
+        ),
+        (
+            "def each_one\n  yield [1]\nend\neach_one { p it }\n",
+            "ambiguous without parens — write yield([...]) to pass an array or yield[...] to index",
+        ),
         // The escapes are a closed set. Until 2026-08-12 the compiler passed
         // an unknown one through as its bare character — accepting a string
         // the seed refused, and silently, since no fixture could hold one.
