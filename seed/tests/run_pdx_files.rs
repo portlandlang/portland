@@ -6738,6 +6738,92 @@ fn portland_check_passes_a_clean_program_without_running_it() {
     );
 }
 
+/// What `check.pdx` says of a sample, standard output and error together,
+/// and whether it passed.
+fn checked_sample(name: &str, source: &str) -> (bool, String) {
+    let sample = std::env::temp_dir().join(name);
+    std::fs::write(&sample, source).unwrap();
+    let checked = Command::new(env!("CARGO_BIN_EXE_pdx"))
+        .arg(format!(
+            "{}/../compiler/check.pdx",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .arg(&sample)
+        .output()
+        .expect("failed to run pdx");
+    let said = format!(
+        "{}{}",
+        String::from_utf8_lossy(&checked.stdout),
+        String::from_utf8_lossy(&checked.stderr)
+    );
+    (checked.status.success(), said)
+}
+
+/// A file's top level runs in order (#514), so a line that reads a def, a
+/// constant, a struct, a module, or a trait written below it refuses when
+/// it runs. The checker says so first, in the run's words, at the line
+/// that reads it, through any def that line calls. A def's body that reads
+/// a name written below it is fine where it is called after that name.
+#[test]
+fn the_checker_refuses_a_name_read_above_where_it_is_written() {
+    let cases = [
+        (
+            "struct Point\n  horizontal\n\n  include Labelled\nend\n\ntrait Labelled\n  def label = \"point #{horizontal}\"\nend\n",
+            "undefined trait Labelled\n  1 | struct Point",
+        ),
+        (
+            "BIGGER = LIMIT * 2\nLIMIT = 10\n",
+            "'LIMIT' is not defined\n  1 | BIGGER = LIMIT * 2",
+        ),
+        (
+            "BIGGER = doubled(10)\n\ndef doubled(number) = number * 2\n",
+            "'doubled' is not defined\n  1 | BIGGER = doubled(10)",
+        ),
+        (
+            "p Point.new(x: 1)\nstruct Point\n  x\nend\n",
+            "undefined struct Point\n  1 | p Point.new(x: 1)",
+        ),
+        (
+            "def first = second\np first\ndef second = 1\n",
+            "'second' is not defined\n  2 | p first",
+        ),
+        (
+            "[1].each { p doubled(it) }\ndef doubled(number) = number * 2\n",
+            "'doubled' is not defined\n  1 | [1].each { p doubled(it) }",
+        ),
+    ];
+    for (source, expected) in cases {
+        let (passed, said) = checked_sample("written_order.pdx", source);
+        assert!(!passed, "the checker should refuse {source:?}");
+        assert!(
+            said.contains(expected),
+            "the checker should say {expected:?}, got: {said}"
+        );
+        let sentence = expected.lines().next().unwrap();
+        let seed = Command::new(env!("CARGO_BIN_EXE_pdx"))
+            .arg(std::env::temp_dir().join("written_order.pdx"))
+            .output()
+            .expect("failed to run pdx");
+        assert!(
+            String::from_utf8_lossy(&seed.stderr).contains(sentence),
+            "the seed should say {sentence:?} of {source:?}, got: {}",
+            String::from_utf8_lossy(&seed.stderr)
+        );
+    }
+    let passing = [
+        "def go = doubled(2)\ndef doubled(number) = number * 2\np go\n",
+        "def count_down(number) = number == 0 ? 0 : count_down(number - 1)\np count_down(3)\n",
+        "def show(size) = size\np show(1)\ndef size = 3\n",
+        "[1].each { |size| p size }\ndef size = 3\n",
+        "LIMIT = 10\nBIGGER = LIMIT * 2\np BIGGER\n",
+        "struct Box\n  item\n  def late = LATER\nend\nLATER = 2\np Box.new(item: 1).late\n",
+    ];
+    for source in passing {
+        let (passed, said) = checked_sample("written_order_passes.pdx", source);
+        assert!(passed, "the checker should pass {source:?}, got: {said}");
+    }
+}
+
 /// ADR 0018: the compiler delegates `/` and `%` to the host, so Ruby's
 /// floored semantics must reach hosted programs unchanged.
 #[test]

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **The checker refuses a name read above the line that writes it** ([#514](https://github.com/portlandlang/portland/issues/514)) — a file's top level runs in order, so `BIGGER = LIMIT * 2` above `LIMIT = 10`, a call above its def, `Point.new` above `struct Point`, and an `include` above its trait each refuse when the line runs. The checker passed all of them, and now refuses each in the run's own words, at the line that reads it. A def's body reads its names when it is called, so what a def reads counts at the line that calls it, and a name a parameter, a block, or a local may hold is passed over.
+
 - **Hosted, an expression that produced no value refuses as on the seed** ([#624](https://github.com/portlandlang/portland/issues/624)) — read as an element, an argument, a receiver, an interpolation, or an operand: `puts produced no value`, `show produced no value`, `twice's block produced no value`. The evaluator read the missing value as nil and ran on, so `p([show])` printed `[]` and `1 + yield` said `cannot apply '+' to 1 and nil`.
 
 - **The seed names an expression that produced no value as it was written** ([#473](https://github.com/portlandlang/portland/issues/473)) — `puts produced no value`, where it printed the expression in Rust's debug form (`Call { arguments: [Integer(1)], … } produced no value`). A call, a method, or a bare name is named; a `yield`, an `if`, or a `case` is named by its kind. The hosted evaluator runs on past such an expression ([#624](https://github.com/portlandlang/portland/issues/624)).
