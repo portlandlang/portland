@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Hosted, an expression that produced no value refuses as on the seed** ([#624](https://github.com/portlandlang/portland/issues/624)) — read as an element, an argument, a receiver, an interpolation, or an operand: `puts produced no value`, `show produced no value`, `twice's block produced no value`. The evaluator read the missing value as nil and ran on, so `p([show])` printed `[]` and `1 + yield` said `cannot apply '+' to 1 and nil`.
+
 - **The seed names an expression that produced no value as it was written** ([#473](https://github.com/portlandlang/portland/issues/473)) — `puts produced no value`, where it printed the expression in Rust's debug form (`Call { arguments: [Integer(1)], … } produced no value`). A call, a method, or a bare name is named; a `yield`, an `if`, or a `case` is named by its kind. The hosted evaluator runs on past such an expression ([#624](https://github.com/portlandlang/portland/issues/624)).
 
 - **Pinning reads each arm of an `if` with what its condition proved, where it gathers a def's ways out** ([#607](https://github.com/portlandlang/portland/issues/607)) — the walk of a body read each arm so, and `value_candidates`, which gathers the values a def answers when it calls itself through another, read both arms with the bindings from before the condition. Inside a `case` arm for a struct, the subject read as one of several structs there, and a call handed it named a combination never pinned, so a pair of defs that call each other, as `returns_in_body` and `return_types_in` do, never settled. `render_type` and `render_native_type` open what they are handed, as `synthesize_name` does.
