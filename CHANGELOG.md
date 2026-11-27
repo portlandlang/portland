@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **The seed and the compiler agree on a few block-taking calls** ([#485](https://github.com/portlandlang/portland/issues/485)):
+  - `reduce` and `inject` with a block and no start refuse hosted as on the seed, since the start is explicit (ADR 0036). The compiler ran them from nil.
+  - A block read as true or false refuses by the method's name as written on both: `filter's block`, `detect's block`, `index's block`. The compiler named the host's method (`select`, `find_index`), and the core's `filter`, `find_all`, and `detect` named their twins.
+  - `index` with a block is an array's alone, and a hash's or a range's refuses hosted as on the seed.
+  - A comparison block that answers nothing says `got nothing` hosted, where it said `got nil`.
+  - `minmax`'s comparison block is refused as `minmax`'s on the seed, where it was refused as `min`'s.
+
 - **`yield []` refuses as `p [1]` does** ([#424](https://github.com/portlandlang/portland/issues/424)) — `ambiguous without parens — write yield([...]) to pass an array or yield[...] to index`, on the seed and hosted alike. A bracket after `yield` and a space either hands an array or indexes what the block answered. The seed printed a token in Rust's debug form for `yield []`, the compiler said `expected closing bracket`, and `yield [1]` indexed on both, each refusing in other words.
 
 - **The checker refuses a name read above the line that writes it** ([#514](https://github.com/portlandlang/portland/issues/514)) — a file's top level runs in order, so `BIGGER = LIMIT * 2` above `LIMIT = 10`, a call above its def, `Point.new` above `struct Point`, and an `include` above its trait each refuse when the line runs. The checker passed all of them, and now refuses each in the run's own words, at the line that reads it. A def's body reads its names when it is called, so what a def reads counts at the line that calls it, and a name a parameter, a block, or a local may hold is passed over.

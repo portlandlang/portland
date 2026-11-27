@@ -867,7 +867,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
       return block_interrupted(interrupt, scope) if interrupt.some?
       return outcome([results], scope)
@@ -992,7 +992,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
@@ -1004,7 +1004,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
@@ -1018,7 +1018,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     else
       receiver.select do |element|
@@ -1028,7 +1028,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -1201,7 +1201,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
@@ -1214,7 +1214,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     else
       receiver.reject do |element|
@@ -1224,7 +1224,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -1306,7 +1306,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1346,6 +1346,9 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([receiver], scope)
   when "reduce", "inject"
+    # The start is explicit (ADR 0036): with none, the seed's refusal, where
+    # nil handed to the host would start the walk (#485).
+    panic("undefined block-taking method #{node.name}") if arguments.empty?
     results = receiver.reduce(value_at(arguments, 0)) do |running, element|
       step = run_guest_block(block, [running, element], scope)
       scope = compacted_since(entry, step.bindings)
@@ -1402,7 +1405,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1414,7 +1417,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1426,13 +1429,16 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
   # Where a true-or-false block first says true (#104), riding the host's
   # by name so a refusal quotes the method written.
   when "index", "find_index"
+    # `index` is an array's alone (#485): a hash's and a range's
+    # Enumerable answers `find_index`, and the seed refuses `index` by name.
+    panic("undefined block-taking method index") if node.name == "index" && !plain_array?(receiver)
     result = receiver.find_index do |element|
       step = run_guest_block(block, [element], scope)
       scope = compacted_since(entry, step.bindings)
@@ -1440,7 +1446,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1452,7 +1458,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1467,7 +1473,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1494,7 +1500,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     result = receiver.sort do |left, right|
       step = run_guest_block(block, [left, right], scope)
       scope = compacted_since(entry, step.bindings)
-      slot_value(step.value)
+      ordering_answer(step, node.name)
     end
     outcome([result], scope)
   when "min"
@@ -1502,7 +1508,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     result = receiver.min do |left, right|
       step = run_guest_block(block, [left, right], scope)
       scope = compacted_since(entry, step.bindings)
-      slot_value(step.value)
+      ordering_answer(step, node.name)
     end
     outcome([result], scope)
   when "max"
@@ -1510,14 +1516,14 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
     result = receiver.max do |left, right|
       step = run_guest_block(block, [left, right], scope)
       scope = compacted_since(entry, step.bindings)
-      slot_value(step.value)
+      ordering_answer(step, node.name)
     end
     outcome([result], scope)
   when "minmax"
     result = receiver.minmax do |left, right|
       step = run_guest_block(block, [left, right], scope)
       scope = compacted_since(entry, step.bindings)
-      slot_value(step.value)
+      ordering_answer(step, node.name)
     end
     outcome([result], scope)
   # The kept and the rest (#104), and exactly one true (#104), riding the
@@ -1530,7 +1536,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([results], scope)
@@ -1542,7 +1548,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1554,7 +1560,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
         interrupt = step
         break
       end
-      block_answer(step, node.name)
+      verdict_answer(step, node.name)
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
     outcome([result], scope)
@@ -1641,7 +1647,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     when "slice_when"
       elements.slice_when do |left, right|
@@ -1651,7 +1657,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     when "slice_before"
       elements.slice_before do |element|
@@ -1661,7 +1667,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     else
       elements.slice_after do |element|
@@ -1671,7 +1677,7 @@ def evaluate_block_call(node, receiver, arguments, mutable scope)
           interrupt = step
           break
         end
-        block_answer(step, node.name)
+        verdict_answer(step, node.name)
       end
     end
     return block_interrupted(interrupt, scope) if interrupt.some?
@@ -4680,6 +4686,13 @@ def ordered_answer(name, receiver, arguments, bindings)
   receiver
 end
 
+# What a comparison block answered (#485): the value, or the seed's
+# refusal where it answered nothing, which handed to the host read as nil.
+def ordering_answer(step, name)
+  panic("'#{name}' block answers -1, 0, or 1, got nothing") if step.value.empty?
+  slot_value(step.value)
+end
+
 def ordering_sign(ordering)
   return -1 if ordering < 0
   return 1 if ordering > 0
@@ -5758,6 +5771,16 @@ end
 
 def values_at_of(receiver, arguments)
   arguments.flat_map { |position| receiver.values_at(position) }
+end
+
+# What a block answered where its method reads it as true or false: the
+# answer, or the seed's refusal by the method's name as written (#485).
+# Handed on to the host, anything else was refused by the host's own
+# method, `select` where `filter` was written.
+def verdict_answer(step, name)
+  answer = block_answer(step, name)
+  return answer if answer == true || answer == false
+  panic("#{name}'s block must answer true or false, got #{render_inspect(answer, step.bindings)}")
 end
 
 # The bindings a program starts with once the core has run in them (ADR

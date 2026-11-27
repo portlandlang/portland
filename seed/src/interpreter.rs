@@ -5700,7 +5700,29 @@ impl<W: std::io::Write> Interpreter<W> {
             panic!("'{name}' takes no keyword arguments, got {label}:");
         }
         // `minmax` is `min` and `max` together (#104), each a maybe, and a
-        // comparator block goes to both.
+        // comparator block goes to both, refused by the name written (#485).
+        if let Some(block) = block
+            && name == "minmax"
+            && arguments.is_empty()
+            && matches!(receiver, Value::Array(_) | Value::Range { .. })
+        {
+            let elements: Vec<Value> = match &receiver {
+                Value::Array(elements) => elements.iter().cloned().collect(),
+                _ => range_elements(&receiver),
+            };
+            let low = match self.block_extreme(elements.clone(), block, name, false) {
+                Ok(best) => best,
+                Err(interrupted) => return interrupted,
+            };
+            let high = match self.block_extreme(elements, block, name, true) {
+                Ok(best) => best,
+                Err(interrupted) => return interrupted,
+            };
+            return Some(Value::array(vec![
+                low.map_or(Value::Nil, Value::present),
+                high.map_or(Value::Nil, Value::present),
+            ]));
+        }
         if name == "minmax"
             && arguments.is_empty()
             && matches!(receiver, Value::Array(_) | Value::Range { .. })
@@ -6791,7 +6813,9 @@ impl<W: std::io::Write> Interpreter<W> {
                         match verdict {
                             Some(Value::Boolean(true)) => kept.push(element),
                             Some(Value::Boolean(false)) => {}
-                            other => self.refuse_verdict("select", other),
+                            // By the name written (#485): one behavior,
+                            // many spellings (ADR 0036).
+                            other => self.refuse_verdict(name, other),
                         }
                     }
                     Some(Value::array(kept))
@@ -6848,7 +6872,7 @@ impl<W: std::io::Write> Interpreter<W> {
                         match verdict {
                             Some(Value::Boolean(true)) => return Some(Value::present(element)),
                             Some(Value::Boolean(false)) => {}
-                            other => self.refuse_verdict("find", other),
+                            other => self.refuse_verdict(name, other),
                         }
                     }
                     Some(Value::Nil)
@@ -6911,28 +6935,11 @@ impl<W: std::io::Write> Interpreter<W> {
                 // `min`/`max` by a comparator block (#99): the first of
                 // equals, and absent for an empty array, as without one.
                 (Value::Array(elements), "min" | "max", []) => {
-                    let mut best: Option<Value> = None;
-                    for element in elements.iter().cloned() {
-                        let replaces = match &best {
-                            None => true,
-                            Some(current) => {
-                                let ordering =
-                                    match self.block_ordering(block, &element, current, name) {
-                                        Ok(ordering) => ordering,
-                                        Err(interrupted) => return interrupted,
-                                    };
-                                if name == "max" {
-                                    ordering > 0
-                                } else {
-                                    ordering < 0
-                                }
-                            }
-                        };
-                        if replaces {
-                            best = Some(element);
-                        }
+                    let elements: Vec<Value> = elements.iter().cloned().collect();
+                    match self.block_extreme(elements, block, name, name == "max") {
+                        Ok(best) => Some(best.map_or(Value::Nil, Value::present)),
+                        Err(interrupted) => interrupted,
                     }
-                    Some(best.map_or(Value::Nil, Value::present))
                 }
                 // `min_by`/`max_by` (#99): the element whose block answer
                 // is least or greatest under `<=>`, the first of equals.
@@ -9033,6 +9040,33 @@ impl<W: std::io::Write> Interpreter<W> {
     /// integer compared with 0, as Ruby reads one, refused otherwise in ADR
     /// 0054's words for `<=>`. `Err` carries a `break` or `return` out, as
     /// `block_interrupt` hands it.
+    /// The least or the greatest of the elements by a comparator block
+    /// (#99), the first of equals, or none for no elements. `name` is the
+    /// method written, which a block answering other than an Integer is
+    /// refused by (#485). `Err` carries a `break` or `return` out.
+    fn block_extreme(
+        &mut self,
+        elements: Vec<Value>,
+        block: &Block,
+        name: &str,
+        greatest: bool,
+    ) -> Result<Option<Value>, Option<Value>> {
+        let mut best: Option<Value> = None;
+        for element in elements {
+            let replaces = match &best {
+                None => true,
+                Some(current) => {
+                    let ordering = self.block_ordering(block, &element, current, name)?;
+                    if greatest { ordering > 0 } else { ordering < 0 }
+                }
+            };
+            if replaces {
+                best = Some(element);
+            }
+        }
+        Ok(best)
+    }
+
     fn block_ordering(
         &mut self,
         block: &Block,
