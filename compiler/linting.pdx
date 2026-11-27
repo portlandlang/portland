@@ -28,6 +28,31 @@ struct LintFinding
   message
 end
 
+# The names a block takes, or none where a call is handed no block.
+def block_parameter_names(block)
+  case block
+  in BlockNode(parameters:) then parameters
+  else
+    []
+  end
+end
+
+# The names a node binds where it is written (#518): a local, a def's
+# parameters, or a block's. Each arm binds the fields it reads, so the
+# native build reads them off that struct, and not off every struct with
+# a field of the name.
+def bound_names(node)
+  case node
+  in AssignmentNode(name:) then [name]
+  in CallNode(block:) then block_parameter_names(block)
+  in DefNode(parameters:) then parameter_names(parameters)
+  in MethodCallNode(block:) then block_parameter_names(block)
+  in SafeMethodCallNode(block:) then block_parameter_names(block)
+  else
+    []
+  end
+end
+
 # Where a top-level statement falls in the order of a file (#509): its
 # place in KIND_NAMES.
 def kind_place(node)
@@ -115,12 +140,26 @@ def lint_parse(path, nodes)
   every_node(nodes).select { it in ErrorNode }.map { LintFinding.new(path: path, line: (it.line or 1), message: "this does not parse — #{it.message}") }
 end
 
+# A name of one character (#518): a local, a def's parameter, or a
+# block's, a throwaway among them — `character`, not `c`. A lone `_`
+# binds nothing (ADR 0080), so it is no name.
+def lint_short_names(path, nodes)
+  mutable findings = []
+  every_node(nodes).each do |node|
+    bound_names(node).each do |name|
+      next unless name.length == 1 && name != "_"
+      findings << LintFinding.new(path: path, line: (node.line or 1), message: "#{name} is a name of one character — name what it holds")
+    end
+  end
+  findings
+end
+
 # Every finding in one file's text.
 def lint_source(path, source)
   nodes = parse_program(lex(source))
   unparsed = lint_parse(path, nodes)
   return unparsed unless unparsed.empty?
-  lint_margins(path, source, nodes) + lint_order(path, nodes) + lint_method_order(path, nodes)
+  lint_margins(path, source, nodes) + lint_order(path, nodes) + lint_method_order(path, nodes) + lint_short_names(path, nodes)
 end
 
 # Whether a line at the margin is one that belongs there: empty, a comment,
@@ -135,3 +174,6 @@ def mentions?(node, name)
   return true if (node in IdentifierNode) && node.name == name
   children_of(node).any? { mentions?(it, name) }
 end
+
+# The names a def's parameters bind, by place and by name alike.
+def parameter_names(parameters) = parameters.map { |parameter| parameter.name }
