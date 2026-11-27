@@ -18,7 +18,7 @@ trait Enumerable
   def detect
     self.each do |element|
       found = yield(element)
-      panic("find's block must answer true or false, got #{inspect(found)}") unless found in Boolean
+      panic("detect's block must answer true or false, got #{inspect(found)}") unless found in Boolean
       return element if found
     end
     nil
@@ -30,7 +30,7 @@ trait Enumerable
     mutable gathered = []
     self.each do |element|
       kept = yield(element)
-      panic("select's block must answer true or false, got #{inspect(kept)}") unless kept in Boolean
+      panic("filter's block must answer true or false, got #{inspect(kept)}") unless kept in Boolean
       gathered << element if kept
     end
     gathered
@@ -53,7 +53,7 @@ trait Enumerable
     mutable gathered = []
     self.each do |element|
       kept = yield(element)
-      panic("select's block must answer true or false, got #{inspect(kept)}") unless kept in Boolean
+      panic("find_all's block must answer true or false, got #{inspect(kept)}") unless kept in Boolean
       gathered << element if kept
     end
     gathered

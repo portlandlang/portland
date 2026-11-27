@@ -5592,6 +5592,67 @@ fn reduce_without_a_start_refuses_on_both_oracles() {
     assert_both_oracles_refuse("reduce_without_a_start.pdx", None, &cases);
 }
 
+/// A block read as true or false refuses by the method's name as written
+/// (#485, ADR 0036), on both oracles: `filter` is not called `select` in
+/// its own refusal. And `index` is an array's alone, so a hash's and a
+/// range's refuse it by name, where the compiler walked them by
+/// `find_index`.
+#[test]
+fn a_verdict_block_refuses_by_the_name_written() {
+    let cases = [
+        (
+            "p([1, 2].index { 1 })\n",
+            "index's block must answer true or false, got 1",
+        ),
+        (
+            "p([1].filter { 1 })\n",
+            "filter's block must answer true or false, got 1",
+        ),
+        (
+            "p({ a: 1 }.filter { |key, value| 1 })\n",
+            "filter's block must answer true or false, got 1",
+        ),
+        (
+            "p([1].detect { 1 })\n",
+            "detect's block must answer true or false, got 1",
+        ),
+        (
+            "p({ a: 1 }.index { true })\n",
+            "undefined block-taking method index",
+        ),
+        (
+            "p((1..3).index { true })\n",
+            "undefined block-taking method index",
+        ),
+    ];
+    assert_both_oracles_refuse("verdict_by_name.pdx", None, &cases);
+}
+
+/// A comparison block that answers nothing refuses as answering nothing
+/// (#485), on both oracles: the compiler read the missing answer as nil.
+#[test]
+fn a_comparison_block_that_answers_nothing_says_so() {
+    let cases = [
+        (
+            "p([1, 2].sort { puts 0 })\n",
+            "'sort' block answers -1, 0, or 1, got nothing",
+        ),
+        (
+            "p([1, 2].min { puts 0 })\n",
+            "'min' block answers -1, 0, or 1, got nothing",
+        ),
+        (
+            "p([1, 2].max { puts 0 })\n",
+            "'max' block answers -1, 0, or 1, got nothing",
+        ),
+        (
+            "p([1, 2].minmax { puts 0 })\n",
+            "'minmax' block answers -1, 0, or 1, got nothing",
+        ),
+    ];
+    assert_both_oracles_refuse("comparison_nothing.pdx", None, &cases);
+}
+
 /// A comparator block's rebindings carry from one comparison to the next
 /// on both implementations, in Ruby's call order — the hosted evaluator
 /// had kept each inside its comparison — and `min`/`max` order arrays of
