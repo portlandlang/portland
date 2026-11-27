@@ -5591,6 +5591,25 @@ fn an_expression_that_produced_no_value_refuses_on_both_oracles() {
     assert_both_oracles_refuse("produced_no_value.pdx", None, &cases);
 }
 
+/// A method handed a block and asked of nil refuses as one without a
+/// block does (#592): by the method's name, with the way forward, on both
+/// oracles. It said only that the block method was undefined, naming no
+/// receiver.
+#[test]
+fn a_block_method_asked_of_nil_refuses_as_a_plain_one_does() {
+    let cases = [
+        (
+            "groups = [[\"a\"]]\ngroups[4].each do |word|\n  puts word\nend\n",
+            "nil has no method 'each' — handle the nil case first",
+        ),
+        (
+            "groups = [[\"a\"]]\np(groups[4].map { it })\n",
+            "nil has no method 'map' — handle the nil case first",
+        ),
+    ];
+    assert_both_oracles_refuse("block_method_of_nil.pdx", None, &cases);
+}
+
 /// A comparator block's rebindings carry from one comparison to the next
 /// on both implementations, in Ruby's call order — the hosted evaluator
 /// had kept each inside its comparison — and `min`/`max` order arrays of

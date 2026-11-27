@@ -1,0 +1,9 @@
+# A method handed a block and asked of nil refuses as one without a block
+# does (#592), natively as on the seed.
+groups = [["a"]]
+groups[0].each do |word|
+  puts word
+end
+groups[4].each do |word|
+  puts word
+end
