@@ -5566,6 +5566,31 @@ fn join_flattens_nested_arrays_and_refuses_nil() {
     assert_both_oracles_refuse("join_nil_refusal.pdx", None, &cases);
 }
 
+/// An expression read for a value it did not produce refuses on both
+/// oracles (#473, #624), named as the program wrote it: as an element, an
+/// argument, a receiver, an interpolation, and an operand. The compiler
+/// read the missing value as nil and ran on.
+#[test]
+fn an_expression_that_produced_no_value_refuses_on_both_oracles() {
+    let cases = [
+        ("list = [puts(1)]\n", "puts produced no value"),
+        ("p(puts(1))\n", "puts produced no value"),
+        ("x = \"#{puts(1)}\"\n", "puts produced no value"),
+        ("p(puts(1).length)\n", "puts produced no value"),
+        ("x = 1 + puts(1)\n", "puts produced no value"),
+        ("def show = puts(1)\np([show])\n", "show produced no value"),
+        (
+            "def go = yield\np([go { puts 1 }])\n",
+            "go produced no value",
+        ),
+        (
+            "def twice\n  1 + yield\nend\np(twice { puts 1 })\n",
+            "twice's block produced no value",
+        ),
+    ];
+    assert_both_oracles_refuse("produced_no_value.pdx", None, &cases);
+}
+
 /// A method handed a block and asked of nil refuses as one without a
 /// block does (#592): by the method's name, with the way forward, on both
 /// oracles. It said only that the block method was undefined, naming no

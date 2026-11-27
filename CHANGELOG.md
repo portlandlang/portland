@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Hosted, an expression that produced no value refuses as on the seed** ([#624](https://github.com/portlandlang/portland/issues/624)) — read as an element, an argument, a receiver, an interpolation, or an operand: `puts produced no value`, `show produced no value`, `twice's block produced no value`. The evaluator read the missing value as nil and ran on, so `p([show])` printed `[]` and `1 + yield` said `cannot apply '+' to 1 and nil`.
+
+- **The seed names an expression that produced no value as it was written** ([#473](https://github.com/portlandlang/portland/issues/473)) — `puts produced no value`, where it printed the expression in Rust's debug form (`Call { arguments: [Integer(1)], … } produced no value`). A call, a method, or a bare name is named; a `yield`, an `if`, or a `case` is named by its kind. The hosted evaluator runs on past such an expression ([#624](https://github.com/portlandlang/portland/issues/624)).
+
 - **The seed names an expression that produced no value as it was written** ([#473](https://github.com/portlandlang/portland/issues/473)) — `puts produced no value`, where it printed the expression in Rust's debug form (`Call { arguments: [Integer(1)], … } produced no value`). A call, a method, or a bare name is named; a `yield`, an `if`, or a `case` is named by its kind. The hosted evaluator runs on past such an expression ([#624](https://github.com/portlandlang/portland/issues/624)).
 
 - **A block method asked of nil refuses as a plain one does** ([#592](https://github.com/portlandlang/portland/issues/592)) — `nil has no method 'each' — handle the nil case first`, on the seed, hosted, and natively alike. With a block it said `undefined block-taking method each`, which names no receiver and gives no way forward, and the native build already said the plain sentence. Fixture: `block_method_of_nil.pdx`.
