@@ -7290,6 +7290,11 @@ impl<W: std::io::Write> Interpreter<W> {
                     refusal("arity");
                     panic!("'{name}' takes 1 to 2 arguments, got 0")
                 }
+                // Nil handed a block refuses as nil without one does
+                // (#592): by the method's name, with the way forward.
+                (Value::Nil, name, _) => {
+                    panic!("nil has no method '{name}' — handle the nil case first")
+                }
                 (receiver, name, _) => {
                     if let Some(survivor) = alias_survivor(name) {
                         refusal("alias");
