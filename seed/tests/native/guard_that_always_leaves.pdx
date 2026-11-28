@@ -1,0 +1,18 @@
+# A guard on what a def answers when it reads a struct the program never
+# makes always leaves, and what follows it is passed over (#635).
+struct Box
+  names
+end
+
+def lookup(table)
+  found = table["x"]
+  (found in Box) ? found.names : nil
+end
+
+def size(table)
+  listed = lookup(table)
+  return 0 if listed.nil?
+  listed.length
+end
+
+p(size({ "x" => 1 }))

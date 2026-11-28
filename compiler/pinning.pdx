@@ -147,6 +147,10 @@ struct PinnedDef
   # What a def that yields hands its block and reads back, as a
   # PinnedBlock, or nil for a def that does not yield.
   block
+  # Whether a combination that answers nothing hands back nil, a value,
+  # from every way out (#635), where one that ends in what produces no
+  # value hands back none, and a name bound to it refuses.
+  answers_nil
 
   def pinned? = reason.nil?
 end
@@ -180,7 +184,12 @@ def answer_candidates(body, parameters, answers, names)
   mutable walk = PinWalk.new(bindings: pairs_as_bindings(parameters), calls: [])
   mutable found = []
   mutable last = [NilType.new]
+  # What follows a statement that always leaves never runs (#635), and
+  # the last way out is that statement's.
+  mutable left = false
   body.each do |statement|
+    next if left
+    left = nil_guard?(statement) && settled_leaves?(statement, with_bindings(answers, walk.bindings))
     after = pin_statement(statement, walk, answers, names)
     scope = with_bindings(answers, loop_scope(statement, walk, after))
     found += return_types_in(statement, scope)
@@ -238,7 +247,11 @@ def body_answer(body, parameters, answers, names)
   mutable walk = PinWalk.new(bindings: pairs_as_bindings(parameters), calls: [])
   mutable early = []
   mutable last = NilType.new
+  # What follows a statement that always leaves never runs (#635).
+  mutable left = false
   body.each do |statement|
+    next if left
+    left = nil_guard?(statement) && settled_leaves?(statement, with_bindings(answers, walk.bindings))
     after = pin_statement(statement, walk, answers, names)
     scope = with_bindings(answers, loop_scope(statement, walk, after))
     early += return_types_in(statement, scope)
@@ -725,7 +738,7 @@ end
 # what it yields from its body, and then its answer.
 def pin_combination(definition, arguments, handed, leaves, answers, names, strict)
   key = combination_key(definition.name, arguments, handed, leaves)
-  unpinned = PinnedDef.new(name: definition.name, key: key, arguments: arguments, definition: definition, parameters: [], answer: UnknownType.new, reason: nil, block: nil)
+  unpinned = PinnedDef.new(name: definition.name, key: key, arguments: arguments, definition: definition, parameters: [], answer: UnknownType.new, reason: nil, block: nil, answers_nil: false)
   placed = arguments.reject { it in KeywordType }
   named = arguments.select { it in KeywordType }
   called = called_definition(definition, placed.length, named.map { it.label })
@@ -751,7 +764,7 @@ def pin_combination(definition, arguments, handed, leaves, answers, names, stric
   borrowed = empty_literal?(solved) ? answered_array(definition.name, answers, solved) : nil
   answer = solved == NilType.new ? NOTHING : (borrowed or solved)
   reason = concrete?(answer) ? nil : "its answer is #{render_type(answer)}"
-  PinnedDef.new(name: definition.name, key: key, arguments: arguments, definition: called, parameters: parameters, answer: answer, reason: reason, block: block)
+  PinnedDef.new(name: definition.name, key: key, arguments: arguments, definition: called, parameters: parameters, answer: answer, reason: reason, block: block, answers_nil: solved == NilType.new)
 end
 
 # Every combination the calls gathered name, the defs in written order
@@ -910,7 +923,7 @@ def pin_program(written, core: nil, progress: nil)
     combinations = pinned.select { it.name == definition.name }
     if combinations.empty? && own.include?(definition)
       reason = walk.calls.any? { it[0] == definition.name } ? "it is called with a value whose type is not known" : "nothing calls it"
-      listed << PinnedDef.new(name: definition.name, key: nil, arguments: [], definition: definition, parameters: [], answer: UnknownType.new, reason: reason, block: nil)
+      listed << PinnedDef.new(name: definition.name, key: nil, arguments: [], definition: definition, parameters: [], answer: UnknownType.new, reason: reason, block: nil, answers_nil: false)
     else
       listed += combinations
     end
@@ -974,7 +987,11 @@ end
 
 def pin_statements(statements, walk, answers, names)
   mutable current = walk
+  # What follows a statement that always leaves never runs (#635).
+  mutable left = false
   statements.each do |statement|
+    next if left
+    left = nil_guard?(statement) && settled_leaves?(statement, with_bindings(answers, current.bindings))
     current = pin_statement(statement, current, answers, names)
   end
   current
