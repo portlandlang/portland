@@ -225,6 +225,17 @@ def alias_survivor(name)
   end
 end
 
+# Whether a test is `nil?` asked of a name that holds only nil (#635):
+# one bound to what a def that answers nothing hands back, as a def that
+# reads a struct the program never makes does.
+def always_nil?(test, types)
+  return false unless (test in MethodCallNode) && test.name == "nil?" && test.arguments.empty? && test.block.nil?
+  subject = test.receiver
+  return false unless subject in IdentifierNode
+  held = synthesize_name(subject.name, types)
+  held == NOTHING || held == NilType.new
+end
+
 # — return annotations (ADR 0041) —
 #
 # The written annotation for a def, if its signature carries one: the
@@ -1190,6 +1201,7 @@ end
 # One Hash from name to type as bindings of one layer (#607).
 def layer_of(names) = Bindings.new(near: names, far: nil)
 
+
 # A type the library's table writes, as it is for the value asked (#560):
 # `element` is what the array asked holds, and `self` the array itself.
 def library_type(written, receiver)
@@ -1409,6 +1421,17 @@ def nil_comparison_name(left, right)
   return left.name if (left in IdentifierNode) && (right in NilNode)
   return right.name if (right in IdentifierNode) && (left in NilNode)
   nil
+end
+
+# Whether a statement is a guard written to leave where a name is nil
+# (#635): `return value if name.nil?`, an `if` of `nil?` of a name whose
+# one arm ends in a way out. Told without a scope.
+def nil_guard?(statement)
+  return false unless statement in IfNode
+  arm = statement.then_body or []
+  return false if arm.empty? || !exit?(arm.last) || !(statement.else_body or []).empty?
+  test = statement.condition
+  (test in MethodCallNode) && test.name == "nil?" && (test.receiver in IdentifierNode)
 end
 
 # Bindings of no name (#607): where a walk starts, and what a condition
@@ -1759,6 +1782,8 @@ end
 # over.
 def settled_arm(node, types)
   test = node.condition
+  # `nil?` of a name that holds only nil is true (#635).
+  return (node.then_body or []) if always_nil?(test, types)
   return nil unless test in MatchTestNode
   # The subject and the pattern as locals, so what an `in` test proves of
   # each holds below it (#607).
@@ -1774,6 +1799,14 @@ def settled_arm(node, types)
   return nil unless (held in StructType) && held != ANY_STRUCT
   held.name == pattern.name ? (node.then_body or []) : (node.else_body or [])
 end
+
+# Whether a statement always leaves as the native build runs it (#635):
+# a guard that leaves where a name is nil, of a name that holds only nil.
+# What follows it never runs, and is passed over. An `in` test of a
+# struct never made settles too (#572), but whether a struct is made is
+# not among what a walk records reading, so a body passed over for it
+# would not be walked again once the struct is made.
+def settled_leaves?(statement, types) = nil_guard?(statement) && always_nil?(statement.condition, types)
 
 # Whether a body ends in `panic` as the native build runs it (#607): by
 # its own last statement, or by an `if` there that settles to an arm that

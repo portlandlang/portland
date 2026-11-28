@@ -644,10 +644,17 @@ def lower_body(body, owner, what, bindings, answer, context)
     lowered = lower_statements(body, bindings, context)
     return Lowered.new(nodes: lowered.nodes + [IntermediateReturn.new(value: nil)], bindings: lowered.bindings)
   end
-  leading = body.slice(0, body.length - 1)
-  last = body.last
-  refuse_native("#{what} with an empty body", owner) if last.nil?
-  lowered = lower_statements(leading, bindings, context)
+  refuse_native("#{what} with an empty body", owner) if body.empty?
+  # What follows a statement that always leaves never runs (#635), so
+  # that statement is the body's last.
+  mutable lowered = Lowered.new(nodes: [], bindings: bindings)
+  mutable index = 0
+  while index < body.length - 1 && !(nil_guard?(body[index]) && settled_leaves?(body[index], with_bindings(context.answers, lowered.bindings)))
+    step = lower_statement(body[index], lowered.bindings, context)
+    lowered = Lowered.new(nodes: lowered.nodes + step.nodes, bindings: step.bindings)
+    index += 1
+  end
+  last = body[index]
   # A `return` or a `panic` is the way out itself.
   if (last in ReturnNode) || ((last in CallNode) && last.name == "panic")
     closing = lower_statement(last, lowered.bindings, context)
@@ -899,6 +906,15 @@ def lower_statement(statement, bindings, context)
     # name is bound in each arm to what the arm ends in (#572).
     chosen = (case_as_if(value) or value)
     return lower_statement(bound_in_arms(statement, chosen), bindings, context) if arms_are_bodies?(chosen)
+    # Bound first to a call that answers nothing, the name holds only nil
+    # (#635): the call is made for what it does, and the name, given no
+    # place of its own, is nil wherever it is read.
+    # One that ends in what produces no value hands back none, and
+    # refuses below as the seed does.
+    if (value in CallNode) && binding_type(bindings, name).nil? && synthesize(value, with_bindings(context.answers, bindings)) == NOTHING
+      made = lower_statement(value, bindings, context)
+      return Lowered.new(nodes: made.nodes, bindings: with_bound(made.bindings, name, NilType.new)) if nil_answered?(made, context)
+    end
     lowered = settled_empty(lower_value(value, bindings, context.with(root: "value")), name, bindings, context)
     found = binding_type(bindings, name)
     # A local that holds a maybe takes a plain value as a maybe that is
@@ -1002,7 +1018,12 @@ end
 def lower_statements(statements, bindings, context)
   mutable nodes = []
   mutable current = bindings
+  # What follows a statement that always leaves never runs (#635), and
+  # is not built.
+  mutable left = false
   statements.each do |statement|
+    next if left
+    left = nil_guard?(statement) && settled_leaves?(statement, with_bindings(context.answers, current))
     lowered = lower_statement(statement, current, context)
     nodes += lowered.nodes
     current = lowered.bindings
@@ -1487,6 +1508,17 @@ def native_value?(type)
   # An array of Hashes is unbuilt (#607): the runtime has no kind of
   # element for one.
   (type in ArrayType) && !(type.element in HashType) && native_value?(type.element)
+end
+
+# Whether a call made for what it does names a combination that hands
+# back nil from every way out (#635), as pinning settled it.
+def nil_answered?(made, context)
+  evaluated = made.nodes.last
+  return false unless evaluated in IntermediateEvaluate
+  called = evaluated.value
+  return false unless called in IntermediateCall
+  found = context.combinations.find { it.key == called.target }
+  found.some? && found.answers_nil
 end
 
 # A value with a maybe opened for a method of this name.
